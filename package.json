@@ -1,0 +1,24 @@
+{
+  "name": "better-mdx",
+  "version": "0.1.0",
+  "description": "Hybrid TypeScript + Markdown Framework",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/cli.ts",
+    "build": "bun build src/cli.ts --outdir dist --target node",
+    "test": "bun test",
+    "compile": "bun run src/cli.ts compile"
+  },
+  "keywords": ["mdx", "typescript", "markdown", "compiler", "framework"],
+  "author": "Better-MDX Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "commander": "^11.0.0",
+    "marked": "^12.0.0"
+  }
+}
