@@ -1,0 +1,129 @@
+{
+  "Better-MDX Function Template": {
+    "prefix": "mdx-function",
+    "body": [
+      "import { $1 } from '$2';",
+      "",
+      "function $3() {",
+      "  const $4 = '$5';",
+      "  const $6 = $7;",
+      "",
+      "  return (",
+      "    # $8",
+      "",
+      "    $9",
+      "  )",
+      "}"
+    ],
+    "description": "Create a basic Better-MDX function template"
+  },
+  "Better-MDX with Conditional": {
+    "prefix": "mdx-conditional",
+    "body": [
+      "import { $1 } from '$2';",
+      "",
+      "function $3() {",
+      "  const $4 = $5;",
+      "",
+      "  return (",
+      "    # $6",
+      "",
+      "    {$4 && (",
+      "      $7",
+      "    )}",
+      "",
+      "    {!$4 && (",
+      "      $8",
+      "    )}",
+      "  )",
+      "}"
+    ],
+    "description": "Create Better-MDX function with conditional rendering"
+  },
+  "Better-MDX Interpolation": {
+    "prefix": "mdx-interpolation",
+    "body": [
+      "{{ $1 }}"
+    ],
+    "description": "Insert template interpolation"
+  },
+  "Better-MDX Conditional Block": {
+    "prefix": "mdx-condition",
+    "body": [
+      "{$1 && (",
+      "  $2",
+      ")}"
+    ],
+    "description": "Insert conditional rendering block"
+  },
+  "Better-MDX Component Import": {
+    "prefix": "mdx-import",
+    "body": [
+      "import { $1 } from '$2';"
+    ],
+    "description": "Import React component for MDX"
+  },
+  "Better-MDX Hook Usage": {
+    "prefix": "mdx-hook",
+    "body": [
+      "const { $1 } = $2();"
+    ],
+    "description": "Use React hook in MDX"
+  },
+  "Better-MDX List Rendering": {
+    "prefix": "mdx-list",
+    "body": [
+      "{{ $1.map(($2, index) => `- ${$2.$3}`).join('\\n') }}"
+    ],
+    "description": "Render array as markdown list"
+  },
+  "Better-MDX Component with Props": {
+    "prefix": "mdx-component",
+    "body": [
+      "<$1 $2={$3}>",
+      "  $4",
+      "</$1>"
+    ],
+    "description": "Insert React component with props"
+  },
+  "Better-MDX Self-Closing Component": {
+    "prefix": "mdx-self-closing",
+    "body": [
+      "<$1 $2={$3} />"
+    ],
+    "description": "Insert self-closing React component"
+  },
+  "Better-MDX Full Example": {
+    "prefix": "mdx-example",
+    "body": [
+      "import { Button } from './components/Button';",
+      "import { useAuth } from './hooks/useAuth';",
+      "",
+      "function $1() {",
+      "  const { user, isLoggedIn } = useAuth();",
+      "  const title = '$2';",
+      "  const items = [$3];",
+      "",
+      "  return (",
+      "    # {{ title }}",
+      "",
+      "    {isLoggedIn && (",
+      "      Welcome back, {{ user.name }}!",
+      "    )}",
+      "",
+      "    {!isLoggedIn && (",
+      "      Please log in to continue.",
+      "    )}",
+      "",
+      "    ## Items",
+      "    {{ items.map(item => `- ${item}`).join('\\n') }}",
+      "",
+      "    <Button onClick={() => alert('Hello!')}>",
+      "      Click me",
+      "    </Button>",
+      "  )",
+      "}"
+    ],
+    "description": "Complete Better-MDX example with authentication and components"
+  }
+}

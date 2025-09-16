@@ -1,0 +1,9 @@
+function OptionalPropsExample({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    # {{ title }}
+
+    {subtitle !== undefined && (
+      ## {{ subtitle }}
+    )}
+  )
+}

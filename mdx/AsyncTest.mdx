@@ -1,0 +1,17 @@
+async function AsyncTest() {
+    // Simple async operation that doesn't require external functions
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    const message = "Hello from async function!";
+    const timestamp = new Date().toISOString();
+
+    return (
+        # Async Test Example
+
+        {{ message }}
+
+        **Generated at:** {{ timestamp }}
+
+        This content was rendered by an async function! 🎉
+    )
+}

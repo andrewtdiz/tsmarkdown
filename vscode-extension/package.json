@@ -1,0 +1,138 @@
+{
+  "name": "better-mdx",
+  "displayName": "Better-MDX",
+  "description": "Syntax highlighting and language support for Better-MDX files",
+  "version": "1.0.0",
+  "publisher": "better-mdx",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Syntax Highlighters",
+    "Snippets"
+  ],
+  "keywords": [
+    "mdx",
+    "better-mdx",
+    "markdown",
+    "typescript",
+    "react",
+    "template"
+  ],
+  "activationEvents": [
+    "onLanguage:better-mdx"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "better-mdx",
+        "aliases": [
+          "Better-MDX",
+          "better-mdx"
+        ],
+        "extensions": [
+          ".mdx"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/better-mdx-light.svg",
+          "dark": "./icons/better-mdx-dark.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "better-mdx",
+        "scopeName": "text.html.markdown.mdx.better",
+        "path": "./syntaxes/better-mdx.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "better-mdx",
+        "path": "./snippets/better-mdx.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "better-mdx.compile",
+        "title": "Compile MDX File",
+        "category": "Better-MDX"
+      },
+      {
+        "command": "better-mdx.execute",
+        "title": "Execute MDX Template",
+        "category": "Better-MDX"
+      },
+      {
+        "command": "better-mdx.preview",
+        "title": "Preview MDX Output",
+        "category": "Better-MDX"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "resourceExtname == .mdx",
+          "command": "better-mdx.compile",
+          "group": "better-mdx"
+        },
+        {
+          "when": "resourceExtname == .mdx",
+          "command": "better-mdx.execute",
+          "group": "better-mdx"
+        },
+        {
+          "when": "resourceExtname == .mdx",
+          "command": "better-mdx.preview",
+          "group": "better-mdx"
+        }
+      ],
+      "explorer/context": [
+        {
+          "when": "resourceExtname == .mdx",
+          "command": "better-mdx.compile",
+          "group": "better-mdx"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Better-MDX",
+      "properties": {
+        "better-mdx.compiler.outputDirectory": {
+          "type": "string",
+          "default": "./dist",
+          "description": "Output directory for compiled MDX files"
+        },
+        "better-mdx.preview.port": {
+          "type": "number",
+          "default": 3000,
+          "description": "Port for preview server"
+        },
+        "better-mdx.syntax.enableInterpolationHighlighting": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable syntax highlighting for {{ }} interpolations"
+        },
+        "better-mdx.syntax.enableConditionalHighlighting": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable syntax highlighting for conditional blocks"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {}
+}

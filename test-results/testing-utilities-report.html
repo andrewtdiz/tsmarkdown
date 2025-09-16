@@ -1,0 +1,544 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Better-MDX Test Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .passed { color: #28a745; }
+        .failed { color: #dc3545; }
+        .test-results {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-item {
+            padding: 16px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .test-item:last-child {
+            border-bottom: none;
+        }
+        .test-name {
+            font-weight: 500;
+        }
+        .test-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-passed {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .duration {
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .error-details {
+            color: #dc3545;
+            font-size: 14px;
+            margin-top: 8px;
+            font-family: monospace;
+            background: #f8d7da;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .collapsible {
+            cursor: pointer;
+            user-select: none;
+        }
+        .details {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow: auto;
+        }
+        .details.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Better-MDX Test Report</h1>
+        <p>Generated on 9/15/2025, 7:08:33 PM</p>
+    </div>
+
+    <div class="summary">
+        <div class="stat-card">
+            <div class="stat-value">6</div>
+            <div>Total Tests</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value passed">4</div>
+            <div>Passed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value failed">2</div>
+            <div>Failed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">2ms</div>
+            <div>Total Time</div>
+        </div>
+    </div>
+
+    <div class="test-results">
+        
+        <div class="test-item">
+            <div>
+                <div class="test-name collapsible" onclick="toggleDetails(0)">Simple Interpolation</div>
+                
+                <div class="details" id="details-0">
+                    <strong>Details:</strong><br>
+                    <pre>{
+  "parsed": {
+    "imports": [],
+    "functionName": "Welcome",
+    "functionParams": [],
+    "typescript": "const name = \"Better-MDX\";",
+    "markdown": "# Hello __INTERPOLATION_0__!",
+    "interpolations": [
+      {
+        "placeholder": "__INTERPOLATION_0__",
+        "expression": "name"
+      }
+    ],
+    "conditionalBlocks": [],
+    "jsxExpressions": []
+  },
+  "compiled": {
+    "id": "Welcome",
+    "typescript": "const name = \"Better-MDX\";",
+    "template": "# Hello __INTERPOLATION_0__!",
+    "dependencies": [],
+    "functionParams": [],
+    "interpolations": [
+      {
+        "placeholder": "__INTERPOLATION_0__",
+        "expression": "name"
+      }
+    ],
+    "conditionalBlocks": [],
+    "jsxExpressions": [],
+    "metadata": {
+      "functionName": "Welcome",
+      "lastModified": "2025-09-16T02:08:33.590Z"
+    }
+  },
+  "executed": {
+    "content": "# Hello Better-MDX!",
+    "errors": []
+  },
+  "rendered": {
+    "html": "<p><h1>Hello Better-MDX!</h1></p>",
+    "metadata": {
+      "title": "Hello Better-MDX!"
+    },
+    "errors": []
+  }
+}</pre>
+                </div>
+            </div>
+            <div class="test-status">
+                <span class="duration">1ms</span>
+                <span class="status-badge status-passed">
+                    PASSED
+                </span>
+            </div>
+        </div>
+        
+        <div class="test-item">
+            <div>
+                <div class="test-name collapsible" onclick="toggleDetails(1)">Conditional Rendering</div>
+                
+                <div class="details" id="details-1">
+                    <strong>Details:</strong><br>
+                    <pre>{
+  "parsed": {
+    "imports": [],
+    "functionName": "StatusMessage",
+    "functionParams": [],
+    "typescript": "const isOnline = true;",
+    "markdown": "# Status\n__CONDITIONAL_0__\n__CONDITIONAL_1__",
+    "interpolations": [],
+    "conditionalBlocks": [
+      {
+        "condition": "isOnline",
+        "content": "✅ System is online"
+      },
+      {
+        "condition": "!isOnline",
+        "content": "❌ System is offline"
+      }
+    ],
+    "jsxExpressions": []
+  },
+  "compiled": {
+    "id": "StatusMessage",
+    "typescript": "const isOnline = true;",
+    "template": "# Status\n__CONDITIONAL_0__\n__CONDITIONAL_1__",
+    "dependencies": [],
+    "functionParams": [],
+    "interpolations": [],
+    "conditionalBlocks": [
+      {
+        "condition": "isOnline",
+        "content": "✅ System is online"
+      },
+      {
+        "condition": "!isOnline",
+        "content": "❌ System is offline"
+      }
+    ],
+    "jsxExpressions": [],
+    "metadata": {
+      "functionName": "StatusMessage",
+      "lastModified": "2025-09-16T02:08:33.591Z"
+    }
+  },
+  "executed": {
+    "content": "# Status\n✅ System is online",
+    "errors": []
+  },
+  "rendered": {
+    "html": "<p><h1>Status</h1><br>✅ System is online</p>",
+    "metadata": {
+      "title": "Status",
+      "description": "✅ System is online"
+    },
+    "errors": []
+  }
+}</pre>
+                </div>
+            </div>
+            <div class="test-status">
+                <span class="duration">0ms</span>
+                <span class="status-badge status-passed">
+                    PASSED
+                </span>
+            </div>
+        </div>
+        
+        <div class="test-item">
+            <div>
+                <div class="test-name collapsible" onclick="toggleDetails(2)">Props Support</div>
+                <div class="error-details">Expected content to contain: "Welcome Alice!"</div>
+                <div class="details" id="details-2">
+                    <strong>Details:</strong><br>
+                    <pre>{
+  "parsed": {
+    "imports": [],
+    "functionName": "UserCard",
+    "functionParams": [
+      "user"
+    ],
+    "typescript": "",
+    "markdown": "# Welcome __INTERPOLATION_0__!\n**Role:** __INTERPOLATION_1__",
+    "interpolations": [
+      {
+        "placeholder": "__INTERPOLATION_0__",
+        "expression": "user.name"
+      },
+      {
+        "placeholder": "__INTERPOLATION_1__",
+        "expression": "user.role"
+      }
+    ],
+    "conditionalBlocks": [],
+    "jsxExpressions": []
+  },
+  "compiled": {
+    "id": "UserCard",
+    "typescript": "",
+    "template": "# Welcome __INTERPOLATION_0__!\n**Role:** __INTERPOLATION_1__",
+    "dependencies": [],
+    "functionParams": [
+      "user"
+    ],
+    "interpolations": [
+      {
+        "placeholder": "__INTERPOLATION_0__",
+        "expression": "user.name"
+      },
+      {
+        "placeholder": "__INTERPOLATION_1__",
+        "expression": "user.role"
+      }
+    ],
+    "conditionalBlocks": [],
+    "jsxExpressions": [],
+    "metadata": {
+      "functionName": "UserCard",
+      "lastModified": "2025-09-16T02:08:33.592Z"
+    }
+  },
+  "executed": {
+    "content": "# Welcome !\n**Role:**",
+    "errors": [
+      "Interpolation error in \"user.name\": Error: Expression evaluation failed: ReferenceError: user is not defined",
+      "Interpolation error in \"user.role\": Error: Expression evaluation failed: ReferenceError: user is not defined"
+    ]
+  },
+  "rendered": {
+    "html": "<p><h1>Welcome !</h1><br><strong>Role:</strong></p>",
+    "metadata": {
+      "title": "Welcome !",
+      "description": "**Role:**"
+    },
+    "errors": [
+      "Interpolation error in \"user.name\": Error: Expression evaluation failed: ReferenceError: user is not defined",
+      "Interpolation error in \"user.role\": Error: Expression evaluation failed: ReferenceError: user is not defined"
+    ]
+  }
+}</pre>
+                </div>
+            </div>
+            <div class="test-status">
+                <span class="duration">1ms</span>
+                <span class="status-badge status-failed">
+                    FAILED
+                </span>
+            </div>
+        </div>
+        
+        <div class="test-item">
+            <div>
+                <div class="test-name collapsible" onclick="toggleDetails(3)">Array Processing</div>
+                
+                <div class="details" id="details-3">
+                    <strong>Details:</strong><br>
+                    <pre>{
+  "parsed": {
+    "imports": [],
+    "functionName": "TechList",
+    "functionParams": [],
+    "typescript": "const technologies = [\"React\", \"TypeScript\", \"Node.js\"];",
+    "markdown": "# Tech Stack\n__INTERPOLATION_0__",
+    "interpolations": [
+      {
+        "placeholder": "__INTERPOLATION_0__",
+        "expression": "technologies.map(tech => \"- \" + tech).join(\"\\n\")"
+      }
+    ],
+    "conditionalBlocks": [],
+    "jsxExpressions": []
+  },
+  "compiled": {
+    "id": "TechList",
+    "typescript": "const technologies = [\"React\", \"TypeScript\", \"Node.js\"];",
+    "template": "# Tech Stack\n__INTERPOLATION_0__",
+    "dependencies": [],
+    "functionParams": [],
+    "interpolations": [
+      {
+        "placeholder": "__INTERPOLATION_0__",
+        "expression": "technologies.map(tech => \"- \" + tech).join(\"\\n\")"
+      }
+    ],
+    "conditionalBlocks": [],
+    "jsxExpressions": [],
+    "metadata": {
+      "functionName": "TechList",
+      "lastModified": "2025-09-16T02:08:33.592Z"
+    }
+  },
+  "executed": {
+    "content": "# Tech Stack\n- React\n- TypeScript\n- Node.js",
+    "errors": []
+  },
+  "rendered": {
+    "html": "<p><h1>Tech Stack</h1><br>- React<br>- TypeScript<br>- Node.js</p>",
+    "metadata": {
+      "title": "Tech Stack",
+      "description": "- React"
+    },
+    "errors": []
+  }
+}</pre>
+                </div>
+            </div>
+            <div class="test-status">
+                <span class="duration">0ms</span>
+                <span class="status-badge status-passed">
+                    PASSED
+                </span>
+            </div>
+        </div>
+        
+        <div class="test-item">
+            <div>
+                <div class="test-name collapsible" onclick="toggleDetails(4)">Error Handling - Invalid Syntax</div>
+                <div class="error-details">Error count mismatch. Expected: 1, Got: 0</div>
+                <div class="details" id="details-4">
+                    <strong>Details:</strong><br>
+                    <pre>{
+  "parsed": {
+    "imports": [],
+    "functionName": "BrokenComponent",
+    "functionParams": [],
+    "typescript": "const data = \"test\";",
+    "markdown": "# Test {{ unclosedBrace",
+    "interpolations": [],
+    "conditionalBlocks": [],
+    "jsxExpressions": []
+  },
+  "compiled": {
+    "id": "BrokenComponent",
+    "typescript": "const data = \"test\";",
+    "template": "# Test {{ unclosedBrace",
+    "dependencies": [],
+    "functionParams": [],
+    "interpolations": [],
+    "conditionalBlocks": [],
+    "jsxExpressions": [],
+    "metadata": {
+      "functionName": "BrokenComponent",
+      "lastModified": "2025-09-16T02:08:33.592Z"
+    }
+  },
+  "executed": {
+    "content": "# Test {{ unclosedBrace",
+    "errors": []
+  },
+  "rendered": {
+    "html": "<p><h1>Test {{ unclosedBrace</h1></p>",
+    "metadata": {
+      "title": "Test {{ unclosedBrace"
+    },
+    "errors": []
+  }
+}</pre>
+                </div>
+            </div>
+            <div class="test-status">
+                <span class="duration">0ms</span>
+                <span class="status-badge status-failed">
+                    FAILED
+                </span>
+            </div>
+        </div>
+        
+        <div class="test-item">
+            <div>
+                <div class="test-name collapsible" onclick="toggleDetails(5)">Component Import (Mock)</div>
+                
+                <div class="details" id="details-5">
+                    <strong>Details:</strong><br>
+                    <pre>{
+  "parsed": {
+    "imports": [
+      "import { Button } from \"./components/Button\";"
+    ],
+    "functionName": "App",
+    "functionParams": [],
+    "typescript": "",
+    "markdown": "# My App\nClick the button below:\n<Button>Click me!</Button>",
+    "interpolations": [],
+    "conditionalBlocks": [],
+    "jsxExpressions": []
+  },
+  "compiled": {
+    "id": "App",
+    "typescript": "import { Button } from \"./components/Button\";",
+    "template": "# My App\nClick the button below:\n<Button>Click me!</Button>",
+    "dependencies": [
+      "Button"
+    ],
+    "functionParams": [],
+    "interpolations": [],
+    "conditionalBlocks": [],
+    "jsxExpressions": [],
+    "metadata": {
+      "functionName": "App",
+      "lastModified": "2025-09-16T02:08:33.592Z"
+    }
+  },
+  "executed": {
+    "content": "# My App\nClick the button below:\n<Button>Click me!</Button>",
+    "errors": []
+  },
+  "rendered": {
+    "html": "<p><h1>My App</h1><br>Click the button below:<br><Button>Click me!</Button></p>",
+    "metadata": {
+      "title": "My App",
+      "description": "Click the button below:"
+    },
+    "errors": []
+  }
+}</pre>
+                </div>
+            </div>
+            <div class="test-status">
+                <span class="duration">0ms</span>
+                <span class="status-badge status-passed">
+                    PASSED
+                </span>
+            </div>
+        </div>
+        
+    </div>
+
+    <script>
+        function toggleDetails(index) {
+            const details = document.getElementById('details-' + index);
+            details.classList.toggle('show');
+        }
+    </script>
+</body>
+</html>
+    

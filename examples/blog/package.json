@@ -1,0 +1,31 @@
+{
+  "name": "better-mdx-blog-example",
+  "version": "1.0.0",
+  "description": "A complete blog example using Better-MDX",
+  "main": "index.js",
+  "scripts": {
+    "dev": "better-mdx dev --port 3000",
+    "build": "better-mdx build",
+    "serve": "better-mdx serve --port 8080",
+    "test": "better-mdx-test run",
+    "test:watch": "better-mdx-test watch",
+    "compile": "better-mdx compile",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "mdx",
+    "better-mdx",
+    "blog",
+    "example"
+  ],
+  "dependencies": {
+    "better-mdx": "^1.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.0.0"
+  }
+}

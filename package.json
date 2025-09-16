@@ -18,7 +18,9 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@types/react": "^19.1.13",
     "commander": "^11.0.0",
-    "marked": "^12.0.0"
+    "marked": "^12.0.0",
+    "react": "^19.1.1"
   }
 }

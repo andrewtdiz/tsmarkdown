@@ -7,15 +7,16 @@ function ExampleComponent() {
     const now = Date.now()
 
     return (
-    # Home
-    Welcome, {{ name }}!
-    Current time: {{ new Date(now).toLocaleString() }}
+        # Home
+        Welcome, {{ name }}!
+        Current time: {{ new Date(now).toLocaleString() }}
 
-    ## Available routes:
-    <RoutesList />
+        ## Available routes:
+        <RoutesList />
 
-    {user?.notifications?.length > 0 && (
-    ### Your Stats
-    You have {{ user.notifications.length || 0 }} notifications.
-    )}
+        {user?.notifications?.length > 0 && (
+            ### Your Stats
+            You have {{ user.notifications.length || 0 }} notifications.
+        )}
+    )
 }

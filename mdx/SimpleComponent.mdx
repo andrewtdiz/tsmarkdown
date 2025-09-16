@@ -1,13 +1,24 @@
 import RoutesList from "./RoutesList"
-import { useUserInfo } from "./hooks/useUserInfo"
 
-function ExampleComponent() {
-    const { user } = useUserInfo();
+async function ExampleComponent() {
+    // Simulate async user data fetching (self-contained)
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    // Mock user data - in real app this would be fetched from API/auth service
+    const user = {
+        id: 1,
+        name: "John Doe",
+        email: "john@example.com"
+    };
+
     const name = user?.name || 'Guest';
-    const now = Date.now()
+    const now = Date.now();
 
     return (
-    # Home
-    Welcome, {{ name }}!
-    Current time: {{ new Date(now).toLocaleString() }}
+        # Home
+        Welcome, {{ name }}!
+        Current time: {{ new Date(now).toLocaleString() }}
+
+        **User Info:** {{ user.email }}
+    )
 }

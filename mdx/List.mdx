@@ -1,0 +1,13 @@
+import OlItem from './OlItem'
+import UlItem from './UlItem'
+
+interface ListProps {
+  items: string[];
+  ordered?: boolean;
+}
+
+function List({ items, ordered = false }: ListProps) {
+  return (
+    {{ items.map((item, index) => ordered ? <OlItem item={item} index={index} /> : <UlItem item={item} /> )}}
+  )
+}
