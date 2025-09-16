@@ -4,25 +4,24 @@ function SimpleDemo() {
   const version = '1.0.0';
   const isProduction = true;
   const features = ['Template Interpolation', 'Conditional Rendering', 'React Integration'];
+  const mode = isProduction ? 'production' : 'development'
 
   return (
     # {{ greeting }} {{ name }}! 🚀
 
     Welcome to **{{ name }}** version {{ version }}.
 
-    {isProduction && (
+    {isProduction ? (
       ## Production Ready Features ✅
       This framework includes powerful features for modern development.
-    )}
-
-    {!isProduction && (
+    ) : (
       ## Development Version 🚧
       This is a development build with debugging enabled.
     )}
 
     ## Key Features
     - Dynamic content with **{{ greeting }}** interpolation
-    - Smart conditional blocks based on {{ isProduction ? 'production' : 'development' }} mode
+    - Smart conditional blocks based on {{ mode }} mode
     - Seamless React component integration
 
     ---

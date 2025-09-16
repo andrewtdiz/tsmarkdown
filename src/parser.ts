@@ -19,6 +19,7 @@ export class MDXParser {
     const interpolations: Array<{ placeholder: string; expression: string }> =
       [];
     const conditionalBlocks: Array<{ condition: string; content: string }> = [];
+    const ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
     const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
 
     let functionName = "";
@@ -90,11 +91,12 @@ export class MDXParser {
       }
     }
 
-    // Second pass: process markdown for interpolations, conditionals, and JSX expressions
+    // Second pass: process markdown for interpolations, conditionals, ternary expressions, and JSX expressions
     markdown = this.processTemplateContent(
       this.normalizeIndentation(markdown).trim(),
       interpolations,
       conditionalBlocks,
+      ternaryExpressions,
       jsxExpressions,
     );
 
@@ -109,6 +111,7 @@ export class MDXParser {
       markdown,
       interpolations,
       conditionalBlocks,
+      ternaryExpressions,
       jsxExpressions,
       propsInterface,
       parameterTypes,
@@ -123,14 +126,14 @@ export class MDXParser {
     if (destructuredMatch) {
       const destructuredParams = destructuredMatch[1]
         .split(',')
-        .map(p => p.trim().split(':')[0].trim()) // Remove type annotations for parameter names
+        .map(p => p.trim().split(':')[0].trim().split('=')[0].trim()) // Remove type annotations and default values
         .filter(p => p.length > 0);
       parameters.push(...destructuredParams);
     } else {
       // Handle regular parameters
       const regularParams = params
         .split(',')
-        .map(p => p.trim().split(':')[0].trim()) // Remove type annotations
+        .map(p => p.trim().split(':')[0].trim().split('=')[0].trim()) // Remove type annotations and default values
         .filter(p => p.length > 0);
       parameters.push(...regularParams);
     }
@@ -169,7 +172,8 @@ export class MDXParser {
       for (const prop of properties) {
         // In destructuring, there shouldn't be type annotations in the parameter names
         const isOptional = prop.includes('?');
-        const cleanName = prop.replace('?', '').trim();
+        const hasDefaultValue = prop.includes('=');
+        const cleanName = prop.replace('?', '').split('=')[0].trim();
 
         const typeInfo = typeMap.get(cleanName);
         const inferredType = typeInfo?.type || this.inferTypeFromUsage(cleanName) || 'any';
@@ -178,7 +182,7 @@ export class MDXParser {
         parameterTypes.push({
           name: cleanName,
           type: inferredType,
-          required: !isOptional && !isTypeOptional
+          required: !isOptional && !isTypeOptional && !hasDefaultValue
         });
       }
     } else {
@@ -188,13 +192,14 @@ export class MDXParser {
       for (const param of regularParams) {
         const [name, paramType] = param.split(':').map(s => s?.trim());
         const isOptional = name?.includes('?') || false;
-        const cleanName = name?.replace('?', '') || '';
+        const hasDefaultValue = name?.includes('=') || false;
+        const cleanName = name?.replace('?', '').split('=')[0].trim() || '';
 
         if (cleanName) {
           parameterTypes.push({
             name: cleanName,
             type: paramType || this.inferTypeFromUsage(cleanName) || 'any',
-            required: !isOptional
+            required: !isOptional && !hasDefaultValue
           });
         }
       }
@@ -265,6 +270,7 @@ ${properties}
     content: string,
     interpolations: Array<{ placeholder: string; expression: string }>,
     conditionalBlocks: Array<{ condition: string; content: string }>,
+    ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>,
     jsxExpressions: Array<{ placeholder: string; expression: string }>,
   ): string {
     // Process interpolations first
@@ -283,7 +289,19 @@ ${properties}
       conditionalBlocks,
     );
 
-    // Process JSX expressions - handle {expression} that are not interpolations or conditionals
+    // Process ternary expressions - handle {condition ? trueValue : falseValue}
+    processedContent = this.processTernaryExpressions(
+      processedContent,
+      ternaryExpressions,
+    );
+
+    // Process JSX elements first (like <Component prop={value} />)
+    processedContent = this.processJSXElements(
+      processedContent,
+      jsxExpressions,
+    );
+
+    // Process JSX expressions - handle {expression} that are not interpolations, conditionals, or ternary expressions
     processedContent = this.processJSXExpressions(
       processedContent,
       jsxExpressions,
@@ -312,32 +330,159 @@ ${properties}
     );
   }
 
+  private processTernaryExpressions(
+    content: string,
+    ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>,
+  ): string {
+    // Match ternary expressions - {condition ? trueValue : falseValue}
+    // This regex handles nested parentheses and braces within each part
+    // But excludes JSX expressions (those containing < and >)
+    const ternaryRegex = /\{([^{}<>]*(?:\{[^}]*\}[^{}<>]*)*)\s*\?\s*([^{}:<>]*(?:\{[^}]*\}[^{}:<>]*)*(?:\([^)]*\)[^{}:<>]*)*)\s*:\s*([^{}<>]*(?:\{[^}]*\}[^{}<>]*)*(?:\([^)]*\)[^{}<>]*)*)\}/g;
+
+    return content.replace(
+      ternaryRegex,
+      (match, condition, trueValue, falseValue) => {
+        const trimmedCondition = condition.trim();
+        const trimmedTrueValue = trueValue.trim();
+        const trimmedFalseValue = falseValue.trim();
+
+        // Skip if any part is empty
+        if (!trimmedCondition || !trimmedTrueValue || !trimmedFalseValue) {
+          return match;
+        }
+
+        const placeholder = `__TERNARY_${ternaryExpressions.length}__`;
+        ternaryExpressions.push({
+          condition: trimmedCondition,
+          trueValue: trimmedTrueValue,
+          falseValue: trimmedFalseValue,
+        });
+        return placeholder;
+      },
+    );
+  }
+
+  private processJSXElements(
+    content: string,
+    jsxExpressions: Array<{ placeholder: string; expression: string }>,
+  ): string {
+    // Find JSX elements like <Component prop={value} />
+    const jsxElementRegex = /<(\w+)([^/>]*)\/>/g;
+
+    return content.replace(jsxElementRegex, (match, componentName, props) => {
+      // Parse props to extract JSX expressions within them
+      const propMatches = props.match(/(\w+)=\{([^}]+)\}/g) || [];
+      const processedProps: string[] = [];
+
+      for (const propMatch of propMatches) {
+        const [, propName, propExpr] = propMatch.match(/(\w+)=\{([^}]+)\}/) || [];
+        if (propName && propExpr) {
+          // For simple prop values (like variables), don't create JSX expressions
+          // Just keep them as-is for now
+          processedProps.push(`${propName}={${propExpr}}`);
+        }
+      }
+
+      // Reconstruct the JSX element with processed props
+      const processedPropsString = processedProps.length > 0 ? ' ' + processedProps.join(' ') : '';
+      return `<${componentName}${processedPropsString} />`;
+    });
+  }
+
   private processJSXExpressions(
     content: string,
     jsxExpressions: Array<{ placeholder: string; expression: string }>,
   ): string {
-    // Match JSX expressions - single line {expression} that are not {{ }} or && (
-    const jsxRegex = /\{(?!\{)([^{}]*(?:\{[^}]*\}[^{}]*)*)\}(?!\})/g;
+    // Find all {expression} patterns and process them
+    let processedContent = content;
+    let startIndex = 0;
 
-    return content.replace(
-      jsxRegex,
-      (match, expression) => {
-        const trimmedExpression = expression.trim();
+    while (startIndex < processedContent.length) {
+      const openBraceIndex = processedContent.indexOf('{', startIndex);
+      if (openBraceIndex === -1) break;
 
-        // Skip if it's a conditional block (contains &&)
-        if (trimmedExpression.includes('&&')) {
-          return match;
+      // Skip if it's a double brace {{ }}
+      if (processedContent[openBraceIndex + 1] === '{') {
+        startIndex = openBraceIndex + 2;
+        continue;
+      }
+
+      // Find the matching closing brace
+      const endIndex = this.findMatchingBrace(processedContent, openBraceIndex);
+      if (endIndex === -1) {
+        startIndex = openBraceIndex + 1;
+        continue;
+      }
+
+      const expression = processedContent.substring(openBraceIndex + 1, endIndex);
+      const trimmedExpression = expression.trim();
+
+      // Skip if it's a conditional block (contains &&)
+      if (trimmedExpression.includes('&&')) {
+        startIndex = endIndex + 1;
+        continue;
+      }
+
+      // Skip if it's a ternary expression (contains ? and :) and doesn't contain JSX
+      if (trimmedExpression.includes('?') && trimmedExpression.includes(':') && !trimmedExpression.includes('<')) {
+        startIndex = endIndex + 1;
+        continue;
+      }
+
+      // Skip if it's empty
+      if (!trimmedExpression) {
+        startIndex = endIndex + 1;
+        continue;
+      }
+
+      const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
+      jsxExpressions.push({ placeholder, expression: trimmedExpression });
+      processedContent = processedContent.substring(0, openBraceIndex) + placeholder + processedContent.substring(endIndex + 1);
+      startIndex = openBraceIndex + placeholder.length;
+    }
+
+    return processedContent;
+  }
+
+  private findMatchingBrace(content: string, startIndex: number): number {
+    let braceCount = 0;
+    let parenCount = 0;
+    let inString = false;
+    let stringChar = '';
+
+    for (let i = startIndex; i < content.length; i++) {
+      const char = content[i];
+      const prevChar = i > 0 ? content[i - 1] : '';
+
+      // Handle string literals
+      if (!inString && (char === '"' || char === "'" || char === '`')) {
+        inString = true;
+        stringChar = char;
+        continue;
+      }
+
+      if (inString && char === stringChar && prevChar !== '\\') {
+        inString = false;
+        continue;
+      }
+
+      if (inString) continue;
+
+      // Count braces and parentheses
+      if (char === '{') {
+        braceCount++;
+      } else if (char === '}') {
+        braceCount--;
+        if (braceCount === 0) {
+          return i;
         }
+      } else if (char === '(') {
+        parenCount++;
+      } else if (char === ')') {
+        parenCount--;
+      }
+    }
 
-        // Skip if it's empty
-        if (!trimmedExpression) {
-          return match;
-        }
-
-        const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
-        jsxExpressions.push({ placeholder, expression: trimmedExpression });
-        return placeholder;
-      },
-    );
+    return -1; // No matching brace found
   }
 }

@@ -33,7 +33,7 @@ export class TemplateExecutionEngine {
       }
 
       // Merge props into context for function parameters
-      const propsContext = this.createPropsContext(compiled.functionParams || [], props);
+      const propsContext = this.createPropsContext(compiled.functionParams || [], props, compiled.metadata?.parameterTypes);
       const mergedContext = { ...context, ...propsContext };
 
       // Execute TypeScript to get runtime values (now supports async)
@@ -57,7 +57,23 @@ export class TemplateExecutionEngine {
         errors
       );
 
-      // Process JSX expressions (like array.map())
+      // Process ternary expressions
+      processedContent = this.processTernaryExpressions(
+        processedContent,
+        compiled.ternaryExpressions || [],
+        fullContext,
+        errors
+      );
+
+      // Process JSX elements first (like <Component prop={value} />) before expressions
+      processedContent = await this.processJSXElements(
+        processedContent,
+        compiled.jsxExpressions || [],
+        fullContext,
+        errors
+      );
+
+      // Process remaining JSX expressions (like array.map())
       processedContent = await this.processJSXExpressions(
         processedContent,
         compiled.jsxExpressions || [],
@@ -94,6 +110,11 @@ export class TemplateExecutionEngine {
             const parsed = this.parser.parse(componentContent);
             const compiled = this.compiler.compile(parsed);
             this.componentRegistry[componentName] = compiled;
+
+            // Recursively load dependencies of this component
+            if (compiled.dependencies && compiled.dependencies.length > 0) {
+              this.loadDependencies(compiled.dependencies, basePath, errors);
+            }
           }
         } catch (error) {
           errors.push(`Failed to load component ${componentName}: ${error}`);
@@ -125,7 +146,7 @@ export class TemplateExecutionEngine {
     return null;
   }
 
-  private createPropsContext(functionParams: string[], props: any): TemplateContext {
+  private createPropsContext(functionParams: string[], props: any, parameterTypes?: Array<{ name: string; type: string; required: boolean }>): TemplateContext {
     const context: TemplateContext = {};
 
     // If props is an object and we have parameters, map them
@@ -133,11 +154,56 @@ export class TemplateExecutionEngine {
       for (const param of functionParams) {
         if (props.hasOwnProperty(param)) {
           context[param] = props[param];
+        } else {
+          // Check if this parameter has a default value (not required)
+          const paramType = parameterTypes?.find(p => p.name === param);
+          if (paramType && !paramType.required) {
+            // For optional parameters, provide a default value based on type
+            if (paramType.type === 'boolean') {
+              context[param] = false;
+            } else if (paramType.type.includes('[]')) {
+              context[param] = [];
+            } else {
+              context[param] = undefined;
+            }
+          }
         }
       }
     }
 
     return context;
+  }
+
+  private mergePropsWithDefaults(jsxProps: any, compiledComponent: CompiledMDX): any {
+    const mergedProps = { ...jsxProps };
+    const parameterTypes = compiledComponent.metadata?.parameterTypes;
+
+    if (!parameterTypes) {
+      return mergedProps;
+    }
+
+    // For each parameter that's not required and not provided in JSX props, add default value
+    for (const paramType of parameterTypes) {
+      if (!paramType.required && !jsxProps.hasOwnProperty(paramType.name)) {
+        mergedProps[paramType.name] = this.getDefaultValueForType(paramType.type);
+      }
+    }
+
+    return mergedProps;
+  }
+
+  private getDefaultValueForType(type: string): any {
+    if (type === 'boolean') {
+      return false;
+    } else if (type.includes('[]')) {
+      return [];
+    } else if (type === 'string') {
+      return '';
+    } else if (type === 'number') {
+      return 0;
+    } else {
+      return undefined;
+    }
   }
 
   private async executeTypeScript(typescript: string, context: TemplateContext): Promise<any> {
@@ -168,7 +234,7 @@ export class TemplateExecutionEngine {
       `;
 
       // Create async function to support await
-      const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+      const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
       const func = new AsyncFunction(...Object.keys(safeContext), functionBody);
       return await func(...Object.values(safeContext)) || {};
     } catch (error) {
@@ -348,6 +414,58 @@ export class TemplateExecutionEngine {
     return processedContent;
   }
 
+  private processTernaryExpressions(
+    content: string,
+    ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>,
+    context: any,
+    errors: string[]
+  ): string {
+    let processedContent = content;
+
+    for (let i = 0; i < ternaryExpressions.length; i++) {
+      const ternary = ternaryExpressions[i];
+      const placeholder = `__TERNARY_${i}__`;
+
+      try {
+        // Evaluate the condition
+        const conditionResult = this.evaluateExpression(ternary.condition, context);
+
+        // Choose the appropriate value based on the condition
+        const selectedValue = conditionResult ? ternary.trueValue : ternary.falseValue;
+
+        // Process any interpolations within the selected value
+        let processedValue = selectedValue;
+        if (processedValue && typeof processedValue === 'string') {
+          // Remove wrapping parentheses if they exist
+          processedValue = processedValue.trim();
+          if (processedValue.startsWith('(') && processedValue.endsWith(')')) {
+            processedValue = processedValue.slice(1, -1).trim();
+          }
+
+          // Normalize indentation within the ternary value
+          processedValue = this.normalizeIndentation(processedValue);
+          processedValue = this.processInterpolations(processedValue, [], context, errors);
+        }
+
+        // Replace placeholder and normalize line spacing
+        const lines = processedContent.split('\n');
+        const updatedLines = lines.map(line => {
+          if (line.includes(placeholder)) {
+            // Replace the placeholder and remove any excess leading whitespace
+            return line.replace(placeholder, processedValue).replace(/^\s{8}/, '');
+          }
+          return line;
+        });
+        processedContent = updatedLines.join('\n');
+      } catch (error) {
+        errors.push(`Ternary expression error in "${ternary.condition}": ${error}`);
+        processedContent = processedContent.replace(placeholder, '');
+      }
+    }
+
+    return processedContent;
+  }
+
   private evaluateExpression(expression: string, context: any): any {
     try {
       // Create function with safe context
@@ -419,6 +537,41 @@ export class TemplateExecutionEngine {
       }
     }
     return String(value);
+  }
+
+  private async processJSXElements(
+    content: string,
+    jsxExpressions: Array<{ placeholder: string; expression: string }>,
+    context: any,
+    errors: string[]
+  ): Promise<string> {
+    // Find JSX elements like <Component prop={value} />
+    const jsxElementRegex = /<(\w+)([^/>]*)\/>/g;
+    let processedContent = content;
+
+    const jsxElements: Array<{ match: string; componentName: string; props: string }> = [];
+    let match;
+
+    // First pass: collect all JSX elements
+    while ((match = jsxElementRegex.exec(content)) !== null) {
+      jsxElements.push({
+        match: match[0],
+        componentName: match[1],
+        props: match[2]
+      });
+    }
+
+    // Second pass: process each JSX element
+    for (const jsxElement of jsxElements) {
+      try {
+        const rendered = await this.renderJSXElement(jsxElement, jsxExpressions, context);
+        processedContent = processedContent.replace(jsxElement.match, rendered);
+      } catch (error) {
+        errors.push(`JSX element error in "${jsxElement.match}": ${error}`);
+        processedContent = processedContent.replace(jsxElement.match, `<${jsxElement.componentName}:ERROR>`);
+      }
+    }
+    return processedContent;
   }
 
   private async processJSXExpressions(
@@ -497,7 +650,14 @@ export class TemplateExecutionEngine {
 
       // For JSX components, we need special handling
       if (elementExpr.includes('<') && elementExpr.includes('>')) {
-        return await this.renderJSXComponent(elementExpr, iterationContext);
+        // Check if this is a ternary expression with JSX components
+        if (elementExpr.includes('?')) {
+          // Handle ternary expressions like: ordered ? <OlItem item={item} index={index} /> : <UlItem item={item} />
+          return await this.evaluateTernaryJSXExpression(elementExpr, iterationContext);
+        } else {
+          // Handle direct JSX components
+          return await this.renderJSXComponent(elementExpr, iterationContext);
+        }
       }
 
       // For regular expressions, evaluate them
@@ -506,6 +666,85 @@ export class TemplateExecutionEngine {
     }));
 
     return results.join('\n');
+  }
+
+  private async evaluateTernaryJSXExpression(expression: string, context: any): Promise<string> {
+    // Parse ternary expressions like: ordered ? <OlItem item={item} index={index} /> : <UlItem item={item} />
+    const ternaryMatch = expression.match(/^(.+)\s*\?\s*(.+)\s*:\s*(.+)$/);
+
+    if (!ternaryMatch) {
+      throw new Error(`Invalid ternary expression: ${expression}`);
+    }
+
+    const [, condition, trueValue, falseValue] = ternaryMatch;
+
+    // Evaluate the condition
+    const conditionFunc = new Function(...Object.keys(context), `return (${condition})`);
+    const conditionResult = conditionFunc(...Object.values(context));
+
+    // Choose the appropriate JSX component based on the condition
+    const selectedExpression = conditionResult ? trueValue.trim() : falseValue.trim();
+
+    // Render the selected JSX component
+    return await this.renderJSXComponent(selectedExpression, context);
+  }
+
+  private async renderJSXElement(
+    jsxElement: { match: string; componentName: string; props: string },
+    jsxExpressions: Array<{ placeholder: string; expression: string }>,
+    context: any
+  ): Promise<string> {
+    const { componentName, props } = jsxElement;
+
+    // Parse props - handle both direct expressions and placeholders
+    // Match both {value} and placeholder patterns
+    const propMatches = props.match(/(\w+)=(?:\{([^}]+)\}|([^}\s]+))/g) || [];
+    const propValues: any = {};
+
+    for (const propMatch of propMatches) {
+      // Handle both {value} and placeholder patterns
+      const matchResult = propMatch.match(/(\w+)=(?:\{([^}]+)\}|([^}\s]+))/) || [];
+      const propName = matchResult[1];
+      const propExpr = matchResult[2] || matchResult[3]; // Either from {value} or placeholder
+
+      if (propName && propExpr) {
+        try {
+          // Check if this is a placeholder (like __JSX_EXPRESSION_0__)
+          const placeholderMatch = jsxExpressions.find(expr => expr.placeholder === propExpr);
+          if (placeholderMatch) {
+            // Evaluate the original expression
+            const result = await this.evaluateJSXExpression(placeholderMatch.expression, context);
+            propValues[propName] = result;
+          } else {
+            // Direct expression evaluation
+            const propFunc = new Function(...Object.keys(context), `return (${propExpr})`);
+            propValues[propName] = propFunc(...Object.values(context));
+          }
+        } catch (error) {
+          // Skip invalid prop expressions
+        }
+      }
+    }
+
+    // Check if we have the component in our registry
+    if (this.componentRegistry[componentName]) {
+      try {
+        // Merge JSX props with default values from component metadata
+        const mergedProps = this.mergePropsWithDefaults(propValues, this.componentRegistry[componentName]);
+        const componentResult = await this.execute(this.componentRegistry[componentName], {}, mergedProps);
+        return componentResult.content;
+      } catch (error) {
+        throw new Error(`Component execution failed: ${error}`);
+      }
+    }
+
+    // Fallback rendering for common components
+    if (componentName === 'ListItem' && propValues.item) {
+      return `- ${propValues.item}`;
+    }
+
+    // Fallback representation
+    return `<${componentName} ${Object.entries(propValues).map(([k, v]) => `${k}="${v}"`).join(' ')} />`;
   }
 
   private async renderJSXComponent(jsxElement: string, context: any): Promise<string> {
@@ -537,7 +776,9 @@ export class TemplateExecutionEngine {
     // Check if we have the component in our registry
     if (this.componentRegistry[componentName]) {
       try {
-        const componentResult = await this.execute(this.componentRegistry[componentName], {}, propValues);
+        // Merge JSX props with default values from component metadata
+        const mergedProps = this.mergePropsWithDefaults(propValues, this.componentRegistry[componentName]);
+        const componentResult = await this.execute(this.componentRegistry[componentName], {}, mergedProps);
         return componentResult.content;
       } catch (error) {
         return `<${componentName}:ERROR>`;

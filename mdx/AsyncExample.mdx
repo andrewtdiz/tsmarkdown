@@ -1,8 +1,7 @@
-import { List } from "./List";
+import { getScoreData } from './api/getScoreData'
 
-function TestExample({ items }: { items: string[] }) {
-  const userName = 'Developer';
-  const score = 79;
+async function AsyncExample() {
+  const score = await getScoreData();
   const isHighScore = score > 80;
 
   return (

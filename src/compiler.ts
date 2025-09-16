@@ -8,6 +8,7 @@ export interface CompiledMDX {
   functionParams: string[];
   interpolations: Array<{ placeholder: string; expression: string }>;
   conditionalBlocks: Array<{ condition: string; content: string }>;
+  ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>;
   jsxExpressions: Array<{ placeholder: string; expression: string }>;
   metadata: {
     functionName: string;
@@ -33,6 +34,7 @@ export class MDXCompiler {
       functionParams: parsed.functionParams,
       interpolations: parsed.interpolations,
       conditionalBlocks: parsed.conditionalBlocks,
+      ternaryExpressions: parsed.ternaryExpressions,
       jsxExpressions: parsed.jsxExpressions,
       metadata: {
         functionName: parsed.functionName,

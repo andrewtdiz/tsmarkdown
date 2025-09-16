@@ -6,8 +6,8 @@ interface ListProps {
   ordered?: boolean;
 }
 
-function List({ items, ordered = false }: ListProps) {
+function List({ items, ordered = false }: { items: string[]; ordered?: boolean }) {
   return (
-    {{ items.map((item, index) => ordered ? <OlItem item={item} index={index} /> : <UlItem item={item} /> )}}
+    {items.map((item, index) => ordered ? <OlItem item={item} index={index} /> : <UlItem item={item} />)}
   )
 }
