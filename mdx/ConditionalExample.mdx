@@ -10,12 +10,12 @@ async function ConditionalExample() {
         preferences: {
             theme: "dark",
             notifications: true
-        }
+        },
+        items: ['Apple', 'Banana', 'Orange']
     };
 
     const isLoggedIn = user !== null;
     const showWelcome = true;
-    const items = ['Apple', 'Banana', 'Orange'];
 
     return (
         # Conditional Rendering Example
@@ -26,8 +26,8 @@ async function ConditionalExample() {
 
         {isLoggedIn && (
             ## Your Dashboard
-            Here are your items:
-            {{ items.join(', ') }}
+            Here are your current items:
+            <CommaList items={user.items} />
         )}
 
         {!isLoggedIn && (

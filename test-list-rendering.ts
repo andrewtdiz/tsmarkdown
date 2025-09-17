@@ -12,7 +12,7 @@ console.log(parsed);
 const compiled = compile(parsed);
 console.log(compiled);
 
-console.log("=== Test 1: List items and ternary expression ===");
+console.log("=== Test 1: Unordered list items and ternary expression ===");
 const result1 = await render(compiled, {
 
 }, {
@@ -20,19 +20,13 @@ const result1 = await render(compiled, {
 }, "./mdx");
 console.log(result1.content);
 
-console.log("\n=== Test 2: Unordered list ===");
-const result2 = await render(compiled, {}, {
-  items: ["React", "TypeScript", "MDX"],
-}, "./mdx");
-console.log(result2.content);
-
-console.log("\n=== Test 3: Empty list ===");
+console.log("\n=== Test 2: Empty list ===");
 const result3 = await render(compiled, {}, {
   items: [],
 }, "./mdx");
 console.log(result3.content);
 
-console.log("\n=== Test 4: Direct List component test (ordered) ===");
+console.log("\n=== Test 3: Direct List component test (ordered) ===");
 const listFile = "./mdx/List.mdx";
 const listContent = await Bun.file(listFile).text();
 const listParsed = parse(listContent);
@@ -43,14 +37,14 @@ const result4 = await render(listCompiled, {}, {
 }, "./mdx");
 console.log(result4.content);
 
-console.log("\n=== Test 5: Direct List component test (unordered) ===");
+console.log("\n=== Test 4: Direct List component test (unordered) ===");
 const result5 = await render(listCompiled, {}, {
   items: ["First", "Second", "Third"],
   ordered: false,
 }, "./mdx");
 console.log(result5.content);
 
-console.log("\n=== Test 6: CommaList component test (unordered) ===");
+console.log("\n=== Test 5: CommaList component test (unordered) ===");
 const commaListFile = "./mdx/CommaList.mdx";
 const commaListContent = await Bun.file(commaListFile).text();
 const commaListParsed = parse(commaListContent);
@@ -60,7 +54,7 @@ const result6 = await render(commaListCompiled, {}, {
 }, "./mdx");
 console.log(result6.content);
 
-console.log("\n=== Test 7: CommaList component test (empty) ===");
+console.log("\n=== Test 6: CommaList component test (empty) ===");
 const result7 = await render(commaListCompiled, {}, {
   items: [],
   ordered: true,

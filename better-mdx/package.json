@@ -1,0 +1,25 @@
+{
+  "name": "better-mdx",
+  "displayName": "better-mdx",
+  "description": "A more robust, programmatic way to make markdown in TypeScript",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.104.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "bettermdx",
+      "aliases": ["Better-mdx", "bettermdx"],
+      "extensions": [".mdx"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "bettermdx",
+      "scopeName": "source.tsx",
+      "path": "./syntaxes/bettermdx.tmLanguage.json"
+    }]
+  }
+}

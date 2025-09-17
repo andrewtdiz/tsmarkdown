@@ -1,4 +1,4 @@
-function CommaList({ items, withAnd = true }: { items: string[]; withAnd: boolean }) {
+function CommaList({ items, withAnd = true }: { items: string[]; withAnd?: boolean }) {
   const beginningItems = items.slice(0, -1);
   const lastItem = items[items.length - 1];
   

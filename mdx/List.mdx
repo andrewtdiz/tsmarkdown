@@ -3,6 +3,6 @@ import UlItem from './UlItem'
 
 function List({ items, ordered = false }: { items: string[]; emptyText?: string; ordered?: boolean }) {
   return (
-    {items.length === 0 ? Empty : items.map((item, index) => ordered ? <OlItem item={item} index={index} /> : <UlItem item={item} />)}
+    {items.length === 0 ? 'Empty' : items.map((item, index) => ordered ? <OlItem item={item} index={index} /> : <UlItem item={item} />)}
   )
 }

@@ -147,23 +147,11 @@ function Homepage() {
   return (
     # Welcome to Better-MDX
 
-    <Card variant="primary">
-      <Icon name="rocket" />
-      Get started in minutes with our powerful framework.
-
-      <Button variant="primary" size="large">
-        Get Started →
-      </Button>
-    </Card>
+    Get started in minutes with our powerful framework.
 
     ## Features
 
-    {{ features.map(feature => `
-    <Card>
-      <Icon name="check" />
-      ${feature}
-    </Card>
-    `).join('\n') }}
+    {{ features.map(feature => <FeatureDetailView feature={feature} /> ) }}
   )
 }
 ```
