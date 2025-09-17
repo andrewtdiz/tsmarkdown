@@ -1,6 +1,6 @@
 import { parseMDX } from "./src/parser";
 import { compileMDX } from "./src/compiler";
-import { executeMDXTemplate } from "./src/template-engine";
+import { renderMDX } from "./src/renderer";
 
 
 function runExample(title: string, description: string, mdxContent: string, context?: any, props?: any, basePath?: string) {
@@ -29,7 +29,7 @@ function runExample(title: string, description: string, mdxContent: string, cont
   try {
     const parsed = parseMDX(mdxContent);
     const compiled = compileMDX(parsed);
-    const result = executeMDXTemplate(compiled, context || {}, props, basePath);
+    const result = renderMDX(compiled, context || {}, props, basePath);
 
     console.log(result.content);
     console.log('─'.repeat(50));

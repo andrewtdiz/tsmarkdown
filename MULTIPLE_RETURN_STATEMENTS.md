@@ -2,7 +2,7 @@
 
 ## Core Problem
 
-The current MDX parser and template engine only supports components with a **single return statement** containing template content. Components like the following are not properly handled:
+The current MDX parser and renderer only supports components with a **single return statement** containing template content. Components like the following are not properly handled:
 
 ```typescript
 function MyComponent({ items }: { items: string[] }) {
@@ -70,9 +70,9 @@ if (trimmed.startsWith("return ")) {
 - Handle compilation of multiple template sections
 - Ensure proper dependency extraction across all return statements
 
-### 3. Template Engine Updates (`src/template-engine.ts`)
+### 3. Renderer Updates (`src/renderer.ts`)
 
-**File**: `src/template-engine.ts`
+**File**: `src/renderer.ts`
 **Methods to modify**:
 - `execute()` method (lines ~25-101)
 - `processConditionalBlocks()` method (lines ~469-510)
@@ -142,7 +142,7 @@ Create test cases for:
 ### Core Files (Required Changes)
 - `src/parser.ts` - Parser logic for multiple returns
 - `src/compiler.ts` - Compilation of multiple templates
-- `src/template-engine.ts` - Runtime execution and template selection
+- `src/renderer.ts` - Runtime execution and template selection
 
 ### Interface Updates
 - `src/parser.ts` - Extend `ParsedMDX` interface

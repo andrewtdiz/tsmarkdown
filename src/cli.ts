@@ -3,8 +3,8 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync, watchFile, unwatchFile } from 'fs';
 import { resolve, dirname, basename, join, extname } from 'path';
 import { parseMDX } from './parser';
-import { compileMDX } from './compiler';
-import { executeMDXTemplate } from './template-engine';
+import { compile } from './compiler';
+import { render } from './renderer';
 import { MDXAPIServer } from './api-server';
 import { MDXTypeChecker } from './type-checker';
 
@@ -351,8 +351,8 @@ Next steps:
         }
 
         const parsed = parseMDX(content);
-        const compiled = compileMDX(parsed);
-        const result = await executeMDXTemplate(compiled, {}, {}, mdxDir);
+        const compiled = compile(parsed);
+        const result = await render(compiled, {}, {}, mdxDir);
 
         // Write compiled file
         const outputPath = join(outputDir, relativePath.replace('.mdx', '.json'));
@@ -389,7 +389,7 @@ Next steps:
     console.log(`📄 Compiling MDX file: ${fullPath}`);
 
     const parsed = parseMDX(content);
-    const compiled = compileMDX(parsed);
+    const compiled = compile(parsed);
 
     // Type checking if requested
     if (options.typecheck) {
@@ -453,9 +453,9 @@ Next steps:
     console.log(`🚀 Executing MDX file: ${fullPath}`);
 
     const parsed = parseMDX(content);
-    const compiled = compileMDX(parsed);
+    const compiled = compile(parsed);
 
-    const result = await executeMDXTemplate(compiled, {
+    const result = await render(compiled, {
       // Mock context for testing
       useAuth: () => ({
         user: { name: 'Demo User' },

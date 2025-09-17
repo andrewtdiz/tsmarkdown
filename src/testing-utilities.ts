@@ -1,7 +1,7 @@
 import { resolve, join } from 'path';
 import { parseMDX } from './parser';
-import { compileMDX } from './compiler';
-import { executeMDXTemplate } from './template-engine';
+import { compile } from './compiler';
+import { render } from './renderer';
 import { ClientRenderer } from './client-renderer';
 
 export interface MDXTestCase {
@@ -65,12 +65,12 @@ export class MDXTestRunner {
 
       if (!testCase.options?.skipCompilation) {
         // Compile phase
-        const compiled = compileMDX(parsed);
+        const compiled = compile(parsed);
         result.details!.compiled = compiled;
 
         if (!testCase.options?.skipExecution) {
           // Execute phase
-          const executed = await executeMDXTemplate(compiled, testCase.context || {});
+          const executed = await render(compiled, testCase.context || {});
           result.details!.executed = executed;
 
           // Render phase
@@ -608,8 +608,8 @@ export class MDXSnapshotTester {
   async matchSnapshot(name: string, input: string, context: Record<string, any> = {}): Promise<boolean> {
     // Generate current output
     const parsed = parseMDX(input);
-    const compiled = compileMDX(parsed);
-    const executed = await executeMDXTemplate(compiled, context);
+    const compiled = compile(parsed);
+    const executed = await render(compiled, context);
 
     const current = {
       content: executed.content,
@@ -656,8 +656,8 @@ export class MDXSnapshotTester {
    */
   async updateSnapshot(name: string, input: string, context: Record<string, any> = {}): Promise<void> {
     const parsed = parseMDX(input);
-    const compiled = compileMDX(parsed);
-    const executed = await executeMDXTemplate(compiled, context);
+    const compiled = compile(parsed);
+    const executed = await render(compiled, context);
 
     const current = {
       content: executed.content,

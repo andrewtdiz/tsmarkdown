@@ -1,7 +1,7 @@
 import { parseMDX } from './parser';
-import { compileMDX } from './compiler';
+import { compile } from './compiler';
 import { ClientRenderer } from './client-renderer';
-import { executeMDXTemplate } from './template-engine';
+import { render } from './renderer';
 import { HotModuleReplacer, HMRConfig } from './hmr';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -85,7 +85,7 @@ export class MDXAPIServer {
       }
 
       const parsed = parseMDX(request.source);
-      const compiled = compileMDX(parsed);
+      const compiled = compile(parsed);
 
       const result = {
         compiled,
@@ -128,7 +128,7 @@ export class MDXAPIServer {
         compiled = request.compiled;
       } else if (request.source) {
         const parsed = parseMDX(request.source);
-        compiled = compileMDX(parsed);
+        compiled = compile(parsed);
       } else {
         return {
           success: false,
@@ -161,7 +161,7 @@ export class MDXAPIServer {
   }
 
   /**
-   * Execute MDX with template engine
+   * Execute MDX with renderer
    */
   async execute(request: RenderRequest): Promise<APIResponse> {
     try {
@@ -170,7 +170,7 @@ export class MDXAPIServer {
         compiled = request.compiled;
       } else if (request.source) {
         const parsed = parseMDX(request.source);
-        compiled = compileMDX(parsed);
+        compiled = compile(parsed);
       } else {
         return {
           success: false,
@@ -178,7 +178,7 @@ export class MDXAPIServer {
         };
       }
 
-      const executionResult = await executeMDXTemplate(compiled, request.context || {});
+      const executionResult = await render(compiled, request.context || {});
 
       return {
         success: true,

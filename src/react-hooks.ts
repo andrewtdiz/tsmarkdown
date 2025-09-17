@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { parseMDX } from './parser';
-import { compileMDX } from './compiler';
+import { compile } from './compiler';
 import { ClientRenderer, RenderedResult } from './client-renderer';
-import { executeMDXTemplate } from './template-engine';
+import { render } from './renderer';
 
 export interface UseMDXComponentOptions {
   source?: string;
@@ -74,10 +74,10 @@ export function useMDXComponent(options: UseMDXComponentOptions = {}): MDXCompon
     try {
       // Parse and compile
       const parsed = parseMDX(mdxSource);
-      const compiled = compileMDX(parsed);
+      const compiled = compile(parsed);
 
       // Execute template
-      const executionResult = await executeMDXTemplate(compiled, mdxContext);
+      const executionResult = await render(compiled, mdxContext);
 
       // Get metadata from content
       const metadata = renderer.extractMetadata(executionResult.content);
@@ -232,8 +232,8 @@ export function useMDXCollection(sources: Record<string, string>, options: Omit<
       for (const [key, source] of Object.entries(sources)) {
         try {
           const parsed = parseMDX(source);
-          const compiled = compileMDX(parsed);
-          const executionResult = await executeMDXTemplate(compiled, options.context || {});
+          const compiled = compile(parsed);
+          const executionResult = await render(compiled, options.context || {});
           const metadata = renderer.extractMetadata(executionResult.content);
 
           results[key] = {

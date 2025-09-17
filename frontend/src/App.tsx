@@ -15,7 +15,7 @@ import { useQuery } from "react-query";
 import "./index.css";
 
 import TestExample from './mdx/generated/TestExample.json';
-import { executeMDXTemplate } from "../../src/template-engine";
+import { render } from "../../src/renderer";
 
 console.log(TestExample);
 
@@ -25,7 +25,7 @@ export function App() {
     async () => {
       try {
         // Load the pre-compiled JSON file from the dist directory
-        const result1 = await executeMDXTemplate(JSON.parse(JSON.stringify(TestExample)), {}, {
+        const result1 = await render(JSON.parse(JSON.stringify(TestExample)), {}, {
           items: ["Apple", "Banana", "Cherry"],
         }, "./mdx");
         return result1.content;

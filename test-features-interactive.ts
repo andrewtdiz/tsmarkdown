@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import { parseMDX } from "./src/parser";
 import { compileMDX } from "./src/compiler";
-import { executeMDXTemplate } from "./src/template-engine";
+import { renderMDX } from "./src/renderer";
 
 
 async function runTest(name: string, mdxContent: string, context?: any, props?: any, basePath?: string) {
@@ -13,7 +13,7 @@ async function runTest(name: string, mdxContent: string, context?: any, props?: 
   try {
     const parsed = parseMDX(mdxContent);
     const compiled = compileMDX(parsed);
-    const result = await executeMDXTemplate(compiled, context || {}, props, basePath);
+    const result = await renderMDX(compiled, context || {}, props, basePath);
     console.log(result.content);
 
     if (result.errors && result.errors.length > 0) {

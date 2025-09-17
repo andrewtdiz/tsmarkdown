@@ -1,6 +1,6 @@
 import { parseMDX } from "./src/parser";
-import { compileMDX } from "./src/compiler";
-import { executeMDXTemplate } from "./src/template-engine";
+import { compile } from "./src/compiler";
+import { render } from "./src/renderer";
 
 
 async function showcase(title: string, mdxCode: string, props = {}, context = {}, basePath?: string) {
@@ -21,8 +21,8 @@ async function showcase(title: string, mdxCode: string, props = {}, context = {}
 
   try {
     const parsed = parseMDX(mdxCode);
-    const compiled = compileMDX(parsed);
-    const result = await executeMDXTemplate(compiled, context, props, basePath);
+    const compiled = compile(parsed);
+    const result = await render(compiled, context, props, basePath);
 
     console.log(result.content);
 

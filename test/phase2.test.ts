@@ -1,7 +1,7 @@
 import { test, expect, describe } from 'bun:test';
 import { parseMDX } from '../src/parser';
-import { compileMDX } from '../src/compiler';
-import { executeMDXTemplate } from '../src/template-engine';
+import { compile } from '../src/compiler';
+import { render } from '../src/renderer';
 
 describe('Phase 2: Template System', () => {
   describe('Template Interpolation', () => {
@@ -51,8 +51,8 @@ function TestComponent() {
 }`;
 
       const parsed = parseMDX(mdx);
-      const compiled = compileMDX(parsed);
-      const result = await executeMDXTemplate(compiled);
+      const compiled = compile(parsed);
+      const result = await render(compiled);
 
       expect(result.content.trim()).toBe('Hello World!');
       expect(result.errors).toHaveLength(0);
@@ -117,8 +117,8 @@ function TestComponent() {
 }`;
 
       const parsed = parseMDX(mdx);
-      const compiled = compileMDX(parsed);
-      const result = await executeMDXTemplate(compiled);
+      const compiled = compile(parsed);
+      const result = await render(compiled);
 
       expect(result.content).toContain('Hello there!');
       expect(result.content).not.toContain('Warning message');
@@ -141,8 +141,8 @@ function TestComponent() {
 }`;
 
       const parsed = parseMDX(mdx);
-      const compiled = compileMDX(parsed);
-      const result = await executeMDXTemplate(compiled);
+      const compiled = compile(parsed);
+      const result = await render(compiled);
 
       expect(result.content).toContain('Admin panel access');
       expect(result.content).not.toContain('Account is inactive');
@@ -163,8 +163,8 @@ function TestComponent() {
 }`;
 
       const parsed = parseMDX(mdx);
-      const compiled = compileMDX(parsed);
-      const result = await executeMDXTemplate(compiled);
+      const compiled = compile(parsed);
+      const result = await render(compiled);
 
       expect(result.content.trim()).toBe('Welcome VIP member Alice!');
       expect(result.errors).toHaveLength(0);
@@ -188,8 +188,8 @@ function TestComponent() {
 }`;
 
       const parsed = parseMDX(mdx);
-      const compiled = compileMDX(parsed);
-      const result = await executeMDXTemplate(compiled);
+      const compiled = compile(parsed);
+      const result = await render(compiled);
 
       expect(result.content).toContain('Name: Bob');
       expect(result.content).toContain('Points: 1200');
@@ -211,8 +211,8 @@ function TestComponent() {
 }`;
 
       const parsed = parseMDX(mdx);
-      const compiled = compileMDX(parsed);
-      const result = await executeMDXTemplate(compiled);
+      const compiled = compile(parsed);
+      const result = await render(compiled);
 
       expect(result.content).toContain('Hello Alice!');
       expect(result.content).toContain('Age:'); // Should be empty for undefined age
@@ -233,8 +233,8 @@ function TestComponent() {
 }`;
 
       const parsed = parseMDX(mdx);
-      const compiled = compileMDX(parsed);
-      const result = await executeMDXTemplate(compiled);
+      const compiled = compile(parsed);
+      const result = await render(compiled);
 
       expect(result.content).toContain('Valid content here');
       expect(result.content).not.toContain('This should not show');

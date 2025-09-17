@@ -351,7 +351,7 @@ export class CacheWarmer {
     ];
 
     const { parseMDX } = await import('./parser');
-    const { compileMDX } = await import('./compiler');
+    const { compile: compileMDX } = await import('./compiler');
 
     for (const source of commonSources) {
       try {
@@ -380,7 +380,7 @@ export class CacheWarmer {
         const source = fs.readFileSync(path.join(directory, file), 'utf-8');
 
         const { parseMDX } = await import('./parser');
-        const { compileMDX } = await import('./compiler');
+        const { compile: compileMDX } = await import('./compiler');
         const parsed = parseMDX(source);
         const compiled = compileMDX(parsed);
 

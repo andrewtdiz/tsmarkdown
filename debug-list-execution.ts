@@ -1,19 +1,19 @@
 import { readFileSync } from "fs";
 import { parseMDX } from "./src/parser";
-import { compileMDX } from "./src/compiler";
-import { executeMDXTemplate } from "./src/template-engine";
+import { compile } from "./src/compiler";
+import { render } from "./src/renderer";
 
 // Test the List component directly
 const listContent = readFileSync('./mdx/List.mdx', 'utf-8');
 
 const parsed = parseMDX(listContent);
-const compiled = compileMDX(parsed);
+const compiled = compile(parsed);
 
 console.log('List component compiled:');
 console.log(JSON.stringify(compiled, null, 2));
 
 console.log('\n=== Testing List component execution ===');
-const result = await executeMDXTemplate(compiled, {}, {
+const result = await render(compiled, {}, {
     items: ["Apple", "Banana", "Cherry"],
     ordered: false
 }, "./mdx");

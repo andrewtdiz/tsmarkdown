@@ -2,8 +2,8 @@ import { EventEmitter } from 'events';
 import { readFileSync, existsSync, watchFile, unwatchFile, Stats } from 'fs';
 import { resolve, relative } from 'path';
 import { parseMDX } from './parser';
-import { compileMDX } from './compiler';
-import { executeMDXTemplate } from './template-engine';
+import { compile } from './compiler';
+import { render } from './renderer';
 
 export interface HMRConfig {
   rootDir: string;
@@ -416,7 +416,7 @@ export class HotModuleReplacer extends EventEmitter {
 
   private async compileFile(filePath: string, content: string): Promise<any> {
     const parsed = parseMDX(content);
-    const compiled = compileMDX(parsed);
+    const compiled = compile(parsed);
 
     this.compiledCache.set(filePath, compiled);
 

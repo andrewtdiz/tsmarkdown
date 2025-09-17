@@ -3,7 +3,7 @@ import { ClientRenderer, createClientRenderer } from '../src/client-renderer';
 import { MDXAPIServer, createAPIServer } from '../src/api-server';
 import { MDXCache, MDXCompilationCache, createCacheKey } from '../src/cache';
 import { parseMDX } from '../src/parser';
-import { compileMDX } from '../src/compiler';
+import { compile } from '../src/compiler';
 
 describe('Phase 3: Runtime and API', () => {
   describe('Client Renderer', () => {
@@ -123,7 +123,7 @@ function TestComponent() {
       expect(result.data.filename).toBe('test.mdx');
     });
 
-    test('should execute MDX with template engine', async () => {
+    test('should execute MDX with renderer', async () => {
       const request = {
         source: `
 function TestComponent() {
