@@ -4,22 +4,50 @@
   "description": "A more robust, programmatic way to make markdown in TypeScript",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.104.0"
+    "vscode": "^1.99.0"
   },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:bettermdx"
+  ],
   "categories": [
     "Programming Languages"
   ],
+  "scripts": {
+    "build": "tsc",
+    "build:grammar": "bun src/build/grammar-compiler.ts",
+    "test": "node out/tests/run-tests.js",
+    "watch": "tsc -w"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "1.99.0",
+    "js-yaml": "^4.1.0",
+    "typescript": "^5.0.0",
+    "xml2js": "^0.6.0"
+  },
   "contributes": {
-    "languages": [{
-      "id": "bettermdx",
-      "aliases": ["Better-mdx", "bettermdx"],
-      "extensions": [".mdx"],
-      "configuration": "./language-configuration.json"
-    }],
-    "grammars": [{
-      "language": "bettermdx",
-      "scopeName": "source.tsx",
-      "path": "./syntaxes/bettermdx.tmLanguage.json"
-    }]
+    "languages": [
+      {
+        "id": "bettermdx",
+        "aliases": [
+          "Better-mdx",
+          "bettermdx"
+        ],
+        "extensions": [
+          ".bettermdx",
+          ".bmdx"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "bettermdx",
+        "scopeName": "source.better-mdx",
+        "path": "./syntaxes/bettermdx.tmLanguage.json"
+      }
+    ]
   }
 }

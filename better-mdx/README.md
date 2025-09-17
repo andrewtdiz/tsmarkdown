@@ -1,65 +1,64 @@
-# better-mdx README
+# Better MDX
 
-This is the README for your extension "better-mdx". After writing up a brief description, we recommend including the following sections.
+A TypeScript-first, React-compatible markdown language that enables fast, iterative development of dynamic content. Better MDX combines the expressiveness of Markdown with the power of TypeScript and React.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- **Syntax Highlighting**: Full syntax highlighting support for Better MDX files
+- **TypeScript Integration**: Full TypeScript support with compile-time error checking
+- **React Components**: Seamless integration with React components and JSX
+- **String Interpolation**: Use `{{ }}` for simple variable interpolation
+- **JavaScript Expressions**: Use `{ }` for complex JavaScript expressions
+- **Async Support**: Built-in support for asynchronous content generation
 
-For example if there is an image subfolder under your extension project workspace:
+## Syntax
 
-\!\[feature X\]\(images/feature-x.png\)
+Better MDX uses two distinct syntax patterns:
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+- **`{{ }}` - String Interpolation**: For simple variable interpolation within markdown text
+- **`{ }` - JavaScript Expressions**: For complex JavaScript expressions that return JSX/React elements
+
+### Example
+
+```mdx
+function Welcome({ userName, score }: { userName: string; score: number }) {
+  return (
+    # Welcome {{ userName }}!
+    
+    Your score is {{ score }}.
+    
+    {score > 80 ? (
+      🎉 **Congratulations!** You achieved a high score!
+    ) : (
+      Keep trying to reach 80+ points.
+    )}
+  )
+}
+```
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+- VS Code 1.104.0 or higher
+- TypeScript knowledge (recommended)
 
 ## Extension Settings
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
 This extension contributes the following settings:
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+* `better-mdx.enable`: Enable/disable Better MDX syntax highlighting
+* `better-mdx.typescript`: Enable TypeScript integration features
 
 ## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+- Some complex JSX patterns may not highlight perfectly
+- TypeScript type checking requires additional tooling
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
+### 0.0.1
 
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
+Initial release of Better MDX syntax highlighting extension.
 
 ---
 
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+**Enjoy writing dynamic, type-safe content with Better MDX!**

@@ -1,0 +1,22 @@
+import { List } from './List'
+import { getScoreData } from './api/getScoreData'
+
+async function AsyncExample({items}: {items: string[]}) {
+  const score = await getScoreData();
+  const isHighScore = score > 80;
+
+  return (
+    # Test MDX Component
+
+    Welcome {{ userName }}! Your score is {{ score }}.
+    
+    {isHighScore ? (
+      🎉 **Congratulations!** You achieved a high score!
+    ) : (
+      Keep trying to reach 80+ points.
+    )}
+
+    ## Technologies Used
+    <List items={items} />
+  )
+}

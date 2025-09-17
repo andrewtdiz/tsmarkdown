@@ -1,0 +1,39 @@
+async function ConditionalExample() {
+    // Simulate async user data fetching (self-contained)
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    // Mock user data - this demonstrates async content generation
+    const user = {
+        id: 1,
+        name: "Alice Johnson",
+        role: "Developer",
+        preferences: {
+            theme: "dark",
+            notifications: true
+        },
+        items: ['Apple', 'Banana', 'Orange']
+    };
+
+    const isLoggedIn = user !== null;
+    const showWelcome = true;
+
+    return (
+        # Conditional Rendering Example
+
+        {isLoggedIn && showWelcome && (
+            Welcome back, {{ user.name }}!
+        )}
+
+        {isLoggedIn && (
+            ## Your Dashboard
+            Here are your current items:
+            <CommaList items={user.items} />
+        )}
+
+        {!isLoggedIn && (
+            Please log in to continue.
+        )}
+
+        **Note:** This content was generated asynchronously! ⚡
+    )
+}

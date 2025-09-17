@@ -1,32 +1,920 @@
 {
-	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-	"name": "Better-mdx",
-	"patterns": [
-		{
-			"include": "#keywords"
-		},
-		{
-			"include": "#strings"
-		}
-	],
-	"repository": {
-		"keywords": {
-			"patterns": [{
-				"name": "keyword.control.bettermdx",
-				"match": "\\b(if|while|for|return)\\b"
-			}]
-		},
-		"strings": {
-			"name": "string.quoted.double.bettermdx",
-			"begin": "\"",
-			"end": "\"",
-			"patterns": [
-				{
-					"name": "constant.character.escape.bettermdx",
-					"match": "\\\\."
-				}
-			]
-		}
-	},
-	"scopeName": "source.tsx"
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Better-mdx",
+  "scopeName": "source.better-mdx",
+  "fileTypes": [
+    "bettermdx",
+    "bmdx"
+  ],
+  "patterns": [
+    {
+      "include": "#function_with_mdx_return"
+    },
+    {
+      "include": "source.ts"
+    }
+  ],
+  "repository": {
+    "function_with_mdx_return": {
+      "name": "meta.function.mdx.better-mdx",
+      "begin": "^\\\\s*(export\\\\s+)?(async\\\\s+)?(function|const|let|var)\\\\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\\\\s*[\\\\(=]",
+      "end": "^\\\\s*\\\\}\\\\s*$",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.export.better-mdx"
+        },
+        "2": {
+          "name": "keyword.control.async.better-mdx"
+        },
+        "3": {
+          "name": "keyword.control.better-mdx"
+        },
+        "4": {
+          "name": "entity.name.function.better-mdx"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#mdx_return_content"
+        },
+        {
+          "include": "source.ts"
+        }
+      ]
+    },
+    "mdx_return_content": {
+      "name": "meta.mdx.content.better-mdx",
+      "begin": "\\\\breturn\\\\s*\\\\(",
+      "end": "^\\s*\\)\\s*;?\\s*$",
+      "beginCaptures": {
+        "0": {
+          "name": "keyword.control.return.better-mdx"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "keyword.control.return.better-mdx"
+        }
+      },
+      "contentName": "text.html.markdown.better-mdx",
+      "patterns": [
+        {
+          "include": "#interpolation"
+        },
+        {
+          "include": "#expressions"
+        },
+        {
+          "include": "#jsx_elements"
+        },
+        {
+          "include": "#mdx_block"
+        }
+      ]
+    },
+    "interpolation": {
+      "name": "meta.interpolation.better-mdx",
+      "begin": "\\\\{\\\\{",
+      "end": "\\\\}\\\\}",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.interpolation.begin.better-mdx"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.interpolation.end.better-mdx"
+        }
+      },
+      "contentName": "source.ts.embedded.better-mdx",
+      "patterns": [
+        {
+          "include": "source.ts"
+        }
+      ]
+    },
+    "interpolation_content": {
+      "name": "variable.other.interpolation.better-mdx",
+      "match": "[^}]+",
+      "patterns": [
+        {
+          "include": "#variable_references"
+        },
+        {
+          "include": "#strings"
+        },
+        {
+          "include": "#comments"
+        }
+      ]
+    },
+    "expressions": {
+      "name": "meta.expression.better-mdx",
+      "begin": "\\\\{(?!\\\\{)",
+      "end": "\\\\}",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.expression.begin.better-mdx"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.expression.end.better-mdx"
+        }
+      },
+      "contentName": "source.ts.embedded.better-mdx",
+      "patterns": [
+        {
+          "include": "source.ts"
+        }
+      ]
+    },
+    "jsx_elements": {
+      "name": "meta.jsx.element.better-mdx",
+      "begin": "<([a-zA-Z][a-zA-Z0-9]*)",
+      "end": "/?>",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.tag.begin.better-mdx"
+        },
+        "1": {
+          "name": "entity.name.tag.better-mdx"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.tag.end.better-mdx"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#jsx_attributes"
+        },
+        {
+          "include": "source.ts"
+        }
+      ]
+    },
+    "jsx_attributes": {
+      "name": "meta.jsx.attributes.better-mdx",
+      "match": "([a-zA-Z][a-zA-Z0-9]*)\\s*=\\s*(\\{[^}]*\\}|\"[^\"]*\"|'[^']*')",
+      "captures": {
+        "1": {
+          "name": "entity.other.attribute-name.better-mdx"
+        },
+        "2": {
+          "name": "string.quoted.attribute.better-mdx"
+        }
+      }
+    },
+    "function_declarations": {
+      "name": "meta.function.declaration.better-mdx",
+      "begin": "\\\\b(function|const|let|var)\\\\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\\\\s*\\\\(",
+      "end": "(?=\\\\{|;|$)",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.better-mdx"
+        },
+        "2": {
+          "name": "entity.name.function.better-mdx"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#parameter_list"
+        },
+        {
+          "include": "#type_annotations"
+        }
+      ]
+    },
+    "imports": {
+      "name": "meta.import.better-mdx",
+      "begin": "\\\\bimport\\\\b",
+      "end": ";",
+      "beginCaptures": {
+        "0": {
+          "name": "keyword.control.import.better-mdx"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#import_specifiers"
+        },
+        {
+          "include": "#module_paths"
+        }
+      ]
+    },
+    "markdown": {
+      "patterns": [
+        {
+          "include": "#headers"
+        },
+        {
+          "include": "#bold_text"
+        },
+        {
+          "include": "#italic_text"
+        },
+        {
+          "include": "#code_blocks"
+        },
+        {
+          "include": "#inline_code"
+        }
+      ]
+    },
+    "headers": {
+      "name": "markup.heading.better-mdx",
+      "match": "^(#{1,6})\\\\s+(.+)$",
+      "captures": {
+        "1": {
+          "name": "markup.heading.marker.better-mdx"
+        },
+        "2": {
+          "name": "markup.heading.text.better-mdx"
+        }
+      }
+    },
+    "bold_text": {
+      "name": "markup.bold.better-mdx",
+      "match": "\\\\*\\\\*([^*]+)\\\\*\\\\*",
+      "captures": {
+        "1": {
+          "name": "markup.bold.text.better-mdx"
+        }
+      }
+    },
+    "italic_text": {
+      "name": "markup.italic.better-mdx",
+      "match": "\\\\*([^*]+)\\\\*",
+      "captures": {
+        "1": {
+          "name": "markup.italic.text.better-mdx"
+        }
+      }
+    },
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.better-mdx",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.better-mdx",
+          "begin": "/\\\\*",
+          "end": "\\\\*/",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.begin.better-mdx"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.end.better-mdx"
+            }
+          }
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.ts",
+          "begin": "\"",
+          "end": "\"",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.begin.ts"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.ts"
+            }
+          },
+          "patterns": [
+            {
+              "name": "constant.character.escape.ts",
+              "match": "\\\\\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.ts",
+          "begin": "'",
+          "end": "'",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.begin.ts"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.ts"
+            }
+          },
+          "patterns": [
+            {
+              "name": "constant.character.escape.ts",
+              "match": "\\\\\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.template.ts",
+          "begin": "`",
+          "end": "`",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.begin.ts"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.ts"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#interpolation"
+            }
+          ]
+        }
+      ]
+    },
+    "keywords": {
+      "name": "keyword.control.better-mdx",
+      "match": "\\\\b(if|else|while|for|return|const|let|var|function|class|interface|type|enum|async|await|import|export|from|default|extends|implements)\\\\b"
+    },
+    "parameter_list": {
+      "name": "meta.parameter.list.better-mdx",
+      "begin": "\\\\(",
+      "end": "\\\\)",
+      "patterns": [
+        {
+          "include": "#type_annotations"
+        },
+        {
+          "include": "#variable_references"
+        }
+      ]
+    },
+    "type_annotations": {
+      "name": "meta.type.annotation.better-mdx",
+      "match": ":\\\\s*[a-zA-Z_$][a-zA-Z0-9_$<>\\\\[\\\\]|\\\\s,]*"
+    },
+    "import_specifiers": {
+      "name": "meta.import.specifier.better-mdx",
+      "match": "\\\\{[^}]+\\\\}"
+    },
+    "module_paths": {
+      "name": "string.quoted.module.better-mdx",
+      "match": "[\"'][^\"']+[\"']"
+    },
+    "code_blocks": {
+      "name": "markup.code.block.better-mdx",
+      "begin": "```",
+      "end": "```",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.code.begin.better-mdx"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.code.end.better-mdx"
+        }
+      }
+    },
+    "inline_code": {
+      "name": "markup.code.inline.better-mdx",
+      "match": "`[^`]+`",
+      "captures": {
+        "0": {
+          "name": "punctuation.definition.code.better-mdx"
+        }
+      }
+    },
+    "variable_references": {
+      "name": "variable.other.better-mdx",
+      "match": "\\\\b[a-zA-Z_$][a-zA-Z0-9_$]*\\\\b"
+    },
+    "mdx_block": {
+      "patterns": [
+        {
+          "include": "#mdx_heading"
+        },
+        {
+          "include": "#mdx_blockquote"
+        },
+        {
+          "include": "#mdx_lists"
+        },
+        {
+          "include": "#mdx_fenced_code_block"
+        },
+        {
+          "include": "#mdx_raw_block"
+        },
+        {
+          "include": "#mdx_separator"
+        },
+        {
+          "include": "#mdx_table"
+        },
+        {
+          "include": "#mdx_paragraph"
+        }
+      ]
+    },
+    "mdx_heading": {
+      "match": "(?:^|\\\\G)[ ]{0,3}(#{1,6}\\\\s+(.*?)(\\\\s+#{1,6})?\\\\s*)$",
+      "captures": {
+        "1": {
+          "patterns": [
+            {
+              "match": "(#{6})\\\\s+(.*?)(?:\\\\s+(#+))?\\\\s*$",
+              "name": "heading.6.markdown",
+              "captures": {
+                "1": {
+                  "name": "punctuation.definition.heading.markdown"
+                },
+                "2": {
+                  "name": "entity.name.section.markdown",
+                  "patterns": [
+                    {
+                      "include": "#mdx_inline"
+                    }
+                  ]
+                },
+                "3": {
+                  "name": "punctuation.definition.heading.markdown"
+                }
+              }
+            },
+            {
+              "match": "(#{5})\\\\s+(.*?)(?:\\\\s+(#+))?\\\\s*$",
+              "name": "heading.5.markdown",
+              "captures": {
+                "1": {
+                  "name": "punctuation.definition.heading.markdown"
+                },
+                "2": {
+                  "name": "entity.name.section.markdown",
+                  "patterns": [
+                    {
+                      "include": "#mdx_inline"
+                    }
+                  ]
+                },
+                "3": {
+                  "name": "punctuation.definition.heading.markdown"
+                }
+              }
+            },
+            {
+              "match": "(#{4})\\\\s+(.*?)(?:\\\\s+(#+))?\\\\s*$",
+              "name": "heading.4.markdown",
+              "captures": {
+                "1": {
+                  "name": "punctuation.definition.heading.markdown"
+                },
+                "2": {
+                  "name": "entity.name.section.markdown",
+                  "patterns": [
+                    {
+                      "include": "#mdx_inline"
+                    }
+                  ]
+                },
+                "3": {
+                  "name": "punctuation.definition.heading.markdown"
+                }
+              }
+            },
+            {
+              "match": "(#{3})\\\\s+(.*?)(?:\\\\s+(#+))?\\\\s*$",
+              "name": "heading.3.markdown",
+              "captures": {
+                "1": {
+                  "name": "punctuation.definition.heading.markdown"
+                },
+                "2": {
+                  "name": "entity.name.section.markdown",
+                  "patterns": [
+                    {
+                      "include": "#mdx_inline"
+                    }
+                  ]
+                },
+                "3": {
+                  "name": "punctuation.definition.heading.markdown"
+                }
+              }
+            },
+            {
+              "match": "(#{2})\\\\s+(.*?)(?:\\\\s+(#+))?\\\\s*$",
+              "name": "heading.2.markdown",
+              "captures": {
+                "1": {
+                  "name": "punctuation.definition.heading.markdown"
+                },
+                "2": {
+                  "name": "entity.name.section.markdown",
+                  "patterns": [
+                    {
+                      "include": "#mdx_inline"
+                    }
+                  ]
+                },
+                "3": {
+                  "name": "punctuation.definition.heading.markdown"
+                }
+              }
+            },
+            {
+              "match": "(#{1})\\\\s+(.*?)(?:\\\\s+(#+))?\\\\s*$",
+              "name": "heading.1.markdown",
+              "captures": {
+                "1": {
+                  "name": "punctuation.definition.heading.markdown"
+                },
+                "2": {
+                  "name": "entity.name.section.markdown",
+                  "patterns": [
+                    {
+                      "include": "#mdx_inline"
+                    }
+                  ]
+                },
+                "3": {
+                  "name": "punctuation.definition.heading.markdown"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "name": "markup.heading.markdown"
+    },
+    "mdx_blockquote": {
+      "begin": "(^|\\\\G)[ ]{0,3}(>) ?",
+      "captures": {
+        "2": {
+          "name": "punctuation.definition.quote.begin.markdown"
+        }
+      },
+      "name": "markup.quote.markdown",
+      "patterns": [
+        {
+          "include": "#mdx_block"
+        }
+      ],
+      "while": "(^|\\\\G)\\\\s*(>) ?"
+    },
+    "mdx_lists": {
+      "patterns": [
+        {
+          "begin": "(^|\\\\G)([ ]{0,3})([*+-])([ \\\\t])",
+          "beginCaptures": {
+            "3": {
+              "name": "punctuation.definition.list.begin.markdown"
+            }
+          },
+          "name": "markup.list.unnumbered.markdown",
+          "patterns": [
+            {
+              "include": "#mdx_block"
+            },
+            {
+              "include": "#mdx_list_paragraph"
+            }
+          ],
+          "while": "((^|\\\\G)([ ]{2,4}|\\\\t))|(^[ \\\\t]*$)"
+        },
+        {
+          "begin": "(^|\\\\G)([ ]{0,3})([0-9]+[\\\\.\\)])([ \\\\t])",
+          "beginCaptures": {
+            "3": {
+              "name": "punctuation.definition.list.begin.markdown"
+            }
+          },
+          "name": "markup.list.numbered.markdown",
+          "patterns": [
+            {
+              "include": "#mdx_block"
+            },
+            {
+              "include": "#mdx_list_paragraph"
+            }
+          ],
+          "while": "((^|\\\\G)([ ]{2,4}|\\\\t))|(^[ \\\\t]*$)"
+        }
+      ]
+    },
+    "mdx_list_paragraph": {
+      "begin": "(^|\\\\G)(?=\\\\S)(?![*+->]\\\\s|[0-9]+\\\\.\\\\s)",
+      "name": "meta.paragraph.markdown",
+      "patterns": [
+        {
+          "include": "#mdx_inline"
+        }
+      ],
+      "while": "(^|\\\\G)(?!\\\\s*$|#|[ ]{0,3}([-*_>][ ]{2,}){3,}[ \\\\t]*$\\\\n?|[ ]{0,3}[*+->]|[ ]{0,3}[0-9]+\\\\.)"
+    },
+    "mdx_fenced_code_block": {
+      "begin": "(^|\\\\G)(\\\\s*)(`{3,}|~{3,})\\\\s*(?=([^`]*)?$)",
+      "beginCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        },
+        "4": {
+          "name": "fenced_code.block.language"
+        }
+      },
+      "end": "(^|\\\\G)(\\\\2|\\\\s{0,3})(\\\\3)\\\\s*$",
+      "endCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        }
+      },
+      "name": "markup.fenced_code.block.markdown"
+    },
+    "mdx_raw_block": {
+      "begin": "(^|\\\\G)([ ]{4}|\\\\t)",
+      "name": "markup.raw.block.markdown",
+      "while": "(^|\\\\G)([ ]{4}|\\\\t)"
+    },
+    "mdx_separator": {
+      "match": "(^|\\\\G)[ ]{0,3}([\\\\*\\\\-\\\\_])([ ]{0,2}\\\\2){2,}[ \\\\t]*$\\\\n?",
+      "name": "meta.separator.markdown"
+    },
+    "mdx_table": {
+      "name": "markup.table.markdown",
+      "begin": "(^|\\\\G)(\\\\|)(?=[^|].+\\\\|\\\\s*$)",
+      "beginCaptures": {
+        "2": {
+          "name": "punctuation.definition.table.markdown"
+        }
+      },
+      "while": "(^|\\\\G)(?=\\\\|)",
+      "patterns": [
+        {
+          "match": "\\\\|",
+          "name": "punctuation.definition.table.markdown"
+        },
+        {
+          "match": "(?<=\\\\|)\\\\s*(:?-+:?)\\\\s*(?=\\\\|)",
+          "captures": {
+            "1": {
+              "name": "punctuation.separator.table.markdown"
+            }
+          }
+        },
+        {
+          "match": "(?<=\\\\|)\\\\s*(?=\\\\S)((\\\\\\\\\\\\||[^|])+)(?<=\\\\S)\\\\s*(?=\\\\|)",
+          "captures": {
+            "1": {
+              "patterns": [
+                {
+                  "include": "#mdx_inline"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "mdx_paragraph": {
+      "begin": "(^|\\\\G)[ ]{0,3}(?=[^ \\\\t\\\\n])",
+      "name": "meta.paragraph.markdown",
+      "patterns": [
+        {
+          "include": "#mdx_inline"
+        }
+      ],
+      "while": "(^|\\\\G)((?=\\\\s*[-=]{3,}\\\\s*$)|[ ]{4,}(?=[^ \\\\t\\\\n]))"
+    },
+    "mdx_inline": {
+      "patterns": [
+        {
+          "include": "#interpolation"
+        },
+        {
+          "include": "#expressions"
+        },
+        {
+          "include": "#jsx_elements"
+        },
+        {
+          "include": "#mdx_ampersand"
+        },
+        {
+          "include": "#mdx_bracket"
+        },
+        {
+          "include": "#mdx_bold"
+        },
+        {
+          "include": "#mdx_italic"
+        },
+        {
+          "include": "#mdx_raw"
+        },
+        {
+          "include": "#mdx_strikethrough"
+        },
+        {
+          "include": "#mdx_escape"
+        },
+        {
+          "include": "#mdx_image_inline"
+        },
+        {
+          "include": "#mdx_link_email"
+        },
+        {
+          "include": "#mdx_link_inet"
+        },
+        {
+          "include": "#mdx_link_inline"
+        }
+      ]
+    },
+    "mdx_bold": {
+      "name": "markup.bold.markdown",
+      "begin": "(\\\\*\\\\*|__)(?=\\\\S)",
+      "end": "(?<=\\\\S)(\\\\1)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.bold.markdown"
+        }
+      },
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.bold.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#mdx_escape"
+        },
+        {
+          "include": "#mdx_raw"
+        },
+        {
+          "include": "#mdx_italic"
+        }
+      ]
+    },
+    "mdx_italic": {
+      "name": "markup.italic.markdown",
+      "begin": "(\\\\*|_)(?=\\\\S)",
+      "end": "(?<=\\\\S)(\\\\1)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.italic.markdown"
+        }
+      },
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.italic.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#mdx_escape"
+        },
+        {
+          "include": "#mdx_raw"
+        }
+      ]
+    },
+    "mdx_raw": {
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.raw.markdown"
+        },
+        "3": {
+          "name": "punctuation.definition.raw.markdown"
+        }
+      },
+      "match": "(`+)((?:[^`]|(?!(?<!`)\\\\1(?!`))`)*+)(\\\\1)",
+      "name": "markup.inline.raw.string.markdown"
+    },
+    "mdx_strikethrough": {
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.strikethrough.markdown"
+        },
+        "2": {
+          "patterns": [
+            {
+              "include": "#mdx_escape"
+            },
+            {
+              "include": "#mdx_ampersand"
+            },
+            {
+              "include": "#mdx_bracket"
+            },
+            {
+              "include": "#mdx_raw"
+            },
+            {
+              "include": "#mdx_bold"
+            },
+            {
+              "include": "#mdx_italic"
+            },
+            {
+              "include": "#mdx_image_inline"
+            },
+            {
+              "include": "#mdx_link_inline"
+            },
+            {
+              "include": "#mdx_link_inet"
+            },
+            {
+              "include": "#mdx_link_email"
+            }
+          ]
+        },
+        "3": {
+          "name": "punctuation.definition.strikethrough.markdown"
+        }
+      },
+      "match": "(?<!\\\\\\\\)(~{2,})(?!(?<=\\\\w~~)_)((?:[^~]|(?!(?<![~\\\\\\\\])\\\\1(?!~))~)*+)(\\\\1)(?!(?<=_\\\\1)\\\\w)",
+      "name": "markup.strikethrough.markdown"
+    },
+    "mdx_escape": {
+      "match": "\\\\\\\\[-`*_#+.!(){}\\\\[\\\\]\\\\\\\\>]",
+      "name": "constant.character.escape.markdown"
+    },
+    "mdx_ampersand": {
+      "match": "&(?!([a-zA-Z0-9]+|#[0-9]+|#x[0-9a-fA-F]+);)",
+      "name": "meta.other.valid-ampersand.markdown"
+    },
+    "mdx_bracket": {
+      "match": "<(?![a-zA-Z/?\\\\$!])",
+      "name": "meta.other.valid-bracket.markdown"
+    },
+    "mdx_image_inline": {
+      "name": "meta.image.inline.markdown",
+      "match": "!\\\\[([^\\\\]]*)\\\\]\\\\(([^)]+)\\\\)",
+      "captures": {
+        "1": {
+          "name": "string.other.link.description.markdown"
+        },
+        "2": {
+          "name": "markup.underline.link.image.markdown"
+        }
+      }
+    },
+    "mdx_link_email": {
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.link.markdown"
+        },
+        "2": {
+          "name": "markup.underline.link.markdown"
+        },
+        "3": {
+          "name": "punctuation.definition.link.markdown"
+        }
+      },
+      "match": "(<)((?:mailto:)?[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*)(>)",
+      "name": "meta.link.email.lt-gt.markdown"
+    },
+    "mdx_link_inet": {
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.link.markdown"
+        },
+        "2": {
+          "name": "markup.underline.link.markdown"
+        },
+        "3": {
+          "name": "punctuation.definition.link.markdown"
+        }
+      },
+      "match": "(<)((?:https?|ftp)://.*?)(>)",
+      "name": "meta.link.inet.markdown"
+    },
+    "mdx_link_inline": {
+      "name": "meta.link.inline.markdown",
+      "match": "\\\\[([^\\\\]]*)\\\\]\\\\(([^)]+)\\\\)",
+      "captures": {
+        "1": {
+          "name": "string.other.link.title.markdown"
+        },
+        "2": {
+          "name": "markup.underline.link.markdown"
+        }
+      }
+    }
+  }
 }

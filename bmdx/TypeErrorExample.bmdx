@@ -1,0 +1,7 @@
+function TypeErrorExample({ title }: { title: string }) {
+  return (
+    # {{ title }}
+
+    Welcome {{ userName }}! // userName is not declared in props
+  )
+}

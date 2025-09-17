@@ -1,0 +1,22 @@
+import { UlItem } from "./UlItem";
+
+function TestExample({ items }: { items: string[] }) {
+  const userName = 'Developer';
+  const score = 85;
+  const isHighScore = score > 80;
+
+  return (
+    # Test MDX Component
+
+    Welcome {{ userName }}! Your score is {{ score }}.
+    
+    {isHighScore ? (
+      🎉 **Congratulations!** You achieved a high score!
+    ): (
+      Keep trying to reach 80+ points.
+    )}
+
+    ## Technologies Used
+    {items.map((item) => <UlItem item={item} />)}
+  )
+}

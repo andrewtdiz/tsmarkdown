@@ -1,0 +1,62 @@
+# Basic MDX Grammar Definition
+# Minimal highlighting for TypeScript functions returning Markdown content
+
+name: MDX Basic
+scopeName: source.mdx-basic
+fileTypes: [mdx, bmdx]
+
+patterns:
+  - include: '#function_with_mdx_return'
+  - include: 'source.ts'
+
+repository:
+  function_with_mdx_return:
+    name: meta.function.mdx-basic
+    begin: '^\\s*(export\\s+)?(async\\s+)?(function|const|let|var)\\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\\s*[\\(=]'
+    end: '^\\s*\\}\\s*$'
+    beginCaptures:
+      '1': { name: keyword.control.export.mdx-basic }
+      '2': { name: keyword.control.async.mdx-basic }
+      '3': { name: keyword.control.mdx-basic }
+      '4': { name: entity.name.function.mdx-basic }
+    contentName: source.ts
+    patterns:
+      - include: '#mdx_return_block'
+
+  mdx_return_block:
+    name: meta.return.markdown.mdx-basic
+    begin: '\\breturn\\s*\\('
+    end: '^\\s*\\)\\s*;?\\s*$'
+    beginCaptures:
+      '0': { name: keyword.control.return.mdx-basic }
+    endCaptures:
+      '0': { name: keyword.control.return.mdx-basic }
+    contentName: text.html.markdown.mdx-basic
+    patterns:
+      - include: '#interpolation'
+      - include: '#expression'
+      - include: 'text.html.markdown'
+
+  interpolation:
+    name: meta.interpolation.mdx-basic
+    begin: '\\{\\{'
+    end: '\\}\\}'
+    beginCaptures:
+      '0': { name: punctuation.definition.interpolation.begin.mdx-basic }
+    endCaptures:
+      '0': { name: punctuation.definition.interpolation.end.mdx-basic }
+    contentName: source.ts.embedded.mdx-basic
+    patterns:
+      - include: 'source.ts'
+
+  expression:
+    name: meta.expression.mdx-basic
+    begin: '\\{(?!\\{)'
+    end: '\\}'
+    beginCaptures:
+      '0': { name: punctuation.definition.expression.begin.mdx-basic }
+    endCaptures:
+      '0': { name: punctuation.definition.expression.end.mdx-basic }
+    contentName: source.ts.embedded.mdx-basic
+    patterns:
+      - include: 'source.ts'
