@@ -15,10 +15,9 @@ import { useQuery } from "react-query";
 import "./index.css";
 
 import TestExample from './mdx/generated/TestExample.json';
-import { TemplateExecutionEngine } from "../../src/template-engine";
+import { executeMDXTemplate } from "../../src/template-engine";
 
 console.log(TestExample);
-const engine = new TemplateExecutionEngine();
 
 export function App() {
   const { data: mdxComponent, isLoading, error } = useQuery(
@@ -26,7 +25,7 @@ export function App() {
     async () => {
       try {
         // Load the pre-compiled JSON file from the dist directory
-        const result1 = await engine.execute(JSON.parse(JSON.stringify(TestExample)), {}, {
+        const result1 = await executeMDXTemplate(JSON.parse(JSON.stringify(TestExample)), {}, {
           items: ["Apple", "Banana", "Cherry"],
         }, "./mdx");
         return result1.content;

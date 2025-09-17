@@ -2,9 +2,9 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync, watchFile, unwatchFile } from 'fs';
 import { resolve, dirname, basename, join, extname } from 'path';
-import { MDXParser } from './parser';
-import { MDXCompiler } from './compiler';
-import { TemplateExecutionEngine } from './template-engine';
+import { parseMDX } from './parser';
+import { compileMDX } from './compiler';
+import { executeMDXTemplate } from './template-engine';
 import { MDXAPIServer } from './api-server';
 import { MDXTypeChecker } from './type-checker';
 
@@ -18,9 +18,6 @@ interface CLIOptions {
 }
 
 class BetterMDXCLI {
-  private parser = new MDXParser();
-  private compiler = new MDXCompiler();
-  private engine = new TemplateExecutionEngine();
   private typeChecker = new MDXTypeChecker();
   private apiServer?: MDXAPIServer;
   private watchedFiles: Set<string> = new Set();
@@ -353,13 +350,13 @@ Next steps:
           console.log(`  🔄 Compiling: ${relativePath}`);
         }
 
-        const parsed = this.parser.parse(content);
-        const compiled = this.compiler.compile(parsed);
-        const result = await this.engine.execute(compiled, context, props, basePath);
+        const parsed = parseMDX(content);
+        const compiled = compileMDX(parsed);
+        const result = await executeMDXTemplate(compiled, {}, {}, mdxDir);
 
         // Write compiled file
         const outputPath = join(outputDir, relativePath.replace('.mdx', '.json'));
-        
+
         mkdirSync(dirname(outputPath), { recursive: true });
         writeFileSync(outputPath, JSON.stringify(compiled, null, 2));
 
@@ -391,8 +388,8 @@ Next steps:
 
     console.log(`📄 Compiling MDX file: ${fullPath}`);
 
-    const parsed = this.parser.parse(content);
-    const compiled = this.compiler.compile(parsed);
+    const parsed = parseMDX(content);
+    const compiled = compileMDX(parsed);
 
     // Type checking if requested
     if (options.typecheck) {
@@ -455,10 +452,10 @@ Next steps:
 
     console.log(`🚀 Executing MDX file: ${fullPath}`);
 
-    const parsed = this.parser.parse(content);
-    const compiled = this.compiler.compile(parsed);
+    const parsed = parseMDX(content);
+    const compiled = compileMDX(parsed);
 
-    const result = await this.engine.execute(compiled, {
+    const result = await executeMDXTemplate(compiled, {
       // Mock context for testing
       useAuth: () => ({
         user: { name: 'Demo User' },

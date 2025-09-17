@@ -1,6 +1,6 @@
 import { readFileSync } from "fs";
-import { MDXParser } from "./src/parser";
-import { MDXCompiler } from "./src/compiler";
+import { parseMDX } from "./src/parser";
+import { compileMDX } from "./src/compiler";
 
 // Test with different MDX files
 const testFiles = [
@@ -10,8 +10,6 @@ const testFiles = [
     "./mdx/OlItem.mdx"
 ];
 
-const parser = new MDXParser();
-const compiler = new MDXCompiler();
 
 for (const testFile of testFiles) {
     console.log(`\n=== ${testFile} ===`);
@@ -20,11 +18,11 @@ for (const testFile of testFiles) {
     console.log("Original MDX content:");
     console.log(content);
 
-    const parsed = parser.parse(content);
+    const parsed = parseMDX(content);
     console.log("\nParsed structure:");
     console.log(JSON.stringify(parsed, null, 2));
 
-    const compiled = compiler.compile(parsed);
+    const compiled = compileMDX(parsed);
     console.log("\nCompiled TypeScript:");
     console.log(compiled.typescript);
 

@@ -1,28 +1,25 @@
-import { TemplateExecutionEngine } from './src/template-engine';
-import { MDXParser } from './src/parser';
-import { MDXCompiler } from './src/compiler';
+import { executeMDXTemplate } from './src/template-engine';
+import { parseMDX } from './src/parser';
+import { compileMDX } from './src/compiler';
 import { readFileSync } from 'fs';
 
 async function testDefaultPropsFinal() {
     console.log('🧪 Final Test: Default Prop Values for JSX Components\n');
 
-    const engine = new TemplateExecutionEngine();
-    const parser = new MDXParser();
-    const compiler = new MDXCompiler();
 
     try {
         // Load and compile the List component
         console.log('📋 Loading List component...');
         const listContent = readFileSync('./mdx/List.mdx', 'utf-8');
-        const parsedList = parser.parse(listContent);
-        const compiledList = compiler.compile(parsedList);
+        const parsedList = parseMDX(listContent);
+        const compiledList = compileMDX(parsedList);
 
         console.log('✅ List component compiled successfully');
         console.log('   Parameter types:', compiledList.metadata.parameterTypes);
 
         // Test 1: Direct List component without ordered prop (should use default false)
         console.log('\n📋 Test 1: Direct List component without ordered prop...');
-        const result1 = await engine.execute(compiledList, {}, {
+        const result1 = await executeMDXTemplate(compiledList, {}, {
             items: ["Apple", "Banana", "Cherry"]
         }, "./mdx");
 
@@ -33,7 +30,7 @@ async function testDefaultPropsFinal() {
 
         // Test 2: Direct List component with explicit ordered=true
         console.log('\n📋 Test 2: Direct List component with ordered=true...');
-        const result2 = await engine.execute(compiledList, {}, {
+        const result2 = await executeMDXTemplate(compiledList, {}, {
             items: ["React", "TypeScript", "MDX"],
             ordered: true
         }, "./mdx");
@@ -45,7 +42,7 @@ async function testDefaultPropsFinal() {
 
         // Test 3: Direct List component with explicit ordered=false
         console.log('\n📋 Test 3: Direct List component with ordered=false...');
-        const result3 = await engine.execute(compiledList, {}, {
+        const result3 = await executeMDXTemplate(compiledList, {}, {
             items: ["Explicit", "False", "Test"],
             ordered: false
         }, "./mdx");
@@ -69,15 +66,15 @@ function WrapperExample({ items, ordered }: { items: string[]; ordered?: boolean
   )
 }`;
 
-        const parsedWrapper = parser.parse(wrapperContent);
-        const compiledWrapper = compiler.compile(parsedWrapper);
+        const parsedWrapper = parseMDX(wrapperContent);
+        const compiledWrapper = compileMDX(parsedWrapper);
 
         console.log('✅ Wrapper component compiled successfully');
         console.log('   Parameter types:', compiledWrapper.metadata.parameterTypes);
 
         // Test 4a: Wrapper without ordered prop
         console.log('\n📋 Test 4a: Wrapper without ordered prop...');
-        const result4a = await engine.execute(compiledWrapper, {}, {
+        const result4a = await executeMDXTemplate(compiledWrapper, {}, {
             items: ["Wrapper", "Test", "A"]
         }, "./mdx");
 
@@ -88,7 +85,7 @@ function WrapperExample({ items, ordered }: { items: string[]; ordered?: boolean
 
         // Test 4b: Wrapper with ordered=true
         console.log('\n📋 Test 4b: Wrapper with ordered=true...');
-        const result4b = await engine.execute(compiledWrapper, {}, {
+        const result4b = await executeMDXTemplate(compiledWrapper, {}, {
             items: ["Wrapper", "Test", "B"],
             ordered: true
         }, "./mdx");

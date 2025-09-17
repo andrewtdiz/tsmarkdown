@@ -1,11 +1,10 @@
 #!/usr/bin/env bun
 
-import { MDXParser } from './src/parser';
+import { parseMDX } from './src/parser';
 
 function debugParser() {
   console.log('🔍 Debugging Parser Logic\n');
 
-  const parser = new MDXParser();
 
   // Simple test case
   const simpleComponent = `function TestComponent({ items }: { items: string[] }) {
@@ -25,7 +24,7 @@ function debugParser() {
   console.log('\n' + '='.repeat(50) + '\n');
 
   try {
-    const parsed = parser.parse(simpleComponent);
+    const parsed = parseMDX(simpleComponent);
     console.log('✅ Parsed successfully');
     console.log('Function name:', parsed.functionName);
     console.log('Function params:', parsed.functionParams);

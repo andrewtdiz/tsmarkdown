@@ -154,7 +154,7 @@ function BlogPost() {
         settings: AppSettings;
       }
 
-      const result = engine.execute(compiled, context as BlogContext);`}
+      const result = executeMDXTemplate(compiled, context as BlogContext);`}
       </CodeBlock>
 
       ### Performance Optimization

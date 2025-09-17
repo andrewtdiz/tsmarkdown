@@ -1,10 +1,7 @@
-import { MDXParser } from "./src/parser";
-import { MDXCompiler } from "./src/compiler";
-import { TemplateExecutionEngine } from "./src/template-engine";
+import { parseMDX } from "./src/parser";
+import { compileMDX } from "./src/compiler";
+import { executeMDXTemplate } from "./src/template-engine";
 
-const parser = new MDXParser();
-const compiler = new MDXCompiler();
-const engine = new TemplateExecutionEngine();
 
 async function demo(title: string, mdxSource: string, context: any = {}, props: any = {}, basePath?: string) {
   console.log('\n' + '='.repeat(60));
@@ -26,9 +23,9 @@ async function demo(title: string, mdxSource: string, context: any = {}, props: 
   console.log('─'.repeat(40));
 
   try {
-    const parsed = parser.parse(mdxSource);
-    const compiled = compiler.compile(parsed);
-    const result = await engine.execute(compiled, context, props, basePath);
+    const parsed = parseMDX(mdxSource);
+    const compiled = compileMDX(parsed);
+    const result = await executeMDXTemplate(compiled, context, props, basePath);
 
     console.log(result.content);
     console.log('─'.repeat(40));

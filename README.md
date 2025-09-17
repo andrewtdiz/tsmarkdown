@@ -59,20 +59,17 @@ function Welcome() {
 ### Basic Usage
 
 ```typescript
-import { MDXParser, MDXCompiler, TemplateExecutionEngine } from 'better-mdx';
+import { parseMDX, compileMDX, executeMDXTemplate } from 'better-mdx';
 
-const parser = new MDXParser();
-const compiler = new MDXCompiler();
-const engine = new TemplateExecutionEngine();
 
 // Parse MDX content
-const parsed = parser.parse(mdxContent);
+const parsed = parseMDX(mdxContent);
 
 // Compile to intermediate format
-const compiled = compiler.compile(parsed);
+const compiled = compileMDX(parsed);
 
 // Execute with context
-const result = engine.execute(compiled, {
+const result = executeMDXTemplate(compiled, {
   Button: ({ children, onClick }) => `<button onclick="${onClick}">${children}</button>`
 });
 
@@ -343,12 +340,10 @@ interface ParsedMDX {
 }
 ```
 
-### MDXCompiler
+### compileMDX
 
 ```typescript
-class MDXCompiler {
-  compile(parsed: ParsedMDX): CompiledMDX;
-}
+function compileMDX(parsed: ParsedMDX): CompiledMDX;
 
 interface CompiledMDX {
   id: string;
@@ -365,12 +360,15 @@ interface CompiledMDX {
 }
 ```
 
-### TemplateExecutionEngine
+### executeMDXTemplate
 
 ```typescript
-class TemplateExecutionEngine {
-  execute(compiled: CompiledMDX, context?: TemplateContext): TemplateExecutionResult;
-}
+async function executeMDXTemplate(
+  compiled: CompiledMDX, 
+  context?: TemplateContext, 
+  props?: any, 
+  basePath?: string
+): Promise<TemplateExecutionResult>;
 
 interface TemplateExecutionResult {
   content: string;

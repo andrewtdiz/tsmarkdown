@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { MDXParser } from './parser';
-import { MDXCompiler } from './compiler';
+import { parseMDX } from './parser';
+import { compileMDX } from './compiler';
 import { ClientRenderer, RenderedResult } from './client-renderer';
-import { TemplateExecutionEngine } from './template-engine';
+import { executeMDXTemplate } from './template-engine';
 
 export interface UseMDXComponentOptions {
   source?: string;
@@ -48,9 +48,6 @@ export function useMDXComponent(options: UseMDXComponentOptions = {}): MDXCompon
   const [componentRegistry, setComponentRegistry] = useState(options.componentRegistry || {});
 
   // Create instances
-  const parser = useMemo(() => new MDXParser(), []);
-  const compiler = useMemo(() => new MDXCompiler(), []);
-  const engine = useMemo(() => new TemplateExecutionEngine(), []);
   const renderer = useMemo(() => new ClientRenderer({
     componentRegistry,
     globalContext: context
@@ -76,11 +73,11 @@ export function useMDXComponent(options: UseMDXComponentOptions = {}): MDXCompon
 
     try {
       // Parse and compile
-      const parsed = parser.parse(mdxSource);
-      const compiled = compiler.compile(parsed);
+      const parsed = parseMDX(mdxSource);
+      const compiled = compileMDX(parsed);
 
       // Execute template
-      const executionResult = await engine.execute(compiled, mdxContext);
+      const executionResult = await executeMDXTemplate(compiled, mdxContext);
 
       // Get metadata from content
       const metadata = renderer.extractMetadata(executionResult.content);
@@ -102,7 +99,7 @@ export function useMDXComponent(options: UseMDXComponentOptions = {}): MDXCompon
         lastUpdated: new Date()
       }));
     }
-  }, [parser, compiler, engine, renderer]);
+  }, [renderer]);
 
   /**
    * Refresh the component with current source and context
@@ -225,9 +222,6 @@ export function useMDXCollection(sources: Record<string, string>, options: Omit<
 
   useEffect(() => {
     const processAll = async () => {
-      const parser = new MDXParser();
-      const compiler = new MDXCompiler();
-      const engine = new TemplateExecutionEngine();
       const renderer = new ClientRenderer({
         componentRegistry: options.componentRegistry,
         globalContext: options.context
@@ -237,9 +231,9 @@ export function useMDXCollection(sources: Record<string, string>, options: Omit<
 
       for (const [key, source] of Object.entries(sources)) {
         try {
-          const parsed = parser.parse(source);
-          const compiled = compiler.compile(parsed);
-          const executionResult = await engine.execute(compiled, options.context || {});
+          const parsed = parseMDX(source);
+          const compiled = compileMDX(parsed);
+          const executionResult = await executeMDXTemplate(compiled, options.context || {});
           const metadata = renderer.extractMetadata(executionResult.content);
 
           results[key] = {

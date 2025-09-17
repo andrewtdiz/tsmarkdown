@@ -240,7 +240,7 @@ export class MDXCompilationCache extends MDXCache {
    * Get compiled MDX result
    */
   getCompiled(source: string, context?: Record<string, any>): any {
-    const key = createCacheKey('compile', source, context);
+    const key = createCacheKey('compile', source, context || {});
     return this.get(key);
   }
 
@@ -248,7 +248,7 @@ export class MDXCompilationCache extends MDXCache {
    * Set compiled MDX result
    */
   setCompiled(source: string, compiled: any, context?: Record<string, any>, ttl?: number): void {
-    const key = createCacheKey('compile', source, context);
+    const key = createCacheKey('compile', source, context || {});
     this.set(key, compiled, ttl);
   }
 
@@ -256,7 +256,7 @@ export class MDXCompilationCache extends MDXCache {
    * Get rendered HTML result
    */
   getRendered(source: string, context?: Record<string, any>): string | undefined {
-    const key = createCacheKey('render', source, context);
+    const key = createCacheKey('render', source, context || {});
     return this.get(key);
   }
 
@@ -264,7 +264,7 @@ export class MDXCompilationCache extends MDXCache {
    * Set rendered HTML result
    */
   setRendered(source: string, html: string, context?: Record<string, any>, ttl?: number): void {
-    const key = createCacheKey('render', source, context);
+    const key = createCacheKey('render', source, context || {});
     this.set(key, html, ttl);
   }
 
@@ -272,7 +272,7 @@ export class MDXCompilationCache extends MDXCache {
    * Get execution result
    */
   getExecuted(source: string, context?: Record<string, any>): any {
-    const key = createCacheKey('execute', source, context);
+    const key = createCacheKey('execute', source, context || {});
     return this.get(key);
   }
 
@@ -280,7 +280,7 @@ export class MDXCompilationCache extends MDXCache {
    * Set execution result
    */
   setExecuted(source: string, result: any, context?: Record<string, any>, ttl?: number): void {
-    const key = createCacheKey('execute', source, context);
+    const key = createCacheKey('execute', source, context || {});
     this.set(key, result, ttl);
   }
 }
@@ -337,7 +337,7 @@ export function cached(cache: MDXCache, keyFn?: (...args: any[]) => string, ttl?
  * Cache warming utilities
  */
 export class CacheWarmer {
-  constructor(private cache: MDXCompilationCache) {}
+  constructor(private cache: MDXCompilationCache) { }
 
   /**
    * Warm cache with common MDX patterns
@@ -350,16 +350,13 @@ export class CacheWarmer {
       '# {{ title }}\n{showContent && ({{ content }})}'
     ];
 
-    const { MDXParser } = await import('./parser');
-    const { MDXCompiler } = await import('./compiler');
-
-    const parser = new MDXParser();
-    const compiler = new MDXCompiler();
+    const { parseMDX } = await import('./parser');
+    const { compileMDX } = await import('./compiler');
 
     for (const source of commonSources) {
       try {
-        const parsed = parser.parse(source);
-        const compiled = compiler.compile(parsed);
+        const parsed = parseMDX(source);
+        const compiled = compileMDX(parsed);
         this.cache.setCompiled(source, compiled);
       } catch (error) {
         // Skip invalid patterns
@@ -382,13 +379,10 @@ export class CacheWarmer {
       try {
         const source = fs.readFileSync(path.join(directory, file), 'utf-8');
 
-        const { MDXParser } = await import('./parser');
-        const { MDXCompiler } = await import('./compiler');
-
-        const parser = new MDXParser();
-        const compiler = new MDXCompiler();
-        const parsed = parser.parse(source);
-        const compiled = compiler.compile(parsed);
+        const { parseMDX } = await import('./parser');
+        const { compileMDX } = await import('./compiler');
+        const parsed = parseMDX(source);
+        const compiled = compileMDX(parsed);
 
         this.cache.setCompiled(source, compiled);
       } catch (error) {

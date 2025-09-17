@@ -1,7 +1,7 @@
-import { MDXParser } from './parser';
-import { MDXCompiler } from './compiler';
+import { parseMDX } from './parser';
+import { compileMDX } from './compiler';
 import { ClientRenderer } from './client-renderer';
-import { TemplateExecutionEngine } from './template-engine';
+import { executeMDXTemplate } from './template-engine';
 import { HotModuleReplacer, HMRConfig } from './hmr';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -36,19 +36,13 @@ export interface APIResponse<T = any> {
 }
 
 export class MDXAPIServer {
-  private parser: MDXParser;
-  private compiler: MDXCompiler;
   private renderer: ClientRenderer;
-  private engine: TemplateExecutionEngine;
   private hmr?: HotModuleReplacer;
   private config: Required<APIServerConfig>;
   private cache: Map<string, any> = new Map();
 
   constructor(config: APIServerConfig = {}) {
-    this.parser = new MDXParser();
-    this.compiler = new MDXCompiler();
     this.renderer = new ClientRenderer();
-    this.engine = new TemplateExecutionEngine();
 
     this.config = {
       port: config.port || 3000,
@@ -90,8 +84,8 @@ export class MDXAPIServer {
         };
       }
 
-      const parsed = this.parser.parse(request.source);
-      const compiled = this.compiler.compile(parsed);
+      const parsed = parseMDX(request.source);
+      const compiled = compileMDX(parsed);
 
       const result = {
         compiled,
@@ -133,8 +127,8 @@ export class MDXAPIServer {
       if (request.compiled) {
         compiled = request.compiled;
       } else if (request.source) {
-        const parsed = this.parser.parse(request.source);
-        compiled = this.compiler.compile(parsed);
+        const parsed = parseMDX(request.source);
+        compiled = compileMDX(parsed);
       } else {
         return {
           success: false,
@@ -175,8 +169,8 @@ export class MDXAPIServer {
       if (request.compiled) {
         compiled = request.compiled;
       } else if (request.source) {
-        const parsed = this.parser.parse(request.source);
-        compiled = this.compiler.compile(parsed);
+        const parsed = parseMDX(request.source);
+        compiled = compileMDX(parsed);
       } else {
         return {
           success: false,
@@ -184,7 +178,7 @@ export class MDXAPIServer {
         };
       }
 
-      const executionResult = await this.engine.execute(compiled, request.context || {});
+      const executionResult = await executeMDXTemplate(compiled, request.context || {});
 
       return {
         success: true,

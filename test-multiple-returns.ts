@@ -1,15 +1,12 @@
 #!/usr/bin/env bun
 
-import { MDXParser } from './src/parser';
-import { MDXCompiler } from './src/compiler';
-import { TemplateExecutionEngine } from './src/template-engine';
+import { parseMDX } from './src/parser';
+import { compileMDX } from './src/compiler';
+import { executeMDXTemplate } from './src/template-engine';
 
 async function testMultipleReturns() {
   console.log('🧪 Testing Multiple Return Statements Implementation\n');
 
-  const parser = new MDXParser();
-  const compiler = new MDXCompiler();
-  const engine = new TemplateExecutionEngine();
 
   // Test case 1: Empty array handling
   console.log('📋 Test 1: Empty array handling');
@@ -24,23 +21,23 @@ async function testMultipleReturns() {
 }`;
 
   try {
-    const parsed = parser.parse(emptyArrayComponent);
+    const parsed = parseMDX(emptyArrayComponent);
     console.log('✅ Parsed successfully');
     console.log('Return statements:', parsed.returnStatements.length);
     console.log('TypeScript:', parsed.typescript);
     console.log('Return statements:', JSON.stringify(parsed.returnStatements, null, 2));
 
-    const compiled = compiler.compile(parsed);
+    const compiled = compileMDX(parsed);
     console.log('✅ Compiled successfully');
 
     // Test with empty array
-    const result1 = await engine.execute(compiled, {}, { items: [] });
+    const result1 = await executeMDXTemplate(compiled, {}, { items: [] });
     console.log('Empty array result:', result1.content);
     console.log('Expected: "Empty"');
     console.log('Match:', result1.content.trim() === 'Empty' ? '✅' : '❌');
 
     // Test with items
-    const result2 = await engine.execute(compiled, {}, { items: ['apple', 'banana'] });
+    const result2 = await executeMDXTemplate(compiled, {}, { items: ['apple', 'banana'] });
     console.log('Items array result:', result2.content);
     console.log('Expected: "Items: apple, banana"');
     console.log('Match:', result2.content.trim() === 'Items: apple, banana' ? '✅' : '❌');
@@ -68,15 +65,15 @@ async function testMultipleReturns() {
 }`;
 
   try {
-    const parsed = parser.parse(singleItemComponent);
+    const parsed = parseMDX(singleItemComponent);
     console.log('✅ Parsed successfully');
     console.log('Return statements:', parsed.returnStatements.length);
 
-    const compiled = compiler.compile(parsed);
+    const compiled = compileMDX(parsed);
     console.log('✅ Compiled successfully');
 
     // Test with single item
-    const result = await engine.execute(compiled, {}, { items: ['apple'] });
+    const result = await executeMDXTemplate(compiled, {}, { items: ['apple'] });
     console.log('Single item result:', result.content);
     console.log('Expected: "Single item: apple"');
     console.log('Match:', result.content.trim() === 'Single item: apple' ? '✅' : '❌');
@@ -109,23 +106,23 @@ async function testMultipleReturns() {
 }`;
 
   try {
-    const parsed = parser.parse(complexComponent);
+    const parsed = parseMDX(complexComponent);
     console.log('✅ Parsed successfully');
     console.log('Return statements:', parsed.returnStatements.length);
 
-    const compiled = compiler.compile(parsed);
+    const compiled = compileMDX(parsed);
     console.log('✅ Compiled successfully');
 
     // Test with null data
-    const result1 = await engine.execute(compiled, {}, { data: null, type: 'simple' });
+    const result1 = await executeMDXTemplate(compiled, {}, { data: null, type: 'simple' });
     console.log('Null data result:', result1.content);
     console.log('Expected: "Error: Unable to process data"');
     console.log('Match:', result1.content.trim() === 'Error: Unable to process data' ? '✅' : '❌');
 
     // Test with simple type
-    const result2 = await engine.execute(compiled, {}, { 
-      data: { name: 'Test Item' }, 
-      type: 'simple' 
+    const result2 = await executeMDXTemplate(compiled, {}, {
+      data: { name: 'Test Item' },
+      type: 'simple'
     });
     console.log('Simple type result:', result2.content);
     console.log('Expected: "Simple view: Test Item"');
@@ -146,14 +143,14 @@ async function testMultipleReturns() {
 }`;
 
   try {
-    const parsed = parser.parse(singleReturnComponent);
+    const parsed = parseMDX(singleReturnComponent);
     console.log('✅ Parsed successfully');
     console.log('Return statements:', parsed.returnStatements.length);
 
-    const compiled = compiler.compile(parsed);
+    const compiled = compileMDX(parsed);
     console.log('✅ Compiled successfully');
 
-    const result = await engine.execute(compiled, {}, { name: 'World' });
+    const result = await executeMDXTemplate(compiled, {}, { name: 'World' });
     console.log('Single return result:', result.content);
     console.log('Expected: "Hello World!"');
     console.log('Match:', result.content.trim() === 'Hello World!' ? '✅' : '❌');

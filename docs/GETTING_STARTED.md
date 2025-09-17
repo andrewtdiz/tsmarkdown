@@ -625,7 +625,7 @@ Enable verbose logging for troubleshooting:
 better-mdx dev --verbose
 
 # Programmatic debug mode
-const engine = new TemplateExecutionEngine({ debug: true });
+// No need to instantiate - executeMDXTemplate is a standalone function
 ```
 
 ### Getting Help

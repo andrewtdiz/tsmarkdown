@@ -2,8 +2,8 @@ import { test, expect, describe, beforeEach } from 'bun:test';
 import { ClientRenderer, createClientRenderer } from '../src/client-renderer';
 import { MDXAPIServer, createAPIServer } from '../src/api-server';
 import { MDXCache, MDXCompilationCache, createCacheKey } from '../src/cache';
-import { MDXParser } from '../src/parser';
-import { MDXCompiler } from '../src/compiler';
+import { parseMDX } from '../src/parser';
+import { compileMDX } from '../src/compiler';
 
 describe('Phase 3: Runtime and API', () => {
   describe('Client Renderer', () => {

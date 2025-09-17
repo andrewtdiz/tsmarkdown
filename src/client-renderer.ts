@@ -1,5 +1,5 @@
 import { CompiledMDX } from './compiler';
-import { TemplateExecutionEngine } from './template-engine';
+import { executeMDXTemplate } from './template-engine';
 
 export interface ClientRendererOptions {
   componentRegistry?: Record<string, React.ComponentType<any>>;
@@ -17,12 +17,10 @@ export interface RenderedResult {
 }
 
 export class ClientRenderer {
-  private engine: TemplateExecutionEngine;
   private componentRegistry: Record<string, React.ComponentType<any>>;
   private globalContext: Record<string, any>;
 
   constructor(options: ClientRendererOptions = {}) {
-    this.engine = new TemplateExecutionEngine();
     this.componentRegistry = options.componentRegistry || {};
     this.globalContext = options.globalContext || {};
   }
@@ -41,7 +39,7 @@ export class ClientRenderer {
       };
 
       // Execute the template with the merged context
-      const executionResult = await this.engine.execute(compiledContent, fullContext);
+      const executionResult = await executeMDXTemplate(compiledContent, fullContext);
 
       return {
         content: executionResult.content,

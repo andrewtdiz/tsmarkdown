@@ -8,507 +8,508 @@ export interface ParsedMDX {
   conditionalBlocks: Array<{ condition: string; content: string }>;
   ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>;
   jsxExpressions: Array<{ placeholder: string; expression: string }>;
+  returnStatements: Array<{ condition?: string; content: string; isTemplate: boolean }>;
   propsInterface?: string;
   parameterTypes: Array<{ name: string; type: string; required: boolean }>;
 }
 
-export class MDXParser {
-  parse(content: string): ParsedMDX {
-    const lines = content.split("\n");
-    const imports: string[] = [];
-    const interpolations: Array<{ placeholder: string; expression: string }> =
-      [];
-    const conditionalBlocks: Array<{ condition: string; content: string }> = [];
-    const ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
-    const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
+function parseParameters(params: string): string[] {
+  const parameters: string[] = [];
 
-    let functionName = "";
-    let functionParams: string[] = [];
-    let typescript = "";
-    let markdown = "";
-    let inFunction = false;
-    let inReturn = false;
-    let braceLevel = 0;
-    let parameterTypes: Array<{ name: string; type: string; required: boolean }> = [];
-    let rawParams = "";
+  // Handle destructured object parameters like { items, user }
+  const destructuredMatch = params.match(/\{\s*([^}]+)\s*\}/);
+  if (destructuredMatch) {
+    const destructuredParams = destructuredMatch[1]
+      .split(',')
+      .map(p => p.trim().split(':')[0].trim().split('=')[0].trim()) // Remove type annotations and default values
+      .filter(p => p.length > 0);
+    parameters.push(...destructuredParams);
+  } else {
+    // Handle regular parameters
+    const regularParams = params
+      .split(',')
+      .map(p => p.trim().split(':')[0].trim().split('=')[0].trim()) // Remove type annotations and default values
+      .filter(p => p.length > 0);
+    parameters.push(...regularParams);
+  }
 
-    // First pass: extract imports and function metadata
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trim();
+  return parameters;
+}
 
-      if (trimmed.startsWith("import ")) {
-        imports.push(trimmed);
-        continue;
-      }
+function parseParameterTypes(params: string): Array<{ name: string; type: string; required: boolean }> {
+  const parameterTypes: Array<{ name: string; type: string; required: boolean }> = [];
 
-      if (trimmed.startsWith("function ") || trimmed.startsWith("async function ")) {
-        const match = trimmed.match(/(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)/);
-        if (match) {
-          functionName = match[1];
-          rawParams = match[2].trim();
-          if (rawParams) {
-            // Parse parameters - handle destructured objects like { items }
-            functionParams = this.parseParameters(rawParams);
-            parameterTypes = this.parseParameterTypes(rawParams);
-          }
-          inFunction = true;
+  // Handle destructured object parameters with type annotations like { month, amount }: { month: string; amount: number }
+  const destructuredMatch = params.match(/\{\s*([^}]+)\s*\}(?:\s*:\s*\{\s*([^}]+)\s*\})?/);
+  if (destructuredMatch) {
+    const destructuredParams = destructuredMatch[1];
+    const typeAnnotation = destructuredMatch[2];
+
+    let typeMap: Map<string, { type: string; optional: boolean }> = new Map();
+
+    // If there's a type annotation, parse it
+    if (typeAnnotation) {
+      const typeProperties = typeAnnotation.split(/[,;]/).map(p => p.trim()).filter(Boolean);
+      for (const typeProp of typeProperties) {
+        const colonIndex = typeProp.indexOf(':');
+        if (colonIndex !== -1) {
+          const typeName = typeProp.substring(0, colonIndex).trim().replace('?', '');
+          const typeValue = typeProp.substring(colonIndex + 1).trim();
+          const isOptional = typeProp.substring(0, colonIndex).includes('?');
+          typeMap.set(typeName, { type: typeValue, optional: isOptional });
         }
-        continue;
-      }
-
-      if (inFunction && !inReturn) {
-        if (trimmed === "return (") {
-          inReturn = true;
-          continue;
-        }
-        if (trimmed !== "{") {
-          typescript += line + "\n";
-        }
-        continue;
-      }
-
-      if (inReturn) {
-        // Check if this line contains the closing parenthesis of the return statement
-        const trimmedLine = line.trim();
-        if (
-          trimmedLine === ")" ||
-          (trimmedLine.endsWith(")") && braceLevel === 0)
-        ) {
-          break; // This is the end of the return statement
-        }
-
-        for (const char of line) {
-          if (char === "{") braceLevel++;
-          if (char === "}") braceLevel--;
-        }
-
-        if (braceLevel < 0) {
-          break;
-        }
-
-        markdown += line + "\n";
       }
     }
 
-    // Second pass: process markdown for interpolations, conditionals, ternary expressions, and JSX expressions
-    markdown = this.processTemplateContent(
-      this.normalizeIndentation(markdown).trim(),
-      interpolations,
-      conditionalBlocks,
-      ternaryExpressions,
-      jsxExpressions,
-    );
+    // Parse parameter names
+    const properties = destructuredParams.split(',').map(p => p.trim());
 
-    // Generate props interface
-    const propsInterface = this.generatePropsInterface(functionName, parameterTypes);
+    for (const prop of properties) {
+      // In destructuring, there shouldn't be type annotations in the parameter names
+      const isOptional = prop.includes('?');
+      const hasDefaultValue = prop.includes('=');
+      const cleanName = prop.replace('?', '').split('=')[0].trim();
 
-    return {
-      imports: imports.filter(Boolean),
-      functionName,
-      functionParams,
-      typescript: typescript.trim(),
-      markdown,
-      interpolations,
-      conditionalBlocks,
-      ternaryExpressions,
-      jsxExpressions,
-      propsInterface,
-      parameterTypes,
-    };
-  }
+      const typeInfo = typeMap.get(cleanName);
+      const inferredType = typeInfo?.type || inferTypeFromUsage(cleanName) || 'any';
+      const isTypeOptional = typeInfo?.optional || false;
 
-  private parseParameters(params: string): string[] {
-    const parameters: string[] = [];
-
-    // Handle destructured object parameters like { items, user }
-    const destructuredMatch = params.match(/\{\s*([^}]+)\s*\}/);
-    if (destructuredMatch) {
-      const destructuredParams = destructuredMatch[1]
-        .split(',')
-        .map(p => p.trim().split(':')[0].trim().split('=')[0].trim()) // Remove type annotations and default values
-        .filter(p => p.length > 0);
-      parameters.push(...destructuredParams);
-    } else {
-      // Handle regular parameters
-      const regularParams = params
-        .split(',')
-        .map(p => p.trim().split(':')[0].trim().split('=')[0].trim()) // Remove type annotations and default values
-        .filter(p => p.length > 0);
-      parameters.push(...regularParams);
+      parameterTypes.push({
+        name: cleanName,
+        type: inferredType,
+        required: !isOptional && !isTypeOptional && !hasDefaultValue
+      });
     }
+  } else {
+    // Handle regular parameters
+    const regularParams = params.split(',').map(p => p.trim());
 
-    return parameters;
-  }
+    for (const param of regularParams) {
+      const [name, paramType] = param.split(':').map(s => s?.trim());
+      const isOptional = name?.includes('?') || false;
+      const hasDefaultValue = name?.includes('=') || false;
+      const cleanName = name?.replace('?', '').split('=')[0].trim() || '';
 
-  private parseParameterTypes(params: string): Array<{ name: string; type: string; required: boolean }> {
-    const parameterTypes: Array<{ name: string; type: string; required: boolean }> = [];
-
-    // Handle destructured object parameters with type annotations like { month, amount }: { month: string; amount: number }
-    const destructuredMatch = params.match(/\{\s*([^}]+)\s*\}(?:\s*:\s*\{\s*([^}]+)\s*\})?/);
-    if (destructuredMatch) {
-      const destructuredParams = destructuredMatch[1];
-      const typeAnnotation = destructuredMatch[2];
-
-      let typeMap: Map<string, { type: string; optional: boolean }> = new Map();
-
-      // If there's a type annotation, parse it
-      if (typeAnnotation) {
-        const typeProperties = typeAnnotation.split(/[,;]/).map(p => p.trim()).filter(Boolean);
-        for (const typeProp of typeProperties) {
-          const colonIndex = typeProp.indexOf(':');
-          if (colonIndex !== -1) {
-            const typeName = typeProp.substring(0, colonIndex).trim().replace('?', '');
-            const typeValue = typeProp.substring(colonIndex + 1).trim();
-            const isOptional = typeProp.substring(0, colonIndex).includes('?');
-            typeMap.set(typeName, { type: typeValue, optional: isOptional });
-          }
-        }
-      }
-
-      // Parse parameter names
-      const properties = destructuredParams.split(',').map(p => p.trim());
-
-      for (const prop of properties) {
-        // In destructuring, there shouldn't be type annotations in the parameter names
-        const isOptional = prop.includes('?');
-        const hasDefaultValue = prop.includes('=');
-        const cleanName = prop.replace('?', '').split('=')[0].trim();
-
-        const typeInfo = typeMap.get(cleanName);
-        const inferredType = typeInfo?.type || this.inferTypeFromUsage(cleanName) || 'any';
-        const isTypeOptional = typeInfo?.optional || false;
-
+      if (cleanName) {
         parameterTypes.push({
           name: cleanName,
-          type: inferredType,
-          required: !isOptional && !isTypeOptional && !hasDefaultValue
+          type: paramType || inferTypeFromUsage(cleanName) || 'any',
+          required: !isOptional && !hasDefaultValue
         });
       }
-    } else {
-      // Handle regular parameters
-      const regularParams = params.split(',').map(p => p.trim());
-
-      for (const param of regularParams) {
-        const [name, paramType] = param.split(':').map(s => s?.trim());
-        const isOptional = name?.includes('?') || false;
-        const hasDefaultValue = name?.includes('=') || false;
-        const cleanName = name?.replace('?', '').split('=')[0].trim() || '';
-
-        if (cleanName) {
-          parameterTypes.push({
-            name: cleanName,
-            type: paramType || this.inferTypeFromUsage(cleanName) || 'any',
-            required: !isOptional && !hasDefaultValue
-          });
-        }
-      }
     }
-
-    return parameterTypes;
   }
 
-  private inferTypeFromUsage(paramName: string): string {
-    // Basic type inference based on common naming patterns
-    if (paramName.includes('count') || paramName.includes('amount') || paramName.includes('price') || paramName.includes('score')) {
-      return 'number';
-    }
-    if (paramName.includes('name') || paramName.includes('title') || paramName.includes('text') || paramName.includes('message')) {
-      return 'string';
-    }
-    if (paramName.includes('is') || paramName.includes('has') || paramName.includes('can') || paramName.includes('enabled')) {
-      return 'boolean';
-    }
-    if (paramName.includes('items') || paramName.includes('list') || paramName.includes('array')) {
-      return 'any[]';
-    }
-    return 'any';
+  return parameterTypes;
+}
+
+function inferTypeFromUsage(paramName: string): string {
+  // Basic type inference based on common naming patterns
+  if (paramName.includes('count') || paramName.includes('amount') || paramName.includes('price') || paramName.includes('score')) {
+    return 'number';
+  }
+  if (paramName.includes('name') || paramName.includes('title') || paramName.includes('text') || paramName.includes('message')) {
+    return 'string';
+  }
+  if (paramName.includes('is') || paramName.includes('has') || paramName.includes('can') || paramName.includes('enabled')) {
+    return 'boolean';
+  }
+  if (paramName.includes('items') || paramName.includes('list') || paramName.includes('array')) {
+    return 'any[]';
+  }
+  return 'any';
+}
+
+function generatePropsInterface(functionName: string, parameterTypes: Array<{ name: string; type: string; required: boolean }>): string {
+  if (parameterTypes.length === 0) {
+    return '';
   }
 
-  private generatePropsInterface(functionName: string, parameterTypes: Array<{ name: string; type: string; required: boolean }>): string {
-    if (parameterTypes.length === 0) {
-      return '';
-    }
+  const interfaceName = `${functionName}Props`;
+  const properties = parameterTypes.map(param => {
+    const optional = param.required ? '' : '?';
+    return `  ${param.name}${optional}: ${param.type};`;
+  }).join('\n');
 
-    const interfaceName = `${functionName}Props`;
-    const properties = parameterTypes.map(param => {
-      const optional = param.required ? '' : '?';
-      return `  ${param.name}${optional}: ${param.type};`;
-    }).join('\n');
-
-    return `export interface ${interfaceName} {
+  return `export interface ${interfaceName} {
 ${properties}
 }`;
+}
+
+function normalizeIndentation(content: string): string {
+  const lines = content.split("\n");
+  if (lines.length === 0) return content;
+
+  // Find the first non-empty line's indentation as the base
+  let baseIndent = 0;
+  for (const line of lines) {
+    if (line.trim() === "") continue;
+    baseIndent = line.match(/^(\s*)/)?.[1].length ?? 0;
+    break;
   }
 
-  private normalizeIndentation(content: string): string {
-    const lines = content.split("\n");
-    if (lines.length === 0) return content;
+  // Remove the base indentation from all lines
+  return lines
+    .map((line) => {
+      if (line.trim() === "") return "";
+      const currentIndent = line.match(/^(\s*)/)?.[1].length ?? 0;
+      if (currentIndent >= baseIndent) {
+        return line.slice(baseIndent);
+      }
+      return line;
+    })
+    .join("\n");
+}
 
-    // Find the first non-empty line's indentation as the base
-    let baseIndent = 0;
-    for (const line of lines) {
-      if (line.trim() === "") continue;
-      baseIndent = line.match(/^(\s*)/)?.[1].length ?? 0;
-      break;
-    }
+function processConditionalBlocks(
+  content: string,
+  conditionalBlocks: Array<{ condition: string; content: string }>,
+): string {
+  // Match conditional blocks with proper nesting
+  const conditionalRegex = /\{([^{}]+?)\s*&&\s*\(\s*([\s\S]*?)\s*\)\s*\}/g;
 
-    // Remove the base indentation from all lines
-    return lines
-      .map((line) => {
-        if (line.trim() === "") return "";
-        const currentIndent = line.match(/^(\s*)/)?.[1].length ?? 0;
-        if (currentIndent >= baseIndent) {
-          return line.slice(baseIndent);
-        }
-        return line;
-      })
-      .join("\n");
-  }
+  return content.replace(
+    conditionalRegex,
+    (match, condition, blockContent) => {
+      const placeholder = `__CONDITIONAL_${conditionalBlocks.length}__`;
+      conditionalBlocks.push({
+        condition: condition.trim(),
+        content: blockContent.trim(),
+      });
+      return placeholder;
+    },
+  );
+}
 
-  private processTemplateContent(
-    content: string,
-    interpolations: Array<{ placeholder: string; expression: string }>,
-    conditionalBlocks: Array<{ condition: string; content: string }>,
-    ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>,
-    jsxExpressions: Array<{ placeholder: string; expression: string }>,
-  ): string {
-    // Process interpolations first
-    let processedContent = content.replace(
-      /\{\{\s*([^}]+)\s*\}\}/g,
-      (match, expression) => {
-        const placeholder = `__INTERPOLATION_${interpolations.length}__`;
-        interpolations.push({ placeholder, expression: expression.trim() });
-        return placeholder;
-      },
-    );
+function processTernaryExpressions(
+  content: string,
+  ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>,
+): string {
+  // Match ternary expressions - {condition ? trueValue : falseValue}
+  // This regex handles nested parentheses and braces within each part
+  // But excludes JSX expressions (those containing < and >)
+  const ternaryRegex = /\{([^{}<>]*(?:\{[^}]*\}[^{}<>]*)*)\s*\?\s*([^{}:<>]*(?:\{[^}]*\}[^{}:<>]*)*(?:\([^)]*\)[^{}:<>]*)*)\s*:\s*([^{}<>]*(?:\{[^}]*\}[^{}<>]*)*(?:\([^)]*\)[^{}<>]*)*)\}/g;
 
-    // Process conditional blocks - handle multiline {condition && (content)}
-    processedContent = this.processConditionalBlocks(
-      processedContent,
-      conditionalBlocks,
-    );
+  return content.replace(
+    ternaryRegex,
+    (match, condition, trueValue, falseValue) => {
+      const trimmedCondition = condition.trim();
+      const trimmedTrueValue = trueValue.trim();
+      const trimmedFalseValue = falseValue.trim();
 
-    // Process ternary expressions - handle {condition ? trueValue : falseValue}
-    processedContent = this.processTernaryExpressions(
-      processedContent,
-      ternaryExpressions,
-    );
-
-    // Process JSX elements first (like <Component prop={value} />)
-    processedContent = this.processJSXElements(
-      processedContent,
-      jsxExpressions,
-    );
-
-    // Process JSX expressions - handle {expression} that are not interpolations, conditionals, or ternary expressions
-    processedContent = this.processJSXExpressions(
-      processedContent,
-      jsxExpressions,
-    );
-
-    return processedContent;
-  }
-
-  private processConditionalBlocks(
-    content: string,
-    conditionalBlocks: Array<{ condition: string; content: string }>,
-  ): string {
-    // Match conditional blocks with proper nesting
-    const conditionalRegex = /\{([^{}]+?)\s*&&\s*\(\s*([\s\S]*?)\s*\)\s*\}/g;
-
-    return content.replace(
-      conditionalRegex,
-      (match, condition, blockContent) => {
-        const placeholder = `__CONDITIONAL_${conditionalBlocks.length}__`;
-        conditionalBlocks.push({
-          condition: condition.trim(),
-          content: blockContent.trim(),
-        });
-        return placeholder;
-      },
-    );
-  }
-
-  private processTernaryExpressions(
-    content: string,
-    ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>,
-  ): string {
-    // Match ternary expressions - {condition ? trueValue : falseValue}
-    // This regex handles nested parentheses and braces within each part
-    // But excludes JSX expressions (those containing < and >)
-    const ternaryRegex = /\{([^{}<>]*(?:\{[^}]*\}[^{}<>]*)*)\s*\?\s*([^{}:<>]*(?:\{[^}]*\}[^{}:<>]*)*(?:\([^)]*\)[^{}:<>]*)*)\s*:\s*([^{}<>]*(?:\{[^}]*\}[^{}<>]*)*(?:\([^)]*\)[^{}<>]*)*)\}/g;
-
-    return content.replace(
-      ternaryRegex,
-      (match, condition, trueValue, falseValue) => {
-        const trimmedCondition = condition.trim();
-        const trimmedTrueValue = trueValue.trim();
-        const trimmedFalseValue = falseValue.trim();
-
-        // Skip if any part is empty
-        if (!trimmedCondition || !trimmedTrueValue || !trimmedFalseValue) {
-          return match;
-        }
-
-        const placeholder = `__TERNARY_${ternaryExpressions.length}__`;
-        ternaryExpressions.push({
-          condition: trimmedCondition,
-          trueValue: trimmedTrueValue,
-          falseValue: trimmedFalseValue,
-        });
-        return placeholder;
-      },
-    );
-  }
-
-  private processJSXElements(
-    content: string,
-    jsxExpressions: Array<{ placeholder: string; expression: string }>,
-  ): string {
-    // Find JSX elements like <Component prop={value} />
-    const jsxElementRegex = /<(\w+)([^/>]*)\/>/g;
-
-    return content.replace(jsxElementRegex, (match, componentName, props) => {
-      // Parse props to extract JSX expressions within them
-      const propMatches = props.match(/(\w+)=\{([^}]+)\}/g) || [];
-      const processedProps: string[] = [];
-
-      // Handle props with ={} syntax
-      for (const propMatch of propMatches) {
-        const [, propName, propExpr] = propMatch.match(/(\w+)=\{([^}]+)\}/) || [];
-        if (propName && propExpr) {
-          // Create a JSX expression placeholder for the prop value
-          const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
-          jsxExpressions.push({ placeholder, expression: propExpr.trim() });
-          processedProps.push(`${propName}=${placeholder}`);
-        }
+      // Skip if any part is empty
+      if (!trimmedCondition || !trimmedTrueValue || !trimmedFalseValue) {
+        return match;
       }
 
-      // Handle props without ={} syntax (default to true)
-      const booleanProps = props.match(/\b(\w+)(?=\s|$)/g) || [];
-      for (const booleanProp of booleanProps) {
-        // Skip if this prop is already handled by the ={} syntax
-        const isAlreadyHandled = propMatches.some((propMatch: string) =>
-          propMatch.includes(`${booleanProp}=`)
-        );
-        if (!isAlreadyHandled) {
-          processedProps.push(booleanProp);
-        }
-      }
+      const placeholder = `__TERNARY_${ternaryExpressions.length}__`;
+      ternaryExpressions.push({
+        condition: trimmedCondition,
+        trueValue: trimmedTrueValue,
+        falseValue: trimmedFalseValue,
+      });
+      return placeholder;
+    },
+  );
+}
 
-      // Reconstruct the JSX element with processed props
-      const processedPropsString = processedProps.length > 0 ? ' ' + processedProps.join(' ') : '';
-      return `<${componentName}${processedPropsString} />`;
-    });
-  }
+function processJSXElements(
+  content: string,
+  jsxExpressions: Array<{ placeholder: string; expression: string }>,
+): string {
+  // Find JSX elements like <Component prop={value} />
+  const jsxElementRegex = /<(\w+)([^/>]*)\/>/g;
 
-  private processJSXExpressions(
-    content: string,
-    jsxExpressions: Array<{ placeholder: string; expression: string }>,
-  ): string {
-    // Find all {expression} patterns and process them
-    let processedContent = content;
-    let startIndex = 0;
+  return content.replace(jsxElementRegex, (match, componentName, props) => {
+    // Parse props to extract JSX expressions within them
+    const propMatches = props.match(/(\w+)=\{([^}]+)\}/g) || [];
+    const processedProps: string[] = [];
 
-    while (startIndex < processedContent.length) {
-      const openBraceIndex = processedContent.indexOf('{', startIndex);
-      if (openBraceIndex === -1) break;
-
-      // Skip if it's a double brace {{ }}
-      if (processedContent[openBraceIndex + 1] === '{') {
-        startIndex = openBraceIndex + 2;
-        continue;
-      }
-
-      // Skip if we're inside a JSX element (between < and />)
-      const beforeBrace = processedContent.substring(0, openBraceIndex);
-      const lastOpenAngle = beforeBrace.lastIndexOf('<');
-      const lastCloseAngle = beforeBrace.lastIndexOf('>');
-      const lastSlashAngle = beforeBrace.lastIndexOf('/>');
-
-      // If we have an unclosed JSX element (last < is after last >), skip this brace
-      if (lastOpenAngle > lastCloseAngle && lastOpenAngle > lastSlashAngle) {
-        startIndex = openBraceIndex + 1;
-        continue;
-      }
-
-      // Find the matching closing brace
-      const endIndex = this.findMatchingBrace(processedContent, openBraceIndex);
-      if (endIndex === -1) {
-        startIndex = openBraceIndex + 1;
-        continue;
-      }
-
-      const expression = processedContent.substring(openBraceIndex + 1, endIndex);
-      const trimmedExpression = expression.trim();
-
-      // Skip if it's a conditional block (contains &&)
-      if (trimmedExpression.includes('&&')) {
-        startIndex = endIndex + 1;
-        continue;
-      }
-
-      // Skip if it's a ternary expression (contains ? and :) and doesn't contain JSX
-      if (trimmedExpression.includes('?') && trimmedExpression.includes(':') && !trimmedExpression.includes('<')) {
-        startIndex = endIndex + 1;
-        continue;
-      }
-
-      // Skip if it's empty
-      if (!trimmedExpression) {
-        startIndex = endIndex + 1;
-        continue;
-      }
-
-      const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
-      jsxExpressions.push({ placeholder, expression: trimmedExpression });
-      processedContent = processedContent.substring(0, openBraceIndex) + placeholder + processedContent.substring(endIndex + 1);
-      startIndex = openBraceIndex + placeholder.length;
-    }
-
-    return processedContent;
-  }
-
-  private findMatchingBrace(content: string, startIndex: number): number {
-    let braceCount = 0;
-    let parenCount = 0;
-    let inString = false;
-    let stringChar = '';
-
-    for (let i = startIndex; i < content.length; i++) {
-      const char = content[i];
-      const prevChar = i > 0 ? content[i - 1] : '';
-
-      // Handle string literals
-      if (!inString && (char === '"' || char === "'" || char === '`')) {
-        inString = true;
-        stringChar = char;
-        continue;
-      }
-
-      if (inString && char === stringChar && prevChar !== '\\') {
-        inString = false;
-        continue;
-      }
-
-      if (inString) continue;
-
-      // Count braces and parentheses
-      if (char === '{') {
-        braceCount++;
-      } else if (char === '}') {
-        braceCount--;
-        if (braceCount === 0) {
-          return i;
-        }
-      } else if (char === '(') {
-        parenCount++;
-      } else if (char === ')') {
-        parenCount--;
+    // Handle props with ={} syntax
+    for (const propMatch of propMatches) {
+      const [, propName, propExpr] = propMatch.match(/(\w+)=\{([^}]+)\}/) || [];
+      if (propName && propExpr) {
+        // Create a JSX expression placeholder for the prop value
+        const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
+        jsxExpressions.push({ placeholder, expression: propExpr.trim() });
+        processedProps.push(`${propName}=${placeholder}`);
       }
     }
 
-    return -1; // No matching brace found
+    // Handle props without ={} syntax (default to true)
+    const booleanProps = props.match(/\b(\w+)(?=\s|$)/g) || [];
+    for (const booleanProp of booleanProps) {
+      // Skip if this prop is already handled by the ={} syntax
+      const isAlreadyHandled = propMatches.some((propMatch: string) =>
+        propMatch.includes(`${booleanProp}=`)
+      );
+      if (!isAlreadyHandled) {
+        processedProps.push(booleanProp);
+      }
+    }
+
+    // Reconstruct the JSX element with processed props
+    const processedPropsString = processedProps.length > 0 ? ' ' + processedProps.join(' ') : '';
+    return `<${componentName}${processedPropsString} />`;
+  });
+}
+
+function processJSXExpressions(
+  content: string,
+  jsxExpressions: Array<{ placeholder: string; expression: string }>,
+): string {
+  // Find all {expression} patterns and process them
+  let processedContent = content;
+  let startIndex = 0;
+
+  while (startIndex < processedContent.length) {
+    const openBraceIndex = processedContent.indexOf('{', startIndex);
+    if (openBraceIndex === -1) break;
+
+    // Skip if it's a double brace {{ }}
+    if (processedContent[openBraceIndex + 1] === '{') {
+      startIndex = openBraceIndex + 2;
+      continue;
+    }
+
+    // Skip if we're inside a JSX element (between < and />)
+    const beforeBrace = processedContent.substring(0, openBraceIndex);
+    const lastOpenAngle = beforeBrace.lastIndexOf('<');
+    const lastCloseAngle = beforeBrace.lastIndexOf('>');
+    const lastSlashAngle = beforeBrace.lastIndexOf('/>');
+
+    // If we have an unclosed JSX element (last < is after last >), skip this brace
+    if (lastOpenAngle > lastCloseAngle && lastOpenAngle > lastSlashAngle) {
+      startIndex = openBraceIndex + 1;
+      continue;
+    }
+
+    // Find the matching closing brace
+    const endIndex = findMatchingBrace(processedContent, openBraceIndex);
+    if (endIndex === -1) {
+      startIndex = openBraceIndex + 1;
+      continue;
+    }
+
+    const expression = processedContent.substring(openBraceIndex + 1, endIndex);
+    const trimmedExpression = expression.trim();
+
+    // Skip if it's a conditional block (contains &&)
+    if (trimmedExpression.includes('&&')) {
+      startIndex = endIndex + 1;
+      continue;
+    }
+
+    // Skip if it's a ternary expression (contains ? and :) and doesn't contain JSX
+    if (trimmedExpression.includes('?') && trimmedExpression.includes(':') && !trimmedExpression.includes('<')) {
+      startIndex = endIndex + 1;
+      continue;
+    }
+
+    // Skip if it's empty
+    if (!trimmedExpression) {
+      startIndex = endIndex + 1;
+      continue;
+    }
+
+    const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
+    jsxExpressions.push({ placeholder, expression: trimmedExpression });
+    processedContent = processedContent.substring(0, openBraceIndex) + placeholder + processedContent.substring(endIndex + 1);
+    startIndex = openBraceIndex + placeholder.length;
   }
+
+  return processedContent;
+}
+
+function findMatchingBrace(content: string, startIndex: number): number {
+  let braceCount = 0;
+  let parenCount = 0;
+  let inString = false;
+  let stringChar = '';
+
+  for (let i = startIndex; i < content.length; i++) {
+    const char = content[i];
+    const prevChar = i > 0 ? content[i - 1] : '';
+
+    // Handle string literals
+    if (!inString && (char === '"' || char === "'" || char === '`')) {
+      inString = true;
+      stringChar = char;
+      continue;
+    }
+
+    if (inString && char === stringChar && prevChar !== '\\') {
+      inString = false;
+      continue;
+    }
+
+    if (inString) continue;
+
+    // Count braces and parentheses
+    if (char === '{') {
+      braceCount++;
+    } else if (char === '}') {
+      braceCount--;
+      if (braceCount === 0) {
+        return i;
+      }
+    } else if (char === '(') {
+      parenCount++;
+    } else if (char === ')') {
+      parenCount--;
+    }
+  }
+
+  return -1; // No matching brace found
+}
+
+function processTemplateContent(
+  content: string,
+  interpolations: Array<{ placeholder: string; expression: string }>,
+  conditionalBlocks: Array<{ condition: string; content: string }>,
+  ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>,
+  jsxExpressions: Array<{ placeholder: string; expression: string }>,
+): string {
+  // Process interpolations first
+  let processedContent = content.replace(
+    /\{\{\s*([^}]+)\s*\}\}/g,
+    (match, expression) => {
+      const placeholder = `__INTERPOLATION_${interpolations.length}__`;
+      interpolations.push({ placeholder, expression: expression.trim() });
+      return placeholder;
+    },
+  );
+
+  // Process conditional blocks - handle multiline {condition && (content)}
+  processedContent = processConditionalBlocks(
+    processedContent,
+    conditionalBlocks,
+  );
+
+  // Process ternary expressions - handle {condition ? trueValue : falseValue}
+  processedContent = processTernaryExpressions(
+    processedContent,
+    ternaryExpressions,
+  );
+
+  // Process JSX elements first (like <Component prop={value} />)
+  processedContent = processJSXElements(
+    processedContent,
+    jsxExpressions,
+  );
+
+  // Process JSX expressions - handle {expression} that are not interpolations, conditionals, or ternary expressions
+  processedContent = processJSXExpressions(
+    processedContent,
+    jsxExpressions,
+  );
+
+  return processedContent;
+}
+
+export function parseMDX(content: string): ParsedMDX {
+  const lines = content.split("\n");
+  const imports: string[] = [];
+  const interpolations: Array<{ placeholder: string; expression: string }> =
+    [];
+  const conditionalBlocks: Array<{ condition: string; content: string }> = [];
+  const ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
+  const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
+  const returnStatements: Array<{ condition?: string; content: string; isTemplate: boolean }> = [];
+
+  let functionName = "";
+  let functionParams: string[] = [];
+  let typescript = "";
+  let markdown = "";
+  let inFunction = false;
+  let inReturn = false;
+  let braceLevel = 0;
+  let parameterTypes: Array<{ name: string; type: string; required: boolean }> = [];
+  let rawParams = "";
+
+  // First pass: extract imports and function metadata
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith("import ")) {
+      imports.push(trimmed);
+      continue;
+    }
+
+    if (trimmed.startsWith("function ") || trimmed.startsWith("async function ")) {
+      const match = trimmed.match(/(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)/);
+      if (match) {
+        functionName = match[1];
+        rawParams = match[2].trim();
+        if (rawParams) {
+          // Parse parameters - handle destructured objects like { items }
+          functionParams = parseParameters(rawParams);
+          parameterTypes = parseParameterTypes(rawParams);
+        }
+        inFunction = true;
+      }
+      continue;
+    }
+
+    if (inFunction && !inReturn) {
+      if (trimmed === "return (") {
+        inReturn = true;
+        continue;
+      }
+      if (trimmed !== "{") {
+        typescript += line + "\n";
+      }
+      continue;
+    }
+
+    if (inReturn) {
+      // Check if this line contains the closing parenthesis of the return statement
+      const trimmedLine = line.trim();
+      if (
+        trimmedLine === ")" ||
+        (trimmedLine.endsWith(")") && braceLevel === 0)
+      ) {
+        break; // This is the end of the return statement
+      }
+
+      for (const char of line) {
+        if (char === "{") braceLevel++;
+        if (char === "}") braceLevel--;
+      }
+
+      if (braceLevel < 0) {
+        break;
+      }
+
+      markdown += line + "\n";
+    }
+  }
+
+  // Second pass: process markdown for interpolations, conditionals, ternary expressions, and JSX expressions
+  markdown = processTemplateContent(
+    normalizeIndentation(markdown).trim(),
+    interpolations,
+    conditionalBlocks,
+    ternaryExpressions,
+    jsxExpressions,
+  );
+
+  // Generate props interface
+  const propsInterface = generatePropsInterface(functionName, parameterTypes);
+
+  return {
+    imports: imports.filter(Boolean),
+    functionName,
+    functionParams,
+    typescript: typescript.trim(),
+    markdown,
+    interpolations,
+    conditionalBlocks,
+    ternaryExpressions,
+    jsxExpressions,
+    returnStatements,
+    propsInterface,
+    parameterTypes,
+  };
 }

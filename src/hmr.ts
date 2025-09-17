@@ -1,9 +1,9 @@
 import { EventEmitter } from 'events';
 import { readFileSync, existsSync, watchFile, unwatchFile, Stats } from 'fs';
 import { resolve, relative } from 'path';
-import { MDXParser } from './parser';
-import { MDXCompiler } from './compiler';
-import { TemplateExecutionEngine } from './template-engine';
+import { parseMDX } from './parser';
+import { compileMDX } from './compiler';
+import { executeMDXTemplate } from './template-engine';
 
 export interface HMRConfig {
   rootDir: string;
@@ -31,9 +31,6 @@ export interface HMRClient {
 
 export class HotModuleReplacer extends EventEmitter {
   private config: Required<HMRConfig>;
-  private parser = new MDXParser();
-  private compiler = new MDXCompiler();
-  private engine = new TemplateExecutionEngine();
   private watchedFiles = new Map<string, Stats>();
   private clients = new Map<string, HMRClient>();
   private fileContents = new Map<string, string>();
@@ -418,8 +415,8 @@ export class HotModuleReplacer extends EventEmitter {
   }
 
   private async compileFile(filePath: string, content: string): Promise<any> {
-    const parsed = this.parser.parse(content);
-    const compiled = this.compiler.compile(parsed);
+    const parsed = parseMDX(content);
+    const compiled = compileMDX(parsed);
 
     this.compiledCache.set(filePath, compiled);
 
