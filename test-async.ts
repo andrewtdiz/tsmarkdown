@@ -17,5 +17,5 @@ const compiled = compiler.compile(parsed);
 console.log(compiled);
 
 console.log("=== Test 1: List items and ternary expression ===");
-const result1 = await engine.execute(compiled, {}, {}, "./mdx");
+const result1 = await engine.execute(compiled, { userName: "Alice", items: ["React", "TypeScript", "MDX"] }, {}, "./mdx");
 console.log(result1.content);

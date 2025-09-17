@@ -207,7 +207,7 @@ export class MDXTypeChecker {
       'length', 'toString', 'valueOf', 'hasOwnProperty',
       'alert', 'console', 'window', 'document',
       'parseInt', 'parseFloat', 'isNaN', 'isFinite',
-      'key', 'index', 'item' // Common loop variables
+      'index', 'item' // Common loop variables
     ]);
 
     return builtInMethods.has(identifier);

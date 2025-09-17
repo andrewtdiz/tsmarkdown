@@ -46,8 +46,8 @@ async function demo(title: string, mdxSource: string, context: any = {}, props: 
 }
 
 async function runAllDemos() {
-// Demo 1: Basic interpolation
-await demo("Basic Interpolation", `
+  // Demo 1: Basic interpolation
+  await demo("Basic Interpolation", `
 function Welcome() {
   const name = "Better-MDX";
   const version = "1.0";
@@ -60,8 +60,8 @@ function Welcome() {
 }
 `);
 
-// Demo 2: Props support
-await demo("Props Support", `
+  // Demo 2: Props support
+  await demo("Props Support", `
 function UserCard({ user }) {
   const greeting = "Hello";
 
@@ -73,15 +73,15 @@ function UserCard({ user }) {
   )
 }
 `, {}, {
-  user: {
-    name: "Alice",
-    role: "Developer",
-    years: 5
-  }
-});
+    user: {
+      name: "Alice",
+      role: "Developer",
+      years: 5
+    }
+  });
 
-// Demo 3: Conditional rendering
-await demo("Conditional Rendering", `
+  // Demo 3: Conditional rendering
+  await demo("Conditional Rendering", `
 function StatusMessage({ isOnline, hasNotifications }: { isOnline: boolean, hasNotifications: boolean }) {
   return (
     # System Status
@@ -105,8 +105,8 @@ function StatusMessage({ isOnline, hasNotifications }: { isOnline: boolean, hasN
 }
 `);
 
-// Demo 4: Array processing
-await demo("Array Processing", `
+  // Demo 4: Array processing
+  await demo("Array Processing", `
 function TechList() {
   const technologies = ["React", "TypeScript", "Node.js"];
   const count = technologies.length;
@@ -125,8 +125,8 @@ function TechList() {
 }
 `);
 
-// Demo 5: Component with arrays and JSX
-await demo("Component with JSX", `
+  // Demo 5: Component with arrays and JSX
+  await demo("Component with JSX", `
 import { ListItem } from "./ListItem";
 
 function ShoppingList({ items }: { items: string[] }) {
@@ -137,17 +137,17 @@ function ShoppingList({ items }: { items: string[] }) {
 
     **Items to buy:** {{ total }}
 
-    {items.map((item, index) => <ListItem key={index} item={item} />)}
+    {items.map((item, index) => <ListItem item={item} />)}
 
     Happy shopping! 🛒
   )
 }
 `, {}, {
-  items: ["Apples", "Bread", "Milk", "Eggs"]
-}, './mdx');
+    items: ["Apples", "Bread", "Milk", "Eggs"]
+  }, './mdx');
 
-// Demo 6: Complex data processing with components
-await demo("Complex Data Processing with Components", `
+  // Demo 6: Complex data processing with components
+  await demo("Complex Data Processing with Components", `
 import { SalesItem } from "./SalesItem";
 
 function SalesReport() {
@@ -165,7 +165,7 @@ function SalesReport() {
     # Q1 Sales Report
 
     ## Monthly Breakdown
-    {sales.map((sale, index) => <SalesItem key={index} month={sale.month} amount={sale.amount} />)}
+    {sales.map((sale, index) => <SalesItem month={sale.month} amount={sale.amount} />)}
 
     ## Summary
     - **Total Revenue:** \${{ total }}
@@ -175,8 +175,8 @@ function SalesReport() {
 }
 `, {}, {}, './mdx');
 
-// Demo 7: External context integration
-await demo("External Context", `
+  // Demo 7: External context integration
+  await demo("External Context", `
 function WeatherWidget() {
   const weather = getWeatherData();
 
@@ -197,25 +197,25 @@ function WeatherWidget() {
   )
 }
 `, {
-  getWeatherData: () => ({
-    city: "San Francisco",
-    temp: 71,
-    condition: "Partly Cloudy"
-  })
-});
+    getWeatherData: () => ({
+      city: "San Francisco",
+      temp: 71,
+      condition: "Partly Cloudy"
+    })
+  });
 
-console.log('\n' + '='.repeat(60));
-console.log('🎉 All demos completed successfully!');
-console.log('='.repeat(60));
-console.log('\n💡 Features demonstrated:');
-console.log('   ✅ Template interpolation {{ }}');
-console.log('   ✅ Props with destructuring');
-console.log('   ✅ Conditional rendering');
-console.log('   ✅ Array processing and mapping');
-console.log('   ✅ Component imports and JSX');
-console.log('   ✅ Complex data calculations');
-console.log('   ✅ External context integration');
-console.log('\n🚀 Better-MDX is production ready!');
+  console.log('\n' + '='.repeat(60));
+  console.log('🎉 All demos completed successfully!');
+  console.log('='.repeat(60));
+  console.log('\n💡 Features demonstrated:');
+  console.log('   ✅ Template interpolation {{ }}');
+  console.log('   ✅ Props with destructuring');
+  console.log('   ✅ Conditional rendering');
+  console.log('   ✅ Array processing and mapping');
+  console.log('   ✅ Component imports and JSX');
+  console.log('   ✅ Complex data calculations');
+  console.log('   ✅ External context integration');
+  console.log('\n🚀 Better-MDX is production ready!');
 }
 
 // Run all demos

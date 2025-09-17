@@ -41,7 +41,7 @@ function TestComponent() {
       expect(result.interpolations[1].expression).toBe('user.name.toUpperCase()');
     });
 
-    test('should execute interpolations correctly', () => {
+    test('should execute interpolations correctly', async () => {
       const parser = new MDXParser();
       const compiler = new MDXCompiler();
       const engine = new TemplateExecutionEngine();
@@ -57,7 +57,7 @@ function TestComponent() {
 
       const parsed = parser.parse(mdx);
       const compiled = compiler.compile(parsed);
-      const result = engine.execute(compiled);
+      const result = await engine.execute(compiled);
 
       expect(result.content.trim()).toBe('Hello World!');
       expect(result.errors).toHaveLength(0);
@@ -107,7 +107,7 @@ function TestComponent() {
       expect(result.conditionalBlocks[1].condition).toBe('hasPermission');
     });
 
-    test('should execute conditional blocks correctly', () => {
+    test('should execute conditional blocks correctly', async () => {
       const parser = new MDXParser();
       const compiler = new MDXCompiler();
       const engine = new TemplateExecutionEngine();
@@ -128,14 +128,14 @@ function TestComponent() {
 
       const parsed = parser.parse(mdx);
       const compiled = compiler.compile(parsed);
-      const result = engine.execute(compiled);
+      const result = await engine.execute(compiled);
 
       expect(result.content).toContain('Hello there!');
       expect(result.content).not.toContain('Warning message');
       expect(result.errors).toHaveLength(0);
     });
 
-    test('should handle complex conditions', () => {
+    test('should handle complex conditions', async () => {
       const parser = new MDXParser();
       const compiler = new MDXCompiler();
       const engine = new TemplateExecutionEngine();
@@ -155,7 +155,7 @@ function TestComponent() {
 
       const parsed = parser.parse(mdx);
       const compiled = compiler.compile(parsed);
-      const result = engine.execute(compiled);
+      const result = await engine.execute(compiled);
 
       expect(result.content).toContain('Admin panel access');
       expect(result.content).not.toContain('Account is inactive');
@@ -163,7 +163,7 @@ function TestComponent() {
   });
 
   describe('Combined Interpolation and Conditionals', () => {
-    test('should handle interpolations within conditional blocks', () => {
+    test('should handle interpolations within conditional blocks', async () => {
       const parser = new MDXParser();
       const compiler = new MDXCompiler();
       const engine = new TemplateExecutionEngine();
@@ -180,13 +180,13 @@ function TestComponent() {
 
       const parsed = parser.parse(mdx);
       const compiled = compiler.compile(parsed);
-      const result = engine.execute(compiled);
+      const result = await engine.execute(compiled);
 
       expect(result.content.trim()).toBe('Welcome VIP member Alice!');
       expect(result.errors).toHaveLength(0);
     });
 
-    test('should handle multiple interpolations and conditionals', () => {
+    test('should handle multiple interpolations and conditionals', async () => {
       const parser = new MDXParser();
       const compiler = new MDXCompiler();
       const engine = new TemplateExecutionEngine();
@@ -208,7 +208,7 @@ function TestComponent() {
 
       const parsed = parser.parse(mdx);
       const compiled = compiler.compile(parsed);
-      const result = engine.execute(compiled);
+      const result = await engine.execute(compiled);
 
       expect(result.content).toContain('Name: Bob');
       expect(result.content).toContain('Points: 1200');
@@ -218,7 +218,7 @@ function TestComponent() {
   });
 
   describe('Error Handling', () => {
-    test('should handle undefined variable interpolations gracefully', () => {
+    test('should handle undefined variable interpolations gracefully', async () => {
       const parser = new MDXParser();
       const compiler = new MDXCompiler();
       const engine = new TemplateExecutionEngine();
@@ -234,14 +234,14 @@ function TestComponent() {
 
       const parsed = parser.parse(mdx);
       const compiled = compiler.compile(parsed);
-      const result = engine.execute(compiled);
+      const result = await engine.execute(compiled);
 
       expect(result.content).toContain('Hello Alice!');
       expect(result.content).toContain('Age:'); // Should be empty for undefined age
       expect(result.errors.length).toBeGreaterThan(0);
     });
 
-    test('should handle invalid condition expressions', () => {
+    test('should handle invalid condition expressions', async () => {
       const parser = new MDXParser();
       const compiler = new MDXCompiler();
       const engine = new TemplateExecutionEngine();
@@ -259,7 +259,7 @@ function TestComponent() {
 
       const parsed = parser.parse(mdx);
       const compiled = compiler.compile(parsed);
-      const result = engine.execute(compiled);
+      const result = await engine.execute(compiled);
 
       expect(result.content).toContain('Valid content here');
       expect(result.content).not.toContain('This should not show');

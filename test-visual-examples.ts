@@ -287,7 +287,7 @@ function ShoppingList({ items, listName }) {
 
     ## Items
 
-    {items.map((item, index) => <ListItem key={index} item={item.name + (item.completed ? ' ✅' : ' ⏳')} />)}
+    {items.map((item, index) => <ListItem item={item.name + (item.completed ? ' ✅' : ' ⏳')} />)}
 
     ---
     *Tap items to mark as completed*

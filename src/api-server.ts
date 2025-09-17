@@ -116,7 +116,7 @@ export class MDXAPIServer {
   }
 
   /**
-   * Render MDX to HTML
+   * Render MDX to markdown content
    */
   async render(request: RenderRequest): Promise<APIResponse> {
     try {
@@ -142,7 +142,7 @@ export class MDXAPIServer {
         };
       }
 
-      const rendered = this.renderer.render(compiled, request.context);
+      const rendered = await this.renderer.render(compiled, request.context);
 
       const result = {
         ...rendered,

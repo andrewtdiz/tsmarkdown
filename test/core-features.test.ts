@@ -24,8 +24,8 @@ function BasicTest() {
 }
       `.trim()
     )
-    .expectContent('# Hello World!')
-    .build();
+      .expectContent('# Hello World!')
+      .build();
 
     const result = await runner.runTestCase(testCase);
     expect(result.passed).toBe(true);
@@ -48,8 +48,8 @@ function ConditionalTest() {
 }
       `.trim()
     )
-    .expectContains('This should be visible.')
-    .build();
+      .expectContains('This should be visible.')
+      .build();
 
     const result = await runner.runTestCase(testCase);
     expect(result.passed).toBe(true);
@@ -72,8 +72,8 @@ function ConditionalTest() {
 }
       `.trim()
     )
-    .expectExcludes('This should NOT be visible.')
-    .build();
+      .expectExcludes('This should NOT be visible.')
+      .build();
 
     const result = await runner.runTestCase(testCase);
     expect(result.passed).toBe(true);
@@ -100,8 +100,8 @@ function ComplexTest() {
 }
       `.trim()
     )
-    .expectContains('User: Alice', 'Age: 30', '- Apple', '- Banana', '- Cherry', 'Item count: 3')
-    .build();
+      .expectContains('User: Alice', 'Age: 30', '- Apple', '- Banana', '- Cherry', 'Item count: 3')
+      .build();
 
     const result = await runner.runTestCase(testCase);
     expect(result.passed).toBe(true);
@@ -126,15 +126,15 @@ function ContextTest() {
 }
       `.trim()
     )
-    .withContext({
-      useAuth: () => ({
-        user: { name: 'Bob' },
-        isLoggedIn: true
+      .withContext({
+        useAuth: () => ({
+          user: { name: 'Bob' },
+          isLoggedIn: true
+        })
       })
-    })
-    .expectContains('Welcome back, Bob!')
-    .expectExcludes('Please log in.')
-    .build();
+      .expectContains('Welcome back, Bob!')
+      .expectExcludes('Please log in.')
+      .build();
 
     const result = await runner.runTestCase(testCase);
     expect(result.passed).toBe(true);
@@ -155,14 +155,14 @@ function ErrorTest() {
 }
       `.trim()
     )
-    .expectErrors(['Interpolation error'])
-    .build();
+      .expectErrors(['Interpolation error'])
+      .build();
 
     const result = await runner.runTestCase(testCase);
     expect(result.passed).toBe(true);
   });
 
-  test('Snapshot testing', () => {
+  test('Snapshot testing', async () => {
     const input = `
 function SnapshotTest() {
   const title = 'Snapshot Test';
@@ -176,7 +176,7 @@ function SnapshotTest() {
 }
     `.trim();
 
-    const matches = snapshotTester.matchSnapshot('snapshot-test', input);
+    const matches = await snapshotTester.matchSnapshot('snapshot-test', input);
     expect(matches).toBe(true);
   });
 });
@@ -197,8 +197,8 @@ function SimpleTest() {
 }
           `.trim()
         )
-        .expectContent('# Hello World')
-        .build()
+          .expectContent('# Hello World')
+          .build()
       )
       .addTest(
         createMDXTest(
@@ -212,8 +212,8 @@ function VarTest() {
 }
           `.trim()
         )
-        .expectContent('# Test')
-        .build()
+          .expectContent('# Test')
+          .build()
       )
       .withSetup(() => {
         console.log('Setting up test suite');
@@ -253,9 +253,9 @@ function LargeTest() {
 }
       `.trim()
     )
-    .withTimeout(5000) // 5 second timeout
-    .expectContains('Total items: 1000')
-    .build();
+      .withTimeout(5000) // 5 second timeout
+      .expectContains('Total items: 1000')
+      .build();
 
     const result = await runner.runTestCase(testCase);
 
@@ -294,9 +294,9 @@ function NestedTest() {
 }
       `.trim()
     )
-    .expectContains('Admin Dashboard', 'You have delete permissions.')
-    .expectExcludes('Limited permissions.', 'User Dashboard')
-    .build();
+      .expectContains('Admin Dashboard', 'You have delete permissions.')
+      .expectExcludes('Limited permissions.', 'User Dashboard')
+      .build();
 
     const result = await runner.runTestCase(testCase);
 

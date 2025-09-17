@@ -191,7 +191,7 @@ function ShoppingList({ items, storeName }) {
 
     ## Shopping Items
 
-    {items.map((item, index) => <ListItem key={index} item={item.name + (item.completed ? ' ✅' : ' 📍')} />)}
+    {items.map((item, index) => <ListItem item={item.name + (item.completed ? ' ✅' : ' 📍')} />)}
 
     {remainingItems === 0 && (
       ---

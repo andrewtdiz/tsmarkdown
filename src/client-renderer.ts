@@ -1,4 +1,4 @@
-import { CompilerResult } from './compiler';
+import { CompiledMDX } from './compiler';
 import { TemplateExecutionEngine } from './template-engine';
 
 export interface ClientRendererOptions {
@@ -7,7 +7,7 @@ export interface ClientRendererOptions {
 }
 
 export interface RenderedResult {
-  html: string;
+  content: string;
   metadata: {
     title?: string;
     description?: string;
@@ -30,7 +30,7 @@ export class ClientRenderer {
   /**
    * Render compiled MDX content on the client side
    */
-  async render(compiledContent: CompilerResult, context: Record<string, any> = {}): Promise<RenderedResult> {
+  async render(compiledContent: CompiledMDX, context: Record<string, any> = {}): Promise<RenderedResult> {
     try {
       // Merge global context with provided context
       const fullContext = {
@@ -43,19 +43,16 @@ export class ClientRenderer {
       // Execute the template with the merged context
       const executionResult = await this.engine.execute(compiledContent, fullContext);
 
-      // Convert markdown to HTML (basic implementation)
-      const html = this.markdownToHtml(executionResult.content);
-
       return {
-        html,
+        content: executionResult.content,
         metadata: this.extractMetadata(executionResult.content),
         errors: executionResult.errors
       };
     } catch (error) {
       return {
-        html: '',
+        content: '',
         metadata: {},
-        errors: [`Client rendering failed: ${error.message}`]
+        errors: [`Client rendering failed: ${error instanceof Error ? error.message : String(error)}`]
       };
     }
   }
@@ -81,33 +78,11 @@ export class ClientRenderer {
     this.globalContext = { ...this.globalContext, ...context };
   }
 
-  /**
-   * Basic markdown to HTML conversion
-   * In a real implementation, you'd use a proper markdown parser like marked or remark
-   */
-  private markdownToHtml(markdown: string): string {
-    return markdown
-      // Headers
-      .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-      .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-      .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-      // Bold and italic
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      // Links
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
-      // Line breaks
-      .replace(/\n/g, '<br>')
-      // Paragraphs
-      .split('<br><br>')
-      .map(para => para.trim() ? `<p>${para}</p>` : '')
-      .join('');
-  }
 
   /**
    * Extract metadata from rendered content
    */
-  private extractMetadata(content: string): { title?: string; description?: string; tags?: string[] } {
+  extractMetadata(content: string): { title?: string; description?: string; tags?: string[] } {
     const metadata: { title?: string; description?: string; tags?: string[] } = {};
 
     // Extract title from first H1

@@ -62,7 +62,7 @@ Each phase builds on the previous one and can be independently tested:
 
 **Completed Phase 2 - All Advanced Template Features:**
 - ✅ **Props Support**: Function parameter destructuring (`{ items }`, `{ user }`)
-- ✅ **Array Mapping**: JSX expressions with `.map()` (`{items.map((item, index) => <ListItem key={index} item={item} />)}`)
+- ✅ **Array Mapping**: JSX expressions with `.map()` (`{items.map((item) => <ListItem item={item} />)}`)
 - ✅ **Component Imports**: Import and render external MDX components (`import { ListItem } from "./ListItem"`)
 - ✅ **Template Interpolation**: Dynamic content with `{{ variable }}` syntax
 - ✅ **Conditional Rendering**: Complex conditional blocks (`{condition && (...)}`)

@@ -212,7 +212,7 @@ function ArrayMappingTest() {
   return (
     # Technologies Used
 
-    {technologies.map((tech, index) => <ListItem key={index} item={tech} />)}
+    {technologies.map((tech, index) => <ListItem item={tech} />)}
 
     Total: {{ technologies.length }} technologies
   )
@@ -235,7 +235,7 @@ function PropsTest({ items }) {
   return (
     # My Items
 
-    {items.map((item, index) => <ListItem key={index} item={item} />)}
+    {items.map((item, index) => <ListItem item={item} />)}
 
     You have {{ total }} items.
   )

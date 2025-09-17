@@ -6,7 +6,7 @@ const parser = new MDXParser();
 const compiler = new MDXCompiler();
 const engine = new TemplateExecutionEngine();
 
-function demo(title: string, mdxCode: string, props = {}, context = {}) {
+async function demo(title: string, mdxCode: string, props = {}, context = {}) {
   console.log('\n' + '='.repeat(60));
   console.log(`🏗️  ${title}`);
   console.log('='.repeat(60));
@@ -24,7 +24,7 @@ function demo(title: string, mdxCode: string, props = {}, context = {}) {
   try {
     const parsed = parser.parse(mdxCode);
     const compiled = compiler.compile(parsed);
-    const result = engine.execute(compiled, context, props, './mdx');
+    const result = await engine.execute(compiled, context, props, './mdx');
 
     console.log(result.content);
 
@@ -73,7 +73,7 @@ function GoodSalesReport() {
     # Sales Report
 
     ## Breakdown (GOOD - reusable components)
-    {sales.map((sale, index) => <SalesItem key={index} month={sale.month} amount={sale.amount} />)}
+    {sales.map((sale, index) => <SalesItem month={sale.month} amount={sale.amount} />)}
 
     This approach is maintainable, reusable, and testable!
   )
@@ -102,12 +102,12 @@ function Dashboard({ user, sales, tasks }) {
     # {{ user.name }}'s Dashboard
 
     ## Recent Sales
-    {sales.map((sale, index) => <SalesItem key={index} month={sale.month} amount={sale.amount} />)}
+    {sales.map((sale, index) => <SalesItem month={sale.month} amount={sale.amount} />)}
 
     **Total: {{ totalSales }}**
 
     ## Today's Tasks
-    {tasks.map((task, index) => <ListItem key={index} item={task} />)}
+    {tasks.map((task, index) => <ListItem item={task} />)}
   )
 }`, {
   user: { name: "Sarah" },

@@ -15,7 +15,6 @@ export interface UseMDXComponentOptions {
 
 export interface MDXComponentState {
   content: string;
-  html: string;
   metadata: RenderedResult['metadata'];
   isLoading: boolean;
   error: string | null;
@@ -37,7 +36,6 @@ export interface MDXComponentActions {
 export function useMDXComponent(options: UseMDXComponentOptions = {}): MDXComponentState & MDXComponentActions {
   const [state, setState] = useState<MDXComponentState>({
     content: '',
-    html: '',
     metadata: {},
     isLoading: false,
     error: null,
@@ -66,7 +64,6 @@ export function useMDXComponent(options: UseMDXComponentOptions = {}): MDXCompon
       setState(prev => ({
         ...prev,
         content: '',
-        html: '',
         metadata: {},
         error: null,
         errors: [],
@@ -85,15 +82,14 @@ export function useMDXComponent(options: UseMDXComponentOptions = {}): MDXCompon
       // Execute template
       const executionResult = await engine.execute(compiled, mdxContext);
 
-      // Render to HTML
-      const rendered = renderer.render(compiled, mdxContext);
+      // Get metadata from content
+      const metadata = renderer.extractMetadata(executionResult.content);
 
       setState(prev => ({
         ...prev,
         content: executionResult.content,
-        html: rendered.html,
-        metadata: rendered.metadata,
-        errors: [...executionResult.errors, ...rendered.errors],
+        metadata: metadata,
+        errors: executionResult.errors,
         error: null,
         isLoading: false,
         lastUpdated: new Date()
@@ -101,7 +97,7 @@ export function useMDXComponent(options: UseMDXComponentOptions = {}): MDXCompon
     } catch (error) {
       setState(prev => ({
         ...prev,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         isLoading: false,
         lastUpdated: new Date()
       }));
@@ -203,7 +199,7 @@ export function useMDXFromAPI(apiEndpoint: string, options: Omit<UseMDXComponent
         throw new Error(data.error || 'Invalid API response');
       }
     } catch (error) {
-      setLoadError(error.message);
+      setLoadError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsLoadingSource(false);
     }
@@ -244,25 +240,24 @@ export function useMDXCollection(sources: Record<string, string>, options: Omit<
           const parsed = parser.parse(source);
           const compiled = compiler.compile(parsed);
           const executionResult = await engine.execute(compiled, options.context || {});
-          const rendered = renderer.render(compiled, options.context);
+          const metadata = renderer.extractMetadata(executionResult.content);
 
           results[key] = {
             content: executionResult.content,
-            html: rendered.html,
-            metadata: rendered.metadata,
+            metadata: metadata,
             isLoading: false,
             error: null,
-            errors: [...executionResult.errors, ...rendered.errors],
+            errors: executionResult.errors,
             lastUpdated: new Date()
           };
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
           results[key] = {
             content: '',
-            html: '',
             metadata: {},
             isLoading: false,
-            error: error.message,
-            errors: [error.message],
+            error: errorMessage,
+            errors: [errorMessage],
             lastUpdated: new Date()
           };
         }
@@ -275,38 +270,4 @@ export function useMDXCollection(sources: Record<string, string>, options: Omit<
   }, [sources, options.context, options.componentRegistry]);
 
   return components;
-}
-
-/**
- * Simple hook for just rendering markdown to HTML
- */
-export function useMarkdownToHTML(markdown: string): { html: string; isLoading: boolean } {
-  const [html, setHtml] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    if (!markdown.trim()) {
-      setHtml('');
-      return;
-    }
-
-    setIsLoading(true);
-
-    // Simple async processing to avoid blocking
-    setTimeout(() => {
-      const renderer = new ClientRenderer();
-      const result = renderer.render({
-        typescript: '',
-        markdown,
-        interpolations: [],
-        conditionalBlocks: [],
-        components: []
-      });
-
-      setHtml(result.html);
-      setIsLoading(false);
-    }, 0);
-  }, [markdown]);
-
-  return { html, isLoading };
 }

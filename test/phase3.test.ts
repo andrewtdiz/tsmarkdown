@@ -7,24 +7,28 @@ import { MDXCompiler } from '../src/compiler';
 
 describe('Phase 3: Runtime and API', () => {
   describe('Client Renderer', () => {
-    test('should render compiled MDX to HTML', () => {
+    test('should render compiled MDX to markdown', async () => {
       const renderer = new ClientRenderer();
       const compiled = {
         id: 'test-component',
         typescript: 'const name = "World";',
         template: 'Hello __INTERPOLATION_0__!',
         dependencies: [],
+        functionParams: [],
         interpolations: [{ placeholder: '__INTERPOLATION_0__', expression: 'name' }],
         conditionalBlocks: [],
+        ternaryExpressions: [],
+        jsxExpressions: [],
         metadata: {
           functionName: 'TestComponent',
-          lastModified: new Date().toISOString()
+          lastModified: new Date().toISOString(),
+          parameterTypes: []
         }
       };
 
-      const result = renderer.render(compiled, { name: 'Alice' });
+      const result = await renderer.render(compiled, { name: 'Alice' });
 
-      expect(result.html).toContain('Hello World!'); // TypeScript variable takes precedence
+      expect(result.content).toContain('Hello World!'); // TypeScript variable takes precedence
       expect(result.errors).toHaveLength(0);
     });
 
@@ -37,44 +41,52 @@ describe('Phase 3: Runtime and API', () => {
       expect(renderer['componentRegistry']['CustomComponent']).toBe(CustomComponent);
     });
 
-    test('should extract metadata from content', () => {
+    test('should extract metadata from content', async () => {
       const renderer = new ClientRenderer();
       const compiled = {
         id: 'test-component',
         typescript: '',
         template: '# My Title\nThis is a description\n#tag1 #tag2',
         dependencies: [],
+        functionParams: [],
         interpolations: [],
         conditionalBlocks: [],
+        ternaryExpressions: [],
+        jsxExpressions: [],
         metadata: {
           functionName: 'TestComponent',
-          lastModified: new Date().toISOString()
+          lastModified: new Date().toISOString(),
+          parameterTypes: []
         }
       };
 
-      const result = renderer.render(compiled);
+      const result = await renderer.render(compiled);
 
       expect(result.metadata.title).toBe('My Title');
       expect(result.metadata.description).toBe('This is a description');
       expect(result.metadata.tags).toEqual(['tag1', 'tag2']);
     });
 
-    test('should handle rendering errors gracefully', () => {
+    test('should handle rendering errors gracefully', async () => {
       const renderer = new ClientRenderer();
       const compiled = {
         id: 'test-component',
         typescript: 'throw new Error("Test error");',
         template: 'Content',
         dependencies: [],
+        functionParams: [],
         interpolations: [],
         conditionalBlocks: [],
+        ternaryExpressions: [],
+        jsxExpressions: [],
         metadata: {
           functionName: 'TestComponent',
-          lastModified: new Date().toISOString()
+          lastModified: new Date().toISOString(),
+          parameterTypes: []
         }
       };
 
-      const result = renderer.render(compiled);
+      const result = await renderer.render(compiled);
 
       // Even with errors, content may still render with error information
       expect(result.errors.length).toBeGreaterThan(0);
@@ -109,25 +121,6 @@ function TestComponent() {
       expect(result.data.compiled.template).toContain('__INTERPOLATION_0__ World!');
       expect(result.data.compiled.interpolations).toHaveLength(1);
       expect(result.data.filename).toBe('test.mdx');
-    });
-
-    test('should render MDX to HTML', async () => {
-      const request = {
-        source: `
-function TestComponent() {
-  const greeting = 'Welcome';
-
-  return (
-    # {{ greeting }} {{ name }}!
-  )}`,
-        context: { name: 'Bob' }
-      };
-
-      const result = await server.render(request);
-
-      expect(result.success).toBe(true);
-      expect(result.data.html).toContain('<h1>Welcome Bob!</h1>');
-      expect(result.data.metadata.title).toBe('Welcome Bob!');
     });
 
     test('should execute MDX with template engine', async () => {
@@ -323,8 +316,8 @@ function TestComponent() {
         compiled: compileResult.data.compiled
       });
       expect(renderResult.success).toBe(true);
-      expect(renderResult.data.html).toContain('Name: Alice');
-      expect(renderResult.data.html).toContain('🌟 VIP Member!');
+      expect(renderResult.data.content).toContain('Name: Alice');
+      expect(renderResult.data.content).toContain('🌟 VIP Member!');
 
       // Test execution with TypeScript variables
       const executeResult = await server.execute({
@@ -348,7 +341,7 @@ function TestComponent() {
       // Second request should use cache
       const result2 = await server.render({ source, context });
       expect(result2.success).toBe(true);
-      expect(result2.data.html).toBe(result1.data.html);
+      expect(result2.data.content).toBe(result1.data.content);
     });
 
     test('should handle simple nested content', async () => {
@@ -397,17 +390,21 @@ function SimpleComponent() {
         typescript: '',
         template: 'Value: __INTERPOLATION_0__',
         dependencies: [],
+        functionParams: [],
         interpolations: [{ placeholder: '__INTERPOLATION_0__', expression: 'unknownVar' }],
         conditionalBlocks: [],
+        ternaryExpressions: [],
+        jsxExpressions: [],
         metadata: {
           functionName: 'TestComponent',
-          lastModified: new Date().toISOString()
+          lastModified: new Date().toISOString(),
+          parameterTypes: []
         }
       };
 
-      const result = renderer.render(compiled, {});
+      const result = await renderer.render(compiled, {});
 
-      expect(result.html).toContain('Value:');
+      expect(result.content).toContain('Value:');
       expect(result.errors.length).toBeGreaterThan(0);
     });
 

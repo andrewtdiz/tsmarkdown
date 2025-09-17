@@ -10,6 +10,7 @@ export interface CompiledMDX {
   conditionalBlocks: Array<{ condition: string; content: string }>;
   ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>;
   jsxExpressions: Array<{ placeholder: string; expression: string }>;
+  returnStatements: Array<{ condition?: string; content: string; isTemplate: boolean }>;
   metadata: {
     functionName: string;
     lastModified: string;
@@ -36,6 +37,7 @@ export class MDXCompiler {
       conditionalBlocks: parsed.conditionalBlocks,
       ternaryExpressions: parsed.ternaryExpressions,
       jsxExpressions: parsed.jsxExpressions,
+      returnStatements: parsed.returnStatements,
       metadata: {
         functionName: parsed.functionName,
         lastModified: new Date().toISOString(),

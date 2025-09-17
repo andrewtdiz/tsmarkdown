@@ -40,46 +40,57 @@ export class TemplateExecutionEngine {
       const runtimeContext = await this.executeTypeScript(compiled.typescript, mergedContext);
       const fullContext = { ...mergedContext, ...runtimeContext };
 
-      // Process conditional blocks first (they may contain interpolations)
-      processedContent = this.processConditionalBlocks(
-        processedContent,
-        compiled.conditionalBlocks,
-        compiled.interpolations,
-        fullContext,
-        errors
-      );
+      // Handle multiple return statements if they exist
+      if (compiled.returnStatements && compiled.returnStatements.length > 0) {
+        processedContent = await this.processMultipleReturnStatements(
+          compiled.returnStatements,
+          fullContext,
+          errors
+        );
+      } else {
+        // Fall back to single template processing for backward compatibility
+        // Process conditional blocks first (they may contain interpolations)
+        processedContent = this.processConditionalBlocks(
+          processedContent,
+          compiled.conditionalBlocks,
+          compiled.interpolations,
+          fullContext,
+          errors
+        );
 
-      // Process any remaining interpolations
-      processedContent = this.processInterpolations(
-        processedContent,
-        compiled.interpolations,
-        fullContext,
-        errors
-      );
+        // Process any remaining interpolations
+        processedContent = this.processInterpolations(
+          processedContent,
+          compiled.interpolations,
+          fullContext,
+          errors
+        );
 
-      // Process ternary expressions
-      processedContent = this.processTernaryExpressions(
-        processedContent,
-        compiled.ternaryExpressions || [],
-        fullContext,
-        errors
-      );
+        // Process ternary expressions
+        processedContent = this.processTernaryExpressions(
+          processedContent,
+          compiled.ternaryExpressions || [],
+          fullContext,
+          errors
+        );
 
-      // Process JSX elements first (like <Component prop={value} />) before expressions
-      processedContent = await this.processJSXElements(
-        processedContent,
-        compiled.jsxExpressions || [],
-        fullContext,
-        errors
-      );
+        // Process JSX elements first (like <Component prop={value} />) before expressions
+        processedContent = await this.processJSXElements(
+          processedContent,
+          compiled.jsxExpressions || [],
+          fullContext,
+          errors,
+          props
+        );
 
-      // Process remaining JSX expressions (like array.map())
-      processedContent = await this.processJSXExpressions(
-        processedContent,
-        compiled.jsxExpressions || [],
-        fullContext,
-        errors
-      );
+        // Process remaining JSX expressions (like array.map())
+        processedContent = await this.processJSXExpressions(
+          processedContent,
+          compiled.jsxExpressions || [],
+          fullContext,
+          errors
+        );
+      }
 
     } catch (error) {
       errors.push(`Template execution error: ${error}`);
@@ -88,7 +99,7 @@ export class TemplateExecutionEngine {
     // Clean up extra whitespace and normalize spacing
     processedContent = processedContent
       .split('\n')
-      .map(line => line.trimRight()) // Remove trailing spaces
+      .map(line => line.trimEnd()) // Remove trailing spaces
       .join('\n')
       .replace(/\n{3,}/g, '\n\n') // Replace multiple consecutive newlines with double newlines
       .trim(); // Remove leading/trailing whitespace
@@ -97,6 +108,340 @@ export class TemplateExecutionEngine {
       content: processedContent,
       errors
     };
+  }
+
+  private async processMultipleReturnStatements(
+    returnStatements: Array<{ condition?: string; content: string; isTemplate: boolean }>,
+    context: any,
+    errors: string[]
+  ): Promise<string> {
+    // Find the first return statement that should be executed
+    for (const returnStmt of returnStatements) {
+      if (returnStmt.isTemplate) {
+        // Check if this return statement has a condition
+        if (returnStmt.condition) {
+          try {
+            // Evaluate the condition
+            const conditionResult = this.evaluateExpression(returnStmt.condition, context);
+            if (conditionResult) {
+              // This condition is true, use this template
+              return await this.processTemplate(returnStmt.content, context, errors);
+            }
+            // Continue to next return statement
+            continue;
+          } catch (error) {
+            errors.push(`Condition evaluation error in "${returnStmt.condition}": ${error}`);
+            continue;
+          }
+        } else {
+          // No condition, this is the default/fallback template
+          return await this.processTemplate(returnStmt.content, context, errors);
+        }
+      }
+    }
+
+    // If no template return statement matched, return empty string
+    return '';
+  }
+
+  private async processTemplate(
+    templateContent: string,
+    context: any,
+    errors: string[]
+  ): Promise<string> {
+    // Extract interpolations, conditionals, ternary expressions, and JSX expressions from the template content
+    const interpolations: Array<{ placeholder: string; expression: string }> = [];
+    const conditionalBlocks: Array<{ condition: string; content: string }> = [];
+    const ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
+    const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
+
+    // Process the template content to extract all the different types of expressions
+    let processedContent = this.processTemplateContent(
+      templateContent,
+      interpolations,
+      conditionalBlocks,
+      ternaryExpressions,
+      jsxExpressions
+    );
+
+    // Process conditional blocks first (they may contain interpolations)
+    processedContent = this.processConditionalBlocks(
+      processedContent,
+      conditionalBlocks,
+      interpolations,
+      context,
+      errors
+    );
+
+    // Process any remaining interpolations
+    processedContent = this.processInterpolations(
+      processedContent,
+      interpolations,
+      context,
+      errors
+    );
+
+    // Process ternary expressions
+    processedContent = this.processTernaryExpressions(
+      processedContent,
+      ternaryExpressions,
+      context,
+      errors
+    );
+
+    // Process JSX expressions
+    processedContent = await this.processJSXExpressions(
+      processedContent,
+      jsxExpressions,
+      context,
+      errors
+    );
+
+    return processedContent;
+  }
+
+  private processTemplateContent(
+    content: string,
+    interpolations: Array<{ placeholder: string; expression: string }>,
+    conditionalBlocks: Array<{ condition: string; content: string }>,
+    ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>,
+    jsxExpressions: Array<{ placeholder: string; expression: string }>,
+  ): string {
+    // Process interpolations first
+    let processedContent = content.replace(
+      /\{\{\s*([^}]+)\s*\}\}/g,
+      (match, expression) => {
+        const placeholder = `__INTERPOLATION_${interpolations.length}__`;
+        interpolations.push({ placeholder, expression: expression.trim() });
+        return placeholder;
+      },
+    );
+
+    // Process conditional blocks - handle multiline {condition && (content)}
+    processedContent = this.processConditionalBlocksForParsing(
+      processedContent,
+      conditionalBlocks,
+    );
+
+    // Process ternary expressions - handle {condition ? trueValue : falseValue}
+    processedContent = this.processTernaryExpressionsForParsing(
+      processedContent,
+      ternaryExpressions,
+    );
+
+    // Process JSX elements first (like <Component prop={value} />)
+    processedContent = this.processJSXElementsForParsing(
+      processedContent,
+      jsxExpressions,
+    );
+
+    // Process JSX expressions - handle {expression} that are not interpolations, conditionals, or ternary expressions
+    processedContent = this.processJSXExpressionsForParsing(
+      processedContent,
+      jsxExpressions,
+    );
+
+    return processedContent;
+  }
+
+  private processConditionalBlocksForParsing(
+    content: string,
+    conditionalBlocks: Array<{ condition: string; content: string }>,
+  ): string {
+    // Match conditional blocks with proper nesting
+    const conditionalRegex = /\{([^{}]+?)\s*&&\s*\(\s*([\s\S]*?)\s*\)\s*\}/g;
+
+    return content.replace(
+      conditionalRegex,
+      (match, condition, blockContent) => {
+        const placeholder = `__CONDITIONAL_${conditionalBlocks.length}__`;
+        conditionalBlocks.push({
+          condition: condition.trim(),
+          content: blockContent.trim(),
+        });
+        return placeholder;
+      },
+    );
+  }
+
+  private processTernaryExpressionsForParsing(
+    content: string,
+    ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>,
+  ): string {
+    // Match ternary expressions - {condition ? trueValue : falseValue}
+    const ternaryRegex = /\{([^{}<>]*(?:\{[^}]*\}[^{}<>]*)*)\s*\?\s*([^{}:<>]*(?:\{[^}]*\}[^{}:<>]*)*(?:\([^)]*\)[^{}:<>]*)*)\s*:\s*([^{}<>]*(?:\{[^}]*\}[^{}<>]*)*(?:\([^)]*\)[^{}:<>]*)*)\}/g;
+
+    return content.replace(
+      ternaryRegex,
+      (match, condition, trueValue, falseValue) => {
+        const trimmedCondition = condition.trim();
+        const trimmedTrueValue = trueValue.trim();
+        const trimmedFalseValue = falseValue.trim();
+
+        // Skip if any part is empty
+        if (!trimmedCondition || !trimmedTrueValue || !trimmedFalseValue) {
+          return match;
+        }
+
+        const placeholder = `__TERNARY_${ternaryExpressions.length}__`;
+        ternaryExpressions.push({
+          condition: trimmedCondition,
+          trueValue: trimmedTrueValue,
+          falseValue: trimmedFalseValue,
+        });
+        return placeholder;
+      },
+    );
+  }
+
+  private processJSXElementsForParsing(
+    content: string,
+    jsxExpressions: Array<{ placeholder: string; expression: string }>,
+  ): string {
+    // Find JSX elements like <Component prop={value} />
+    const jsxElementRegex = /<(\w+)([^/>]*)\/>/g;
+
+    return content.replace(jsxElementRegex, (match, componentName, props) => {
+      // Parse props to extract JSX expressions within them
+      const propMatches = props.match(/(\w+)=\{([^}]+)\}/g) || [];
+      const processedProps: string[] = [];
+
+      // Handle props with ={} syntax
+      for (const propMatch of propMatches) {
+        const [, propName, propExpr] = propMatch.match(/(\w+)=\{([^}]+)\}/) || [];
+        if (propName && propExpr) {
+          // Create a JSX expression placeholder for the prop value
+          const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
+          jsxExpressions.push({ placeholder, expression: propExpr.trim() });
+          processedProps.push(`${propName}=${placeholder}`);
+        }
+      }
+
+      // Handle props without ={} syntax (default to true)
+      const booleanProps = props.match(/\b(\w+)(?=\s|$)/g) || [];
+      for (const booleanProp of booleanProps) {
+        // Skip if this prop is already handled by the ={} syntax
+        const isAlreadyHandled = propMatches.some((propMatch: string) =>
+          propMatch.includes(`${booleanProp}=`)
+        );
+        if (!isAlreadyHandled) {
+          processedProps.push(booleanProp);
+        }
+      }
+
+      // Reconstruct the JSX element with processed props
+      const processedPropsString = processedProps.length > 0 ? ' ' + processedProps.join(' ') : '';
+      return `<${componentName}${processedPropsString} />`;
+    });
+  }
+
+  private processJSXExpressionsForParsing(
+    content: string,
+    jsxExpressions: Array<{ placeholder: string; expression: string }>,
+  ): string {
+    // Find all {expression} patterns and process them
+    let processedContent = content;
+    let startIndex = 0;
+
+    while (startIndex < processedContent.length) {
+      const openBraceIndex = processedContent.indexOf('{', startIndex);
+      if (openBraceIndex === -1) break;
+
+      // Skip if it's a double brace {{ }}
+      if (processedContent[openBraceIndex + 1] === '{') {
+        startIndex = openBraceIndex + 2;
+        continue;
+      }
+
+      // Skip if we're inside a JSX element (between < and />)
+      const beforeBrace = processedContent.substring(0, openBraceIndex);
+      const lastOpenAngle = beforeBrace.lastIndexOf('<');
+      const lastCloseAngle = beforeBrace.lastIndexOf('>');
+      const lastSlashAngle = beforeBrace.lastIndexOf('/>');
+
+      // If we have an unclosed JSX element (last < is after last >), skip this brace
+      if (lastOpenAngle > lastCloseAngle && lastOpenAngle > lastSlashAngle) {
+        startIndex = openBraceIndex + 1;
+        continue;
+      }
+
+      // Find the matching closing brace
+      const endIndex = this.findMatchingBrace(processedContent, openBraceIndex);
+      if (endIndex === -1) {
+        startIndex = openBraceIndex + 1;
+        continue;
+      }
+
+      const expression = processedContent.substring(openBraceIndex + 1, endIndex);
+      const trimmedExpression = expression.trim();
+
+      // Skip if it's a conditional block (contains &&)
+      if (trimmedExpression.includes('&&')) {
+        startIndex = endIndex + 1;
+        continue;
+      }
+
+      // Skip if it's a ternary expression (contains ? and :) and doesn't contain JSX
+      if (trimmedExpression.includes('?') && trimmedExpression.includes(':') && !trimmedExpression.includes('<')) {
+        startIndex = endIndex + 1;
+        continue;
+      }
+
+      // Skip if it's empty
+      if (!trimmedExpression) {
+        startIndex = endIndex + 1;
+        continue;
+      }
+
+      const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
+      jsxExpressions.push({ placeholder, expression: trimmedExpression });
+      processedContent = processedContent.substring(0, openBraceIndex) + placeholder + processedContent.substring(endIndex + 1);
+      startIndex = openBraceIndex + placeholder.length;
+    }
+
+    return processedContent;
+  }
+
+  private findMatchingBrace(content: string, startIndex: number): number {
+    let braceCount = 0;
+    let parenCount = 0;
+    let inString = false;
+    let stringChar = '';
+
+    for (let i = startIndex; i < content.length; i++) {
+      const char = content[i];
+      const prevChar = i > 0 ? content[i - 1] : '';
+
+      // Handle string literals
+      if (!inString && (char === '"' || char === "'" || char === '`')) {
+        inString = true;
+        stringChar = char;
+        continue;
+      }
+
+      if (inString && char === stringChar && prevChar !== '\\') {
+        inString = false;
+        continue;
+      }
+
+      if (inString) continue;
+
+      // Count braces and parentheses
+      if (char === '{') {
+        braceCount++;
+      } else if (char === '}') {
+        braceCount--;
+        if (braceCount === 0) {
+          return i;
+        }
+      } else if (char === '(') {
+        parenCount++;
+      } else if (char === ')') {
+        parenCount--;
+      }
+    }
+
+    return -1; // No matching brace found
   }
 
   private loadDependencies(dependencies: string[], basePath: string, errors: string[]): void {
@@ -212,8 +557,12 @@ export class TemplateExecutionEngine {
     }
 
     try {
-      // Create a safe execution environment
-      const safeContext = this.createSafeContext(context, typescript);
+      // Extract imports and resolve them
+      const imports = this.extractImports(typescript);
+      const resolvedImports = await this.resolveImports(imports);
+
+      // Create a safe execution environment with resolved imports
+      const safeContext = this.createSafeContext(context, typescript, resolvedImports);
 
       // Remove import statements as they can't be executed in this context
       const executableCode = this.removeImports(typescript);
@@ -242,7 +591,7 @@ export class TemplateExecutionEngine {
     }
   }
 
-  private createSafeContext(context: TemplateContext, typescript?: string): any {
+  private createSafeContext(context: TemplateContext, typescript?: string, resolvedImports?: any): any {
     // Extract variable names from TypeScript to avoid conflicts
     const declaredVars = typescript ? this.extractVariableNames(typescript) : [];
 
@@ -254,6 +603,7 @@ export class TemplateExecutionEngine {
     // Create a safe execution context with common utilities
     return {
       ...filteredContext,
+      ...(resolvedImports || {}),
       // Add safe built-in functions
       Date,
       Math,
@@ -270,6 +620,95 @@ export class TemplateExecutionEngine {
         error: (...args: any[]) => console.error('[MDX]', ...args)
       }
     };
+  }
+
+  private extractImports(code: string): string[] {
+    const lines = code.split('\n');
+    const imports: string[] = [];
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('import ')) {
+        imports.push(trimmed);
+      }
+    }
+
+    return imports;
+  }
+
+  private async resolveImports(imports: string[]): Promise<any> {
+    const resolvedImports: any = {};
+
+    for (const importLine of imports) {
+      try {
+        // Parse the import statement
+        const importMatch = importLine.match(/import\s*\{\s*([^}]+)\s*\}\s*from\s*['"]([^'"]+)['"]/);
+        if (importMatch) {
+          const [, namedImports, modulePath] = importMatch;
+          const importNames = namedImports.split(',').map(name => name.trim());
+
+          // Resolve the module path
+          const resolvedModule = await this.resolveModule(modulePath);
+          if (resolvedModule) {
+            // Add each named import to the resolved imports
+            for (const importName of importNames) {
+              if (resolvedModule[importName]) {
+                resolvedImports[importName] = resolvedModule[importName];
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`Failed to resolve import: ${importLine}`, error);
+      }
+    }
+
+    return resolvedImports;
+  }
+
+  private async resolveModule(modulePath: string): Promise<any> {
+    try {
+      // Handle relative imports
+      if (modulePath.startsWith('./') || modulePath.startsWith('../')) {
+        // For now, we'll use a simple require approach
+        // In a real implementation, you might want to use dynamic imports
+        const fs = require('fs');
+        const path = require('path');
+
+        // Try to find the module file
+        const possibleExtensions = ['.ts', '.js', '.mjs'];
+        let resolvedPath = null;
+
+        for (const ext of possibleExtensions) {
+          const fullPath = path.resolve(modulePath + ext);
+          try {
+            if (fs.existsSync(fullPath)) {
+              resolvedPath = fullPath;
+              break;
+            }
+          } catch (error) {
+            // Continue to next extension
+          }
+        }
+
+        if (resolvedPath) {
+          // Use require to load the module
+          delete require.cache[require.resolve(resolvedPath)];
+          return require(resolvedPath);
+        }
+      }
+
+      // For absolute imports or node_modules, try require
+      try {
+        return require(modulePath);
+      } catch (error) {
+        // Module not found
+        return null;
+      }
+    } catch (error) {
+      console.warn(`Failed to resolve module: ${modulePath}`, error);
+      return null;
+    }
   }
 
   private removeImports(code: string): string {
@@ -390,6 +829,9 @@ export class TemplateExecutionEngine {
 
         // Process any interpolations within the conditional block content
         if (blockContent && shouldRender) {
+          // Process escape sequences first (convert \n to actual newlines)
+          blockContent = this.processEscapeSequences(blockContent);
+
           // Normalize indentation within the conditional block
           blockContent = this.normalizeIndentation(blockContent.trim());
           blockContent = this.processInterpolations(blockContent, interpolations, context, errors);
@@ -442,6 +884,9 @@ export class TemplateExecutionEngine {
             processedValue = processedValue.slice(1, -1).trim();
           }
 
+          // Process escape sequences first (convert \n to actual newlines)
+          processedValue = this.processEscapeSequences(processedValue);
+
           // Normalize indentation within the ternary value
           processedValue = this.normalizeIndentation(processedValue);
           processedValue = this.processInterpolations(processedValue, [], context, errors);
@@ -474,6 +919,17 @@ export class TemplateExecutionEngine {
     } catch (error) {
       throw new Error(`Expression evaluation failed: ${error}`);
     }
+  }
+
+  private processEscapeSequences(content: string): string {
+    // Convert literal escape sequences to actual characters
+    return content
+      .replace(/\\n/g, '\n')
+      .replace(/\\t/g, '\t')
+      .replace(/\\r/g, '\r')
+      .replace(/\\\\/g, '\\')
+      .replace(/\\"/g, '"')
+      .replace(/\\'/g, "'");
   }
 
   private normalizeIndentation(content: string): string {
@@ -543,7 +999,8 @@ export class TemplateExecutionEngine {
     content: string,
     jsxExpressions: Array<{ placeholder: string; expression: string }>,
     context: any,
-    errors: string[]
+    errors: string[],
+    originalProps: any = {}
   ): Promise<string> {
     // Find JSX elements like <Component prop={value} />
     const jsxElementRegex = /<(\w+)([^/>]*)\/>/g;
@@ -564,7 +1021,7 @@ export class TemplateExecutionEngine {
     // Second pass: process each JSX element
     for (const jsxElement of jsxElements) {
       try {
-        const rendered = await this.renderJSXElement(jsxElement, jsxExpressions, context);
+        const rendered = await this.renderJSXElement(jsxElement, jsxExpressions, context, originalProps);
         processedContent = processedContent.replace(jsxElement.match, rendered);
       } catch (error) {
         errors.push(`JSX element error in "${jsxElement.match}": ${error}`);
@@ -603,6 +1060,11 @@ export class TemplateExecutionEngine {
 
   private async evaluateJSXExpression(expression: string, context: any): Promise<any> {
     try {
+      // Check if this is a ternary expression first
+      if (expression.includes('?')) {
+        return await this.evaluateTernaryExpression(expression, context);
+      }
+
       // Check if this is a .map() expression for arrays
       if (expression.includes('.map(')) {
         return await this.evaluateMapExpression(expression, context);
@@ -616,8 +1078,66 @@ export class TemplateExecutionEngine {
     }
   }
 
+  private async evaluateTernaryExpression(expression: string, context: any): Promise<any> {
+    // Parse ternary expressions like: items.length === 0 ? "Empty" : items.map(...)
+    // We need to find the outermost ternary operator, not nested ones
+    let parenCount = 0;
+    let questionIndex = -1;
+    let colonIndex = -1;
+
+    for (let i = 0; i < expression.length; i++) {
+      const char = expression[i];
+      if (char === '(') parenCount++;
+      else if (char === ')') parenCount--;
+      else if (char === '?' && parenCount === 0) {
+        questionIndex = i;
+        break;
+      }
+    }
+
+    if (questionIndex === -1) {
+      throw new Error(`No ternary operator found in expression: ${expression}`);
+    }
+
+    // Find the matching colon
+    for (let i = questionIndex + 1; i < expression.length; i++) {
+      const char = expression[i];
+      if (char === '(') parenCount++;
+      else if (char === ')') parenCount--;
+      else if (char === ':' && parenCount === 0) {
+        colonIndex = i;
+        break;
+      }
+    }
+
+    if (colonIndex === -1) {
+      throw new Error(`No matching colon found in ternary expression: ${expression}`);
+    }
+
+    const condition = expression.substring(0, questionIndex).trim();
+    const trueValue = expression.substring(questionIndex + 1, colonIndex).trim();
+    const falseValue = expression.substring(colonIndex + 1).trim();
+
+    // Evaluate the condition
+    const conditionFunc = new Function(...Object.keys(context), `return (${condition})`);
+    const conditionResult = conditionFunc(...Object.values(context));
+
+    // Choose the appropriate value based on the condition
+    const selectedExpression = conditionResult ? trueValue : falseValue;
+
+    // If the selected expression contains JSX or map, evaluate it appropriately
+    if (selectedExpression.includes('.map(')) {
+      return await this.evaluateMapExpression(selectedExpression, context);
+    } else if (selectedExpression.includes('<') && selectedExpression.includes('>')) {
+      return await this.evaluateTernaryJSXExpression(selectedExpression, context);
+    } else {
+      // Simple value (like "Empty") - remove quotes if present
+      return selectedExpression.replace(/^["']|["']$/g, '');
+    }
+  }
+
   private async evaluateMapExpression(expression: string, context: any): Promise<string> {
-    // Parse expressions like: items.map((item, index) => <ListItem key={index} item={item} />)
+    // Parse expressions like: items.map((item, index) => <ListItem item={item} />)
     const mapMatch = expression.match(/(.+)\.map\s*\(\s*\(([^)]+)\)\s*=>\s*(.+)\s*\)/);
 
     if (!mapMatch) {
@@ -653,7 +1173,13 @@ export class TemplateExecutionEngine {
         // Check if this is a ternary expression with JSX components
         if (elementExpr.includes('?')) {
           // Handle ternary expressions like: ordered ? <OlItem item={item} index={index} /> : <UlItem item={item} />
-          return await this.evaluateTernaryJSXExpression(elementExpr, iterationContext);
+          // First, resolve any placeholders in the expression with actual values
+          let resolvedExpr = elementExpr;
+          resolvedExpr = resolvedExpr.replace(/__JSX_EXPRESSION_0__/g, 'item');
+          resolvedExpr = resolvedExpr.replace(/__JSX_EXPRESSION_1__/g, 'index');
+          resolvedExpr = resolvedExpr.replace(/__JSX_EXPRESSION_2__/g, 'item');
+
+          return await this.evaluateTernaryJSXExpression(resolvedExpr, iterationContext);
         } else {
           // Handle direct JSX components
           return await this.renderJSXComponent(elementExpr, iterationContext);
@@ -685,14 +1211,15 @@ export class TemplateExecutionEngine {
     // Choose the appropriate JSX component based on the condition
     const selectedExpression = conditionResult ? trueValue.trim() : falseValue.trim();
 
-    // Render the selected JSX component
+    // Render the selected JSX component with proper context
     return await this.renderJSXComponent(selectedExpression, context);
   }
 
   private async renderJSXElement(
     jsxElement: { match: string; componentName: string; props: string },
     jsxExpressions: Array<{ placeholder: string; expression: string }>,
-    context: any
+    context: any,
+    originalProps: any = {}
   ): Promise<string> {
     const { componentName, props } = jsxElement;
 
@@ -726,12 +1253,28 @@ export class TemplateExecutionEngine {
       }
     }
 
+    // Handle boolean props without ={} syntax (default to true)
+    const booleanProps = props.match(/\b(\w+)(?=\s|$)/g) || [];
+    for (const booleanProp of booleanProps) {
+      // Skip if this prop is already handled by the ={} syntax
+      const isAlreadyHandled = propMatches.some((propMatch: string) =>
+        propMatch.includes(`${booleanProp}=`)
+      );
+      if (!isAlreadyHandled) {
+        propValues[booleanProp] = true;
+      }
+    }
+
     // Check if we have the component in our registry
     if (this.componentRegistry[componentName]) {
       try {
-        // Merge JSX props with default values from component metadata
-        const mergedProps = this.mergePropsWithDefaults(propValues, this.componentRegistry[componentName]);
-        const componentResult = await this.execute(this.componentRegistry[componentName], {}, mergedProps);
+        // Merge JSX props with original props (original props take precedence)
+        const mergedProps = { ...propValues, ...originalProps };
+
+
+        // Merge with default values from component metadata
+        const finalProps = this.mergePropsWithDefaults(mergedProps, this.componentRegistry[componentName]);
+        const componentResult = await this.execute(this.componentRegistry[componentName], context, finalProps);
         return componentResult.content;
       } catch (error) {
         throw new Error(`Component execution failed: ${error}`);
@@ -748,7 +1291,7 @@ export class TemplateExecutionEngine {
   }
 
   private async renderJSXComponent(jsxElement: string, context: any): Promise<string> {
-    // Parse JSX like: <ListItem key={index} item={item} />
+    // Parse JSX like: <ListItem item={item} /> or <OlItem item=__JSX_EXPRESSION_0__ index=__JSX_EXPRESSION_1__ />
     const componentMatch = jsxElement.match(/<(\w+)([^/>]*)\/>/);
 
     if (!componentMatch) {
@@ -757,16 +1300,28 @@ export class TemplateExecutionEngine {
 
     const [, componentName, props] = componentMatch;
 
-    // Parse props
-    const propMatches = props.match(/(\w+)=\{([^}]+)\}/g) || [];
+    // Parse props - handle both {expression} and placeholder patterns
+    const propMatches = props.match(/(\w+)=(?:\{([^}]+)\}|([^}\s]+))/g) || [];
     const propValues: any = {};
 
     for (const propMatch of propMatches) {
-      const [, propName, propExpr] = propMatch.match(/(\w+)=\{([^}]+)\}/) || [];
+      // Handle both {value} and placeholder patterns
+      const matchResult = propMatch.match(/(\w+)=(?:\{([^}]+)\}|([^}\s]+))/) || [];
+      const propName = matchResult[1];
+      const propExpr = matchResult[2] || matchResult[3]; // Either from {value} or placeholder
+
       if (propName && propExpr) {
         try {
-          const propFunc = new Function(...Object.keys(context), `return (${propExpr})`);
-          propValues[propName] = propFunc(...Object.values(context));
+          // Check if this is a placeholder (like __JSX_EXPRESSION_0__)
+          if (propExpr.startsWith('__JSX_EXPRESSION_') && propExpr.endsWith('__')) {
+            // This is a placeholder, evaluate it directly from context
+            const propFunc = new Function(...Object.keys(context), `return (${propExpr})`);
+            propValues[propName] = propFunc(...Object.values(context));
+          } else {
+            // Direct expression evaluation
+            const propFunc = new Function(...Object.keys(context), `return (${propExpr})`);
+            propValues[propName] = propFunc(...Object.values(context));
+          }
         } catch (error) {
           // Skip invalid prop expressions
         }

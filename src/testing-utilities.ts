@@ -1,4 +1,3 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { resolve, join } from 'path';
 import { MDXParser } from './parser';
 import { MDXCompiler } from './compiler';
@@ -65,21 +64,21 @@ export class MDXTestRunner {
     try {
       // Parse phase
       const parsed = this.parser.parse(testCase.input);
-      result.details.parsed = parsed;
+      result.details!.parsed = parsed;
 
       if (!testCase.options?.skipCompilation) {
         // Compile phase
         const compiled = this.compiler.compile(parsed);
-        result.details.compiled = compiled;
+        result.details!.compiled = compiled;
 
         if (!testCase.options?.skipExecution) {
           // Execute phase
           const executed = await this.engine.execute(compiled, testCase.context || {});
-          result.details.executed = executed;
+          result.details!.executed = executed;
 
           // Render phase
           const rendered = this.renderer.render(compiled, testCase.context || {});
-          result.details.rendered = rendered;
+          result.details!.rendered = rendered;
 
           // Validate results if expected values are provided
           if (testCase.expected) {
@@ -185,21 +184,28 @@ export class MDXTestRunner {
   /**
    * Load test cases from JSON file
    */
-  loadTestCasesFromFile(filePath: string): MDXTestCase[] {
-    if (!existsSync(filePath)) {
+  async loadTestCasesFromFile(filePath: string): Promise<MDXTestCase[]> {
+    const file = Bun.file(filePath);
+
+    if (!(await file.exists())) {
       throw new Error(`Test file not found: ${filePath}`);
     }
 
-    const content = readFileSync(filePath, 'utf-8');
+    const content = await file.text();
     return JSON.parse(content);
   }
 
   /**
    * Save test results to file
    */
-  saveResults(filePath: string, results: MDXTestResult[] = this.results): void {
+  async saveResults(filePath: string, results: MDXTestResult[] = this.results): Promise<void> {
     const outputDir = resolve(filePath, '..');
-    if (!existsSync(outputDir)) {
+    const outputDirFile = Bun.file(outputDir);
+
+    if (!(await outputDirFile.exists())) {
+      await Bun.write(outputDir, '');
+      // Note: Bun doesn't have a direct mkdir equivalent, so we use the node:fs module for directory creation
+      const { mkdirSync } = await import('node:fs');
       mkdirSync(outputDir, { recursive: true });
     }
 
@@ -214,14 +220,14 @@ export class MDXTestRunner {
       results
     };
 
-    writeFileSync(filePath, JSON.stringify(report, null, 2));
+    await Bun.write(filePath, JSON.stringify(report, null, 2));
     console.log(`📝 Test results saved to: ${filePath}`);
   }
 
   /**
    * Generate HTML test report
    */
-  generateHTMLReport(outputPath: string, results: MDXTestResult[] = this.results): void {
+  async generateHTMLReport(outputPath: string, results: MDXTestResult[] = this.results): Promise<void> {
     const passed = results.filter(r => r.passed).length;
     const failed = results.length - passed;
     const totalTime = results.reduce((sum, r) => sum + r.duration, 0);
@@ -397,11 +403,15 @@ export class MDXTestRunner {
     `;
 
     const outputDir = resolve(outputPath, '..');
-    if (!existsSync(outputDir)) {
+    const outputDirFile = Bun.file(outputDir);
+
+    if (!(await outputDirFile.exists())) {
+      // Note: Bun doesn't have a direct mkdir equivalent, so we use the node:fs module for directory creation
+      const { mkdirSync } = await import('node:fs');
       mkdirSync(outputDir, { recursive: true });
     }
 
-    writeFileSync(outputPath, html);
+    await Bun.write(outputPath, html);
     console.log(`📊 HTML report generated: ${outputPath}`);
   }
 
@@ -611,25 +621,32 @@ export class MDXSnapshotTester {
     const current = {
       content: executed.content,
       errors: executed.errors,
-      metadata: compiled.metadata
+      metadata: {
+        ...compiled.metadata,
+        lastModified: 'TIMESTAMP_PLACEHOLDER' // Normalize timestamp for comparison
+      }
     };
 
     const snapshotPath = join(this.snapshotsDir, `${name}.snapshot.json`);
 
     // Create snapshots directory if it doesn't exist
-    if (!existsSync(this.snapshotsDir)) {
+    const snapshotsDirFile = Bun.file(this.snapshotsDir);
+    if (!(await snapshotsDirFile.exists())) {
+      // Note: Bun doesn't have a direct mkdir equivalent, so we use the node:fs module for directory creation
+      const { mkdirSync } = await import('node:fs');
       mkdirSync(this.snapshotsDir, { recursive: true });
     }
 
     // If snapshot doesn't exist, create it
-    if (!existsSync(snapshotPath)) {
-      writeFileSync(snapshotPath, JSON.stringify(current, null, 2));
+    const snapshotFile = Bun.file(snapshotPath);
+    if (!(await snapshotFile.exists())) {
+      await Bun.write(snapshotPath, JSON.stringify(current, null, 2));
       console.log(`📸 Created snapshot: ${name}`);
       return true;
     }
 
     // Compare with existing snapshot
-    const snapshot = JSON.parse(readFileSync(snapshotPath, 'utf-8'));
+    const snapshot = JSON.parse(await snapshotFile.text());
     const matches = JSON.stringify(current) === JSON.stringify(snapshot);
 
     if (!matches) {
@@ -661,11 +678,14 @@ export class MDXSnapshotTester {
 
     const snapshotPath = join(this.snapshotsDir, `${name}.snapshot.json`);
 
-    if (!existsSync(this.snapshotsDir)) {
+    const snapshotsDirFile = Bun.file(this.snapshotsDir);
+    if (!(await snapshotsDirFile.exists())) {
+      // Note: Bun doesn't have a direct mkdir equivalent, so we use the node:fs module for directory creation
+      const { mkdirSync } = await import('node:fs');
       mkdirSync(this.snapshotsDir, { recursive: true });
     }
 
-    writeFileSync(snapshotPath, JSON.stringify(current, null, 2));
+    await Bun.write(snapshotPath, JSON.stringify(current, null, 2));
     console.log(`📸 Updated snapshot: ${name}`);
   }
 }

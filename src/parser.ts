@@ -374,12 +374,26 @@ ${properties}
       const propMatches = props.match(/(\w+)=\{([^}]+)\}/g) || [];
       const processedProps: string[] = [];
 
+      // Handle props with ={} syntax
       for (const propMatch of propMatches) {
         const [, propName, propExpr] = propMatch.match(/(\w+)=\{([^}]+)\}/) || [];
         if (propName && propExpr) {
-          // For simple prop values (like variables), don't create JSX expressions
-          // Just keep them as-is for now
-          processedProps.push(`${propName}={${propExpr}}`);
+          // Create a JSX expression placeholder for the prop value
+          const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
+          jsxExpressions.push({ placeholder, expression: propExpr.trim() });
+          processedProps.push(`${propName}=${placeholder}`);
+        }
+      }
+
+      // Handle props without ={} syntax (default to true)
+      const booleanProps = props.match(/\b(\w+)(?=\s|$)/g) || [];
+      for (const booleanProp of booleanProps) {
+        // Skip if this prop is already handled by the ={} syntax
+        const isAlreadyHandled = propMatches.some((propMatch: string) =>
+          propMatch.includes(`${booleanProp}=`)
+        );
+        if (!isAlreadyHandled) {
+          processedProps.push(booleanProp);
         }
       }
 
@@ -404,6 +418,18 @@ ${properties}
       // Skip if it's a double brace {{ }}
       if (processedContent[openBraceIndex + 1] === '{') {
         startIndex = openBraceIndex + 2;
+        continue;
+      }
+
+      // Skip if we're inside a JSX element (between < and />)
+      const beforeBrace = processedContent.substring(0, openBraceIndex);
+      const lastOpenAngle = beforeBrace.lastIndexOf('<');
+      const lastCloseAngle = beforeBrace.lastIndexOf('>');
+      const lastSlashAngle = beforeBrace.lastIndexOf('/>');
+
+      // If we have an unclosed JSX element (last < is after last >), skip this brace
+      if (lastOpenAngle > lastCloseAngle && lastOpenAngle > lastSlashAngle) {
+        startIndex = openBraceIndex + 1;
         continue;
       }
 
