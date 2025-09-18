@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 import plugin from "bun-plugin-tailwind";
-import { existsSync } from "fs";
-import { rm } from "fs/promises";
+// Using Bun APIs for file operations instead of fs
 import path from "path";
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
@@ -110,9 +109,9 @@ console.log("\n🚀 Starting build process...\n");
 const cliConfig = parseArgs();
 const outdir = cliConfig.outdir || path.join(process.cwd(), "dist");
 
-if (existsSync(outdir)) {
+if (await Bun.file(outdir).exists()) {
   console.log(`🗑️ Cleaning previous build at ${outdir}`);
-  await rm(outdir, { recursive: true, force: true });
+  await Bun.write(outdir, ''); // Clear directory by writing empty content
 }
 
 const start = performance.now();

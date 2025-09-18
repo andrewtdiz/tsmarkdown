@@ -1,0 +1,68 @@
+function CodeSyntaxHighlighting() {
+  return (
+    # Code and Syntax Highlighting
+
+    ## Inline Code
+
+    This is `inline code` with backticks.
+
+    You can have multiple `inline code snippets` in the same paragraph.
+
+    ## Code Blocks
+
+    Here's a simple code block:
+
+    ```
+    function hello() {
+        console.log("Hello, world!");
+    }
+    ```
+
+    ## Syntax Highlighted Code Blocks
+
+    JavaScript code:
+
+    ```javascript
+    function greet(name) {
+        return `Hello, ${name}!`;
+    }
+
+    const message = greet("World");
+    console.log(message);
+    ```
+
+    TypeScript code:
+
+    ```typescript
+    interface User {
+        name: string;
+        age: number;
+    }
+
+    function createUser(name: string, age: number): User {
+        return { name, age };
+    }
+    ```
+
+    Python code:
+
+    ```python
+    def fibonacci(n):
+        if n <= 1:
+            return n
+        return fibonacci(n-1) + fibonacci(n-2)
+
+    print(fibonacci(10))
+    ```
+
+    ## Mixed Content
+
+    You can mix `inline code` with regular text and code blocks:
+
+    ```bash
+    npm install better-mdx
+    ```
+
+    Then use it in your project with `import { parseMDX } from 'better-mdx'`.
+  )
+}

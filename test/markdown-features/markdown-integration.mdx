@@ -1,0 +1,29 @@
+function MarkdownIntegration({ userName }: { userName: string }) {
+  return (
+    # Welcome {{ userName }}!
+
+    This document demonstrates that **markdown formatting** works alongside Better MDX features.
+
+    ## Code Examples
+
+    Here's some `inline code` and a code block:
+
+    ```javascript
+    function greet(name) {
+        return `Hello, ${name}!`;
+    }
+    ```
+
+    ## Links and Tables
+
+    Visit [Better MDX](https://github.com/better-mdx) for more information.
+
+    | Feature | Status |
+    |---------|--------|
+    | Interpolation | ✅ Working |
+    | Conditionals | ✅ Working |
+    | Markdown | ✅ Working |
+
+    > This block quote shows that all features work together seamlessly.
+  )
+}

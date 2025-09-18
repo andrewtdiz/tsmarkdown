@@ -1,0 +1,13 @@
+import { Header } from "./Header"
+import { Content } from "./Content"
+
+function WrappedComponents() {
+  return (
+    <description>
+    <@Header />
+    <content>
+        <@Content />
+    </content>
+    </description>
+  )
+}

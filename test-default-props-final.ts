@@ -1,7 +1,7 @@
 import { render } from './src/renderer';
 import { parseMDX } from './src/parser';
 import { compile } from './src/compiler';
-import { readFileSync } from 'fs';
+// Using Bun.file() for file operations instead of fs
 
 async function testDefaultPropsFinal() {
     console.log('🧪 Final Test: Default Prop Values for JSX Components\n');
@@ -10,7 +10,7 @@ async function testDefaultPropsFinal() {
     try {
         // Load and compile the List component
         console.log('📋 Loading List component...');
-        const listContent = readFileSync('./mdx/List.mdx', 'utf-8');
+        const listContent = await Bun.file('./mdx/List.mdx').text();
         const parsedList = parseMDX(listContent);
         const compiledList = compile(parsedList);
 

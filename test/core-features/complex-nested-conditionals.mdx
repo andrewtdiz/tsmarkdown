@@ -7,11 +7,9 @@ function NestedTest() {
       {user.role === 'admin' && (
         # Admin Dashboard
 
-        {user.permissions.includes('delete') && (
+        {user.permissions.includes('delete') ? (
           You have delete permissions.
-        )}
-
-        {!user.permissions.includes('delete') && (
+        ) : (
           Limited permissions.
         )}
       )}

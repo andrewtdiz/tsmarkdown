@@ -1,7 +1,8 @@
 import { generatePropsInterface, parseParameters, parseParameterTypes } from "./parser/parameters";
 import { processJSXExpressions } from "./renderer/jsx-runtime";
 import { normalizeIndentation } from "./renderer/string-helpers";
-import { processTemplateContent } from "./renderer/template-parsing";
+import { parseContent } from "./parser/pipeline";
+import { protectCodeBlocks, restoreCodeBlocks } from "./parser/code-protection";
 
 export interface ParsedMDX {
   imports: string[];
@@ -38,9 +39,13 @@ export function parseMDX(content: string): ParsedMDX {
   let parameterTypes: Array<{ name: string; type: string; required: boolean }> = [];
   let rawParams = "";
 
+  // First, protect code blocks in the entire content to avoid brace level issues
+  const { protectedContent: protectedContent, codeBlocks: allCodeBlocks } = protectCodeBlocks(content);
+  const protectedLines = protectedContent.split("\n");
+
   // First pass: extract imports and function metadata
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  for (let i = 0; i < protectedLines.length; i++) {
+    const line = protectedLines[i];
     const trimmed = line.trim();
 
     if (trimmed.startsWith("import ")) {
@@ -77,10 +82,7 @@ export function parseMDX(content: string): ParsedMDX {
     if (inReturn) {
       // Check if this line contains the closing parenthesis of the return statement
       const trimmedLine = line.trim();
-      if (
-        trimmedLine === ")" ||
-        (trimmedLine.endsWith(")") && braceLevel === 0)
-      ) {
+      if (trimmedLine === ")" && braceLevel === 0) {
         break; // This is the end of the return statement
       }
 
@@ -100,16 +102,18 @@ export function parseMDX(content: string): ParsedMDX {
   // Second pass: process markdown for interpolations, conditionals, ternary expressions, and JSX expressions
   const normalizedMarkdown = normalizeIndentation(markdown).trim();
 
-  // Process JSX expressions first to populate the jsxExpressions array
-  processJSXExpressions(normalizedMarkdown, jsxExpressions, {}, []);
-
-  markdown = processTemplateContent(
-    normalizedMarkdown,
+  // Use the new parsing pipeline with code protection
+  const context = {
     interpolations,
     conditionalBlocks,
     ternaryExpressions,
-    jsxExpressions,
-  );
+    jsxExpressions
+  };
+
+  markdown = parseContent(normalizedMarkdown, context);
+
+  // Restore the protected code blocks in the final markdown
+  markdown = restoreCodeBlocks(markdown, allCodeBlocks);
 
   // Generate props interface
   const propsInterface = generatePropsInterface(functionName, parameterTypes);

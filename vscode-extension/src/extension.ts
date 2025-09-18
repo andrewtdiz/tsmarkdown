@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as fs from 'fs';
+// Using Bun.file() for file operations instead of fs
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('Better-MDX extension is now active!');
@@ -82,7 +82,7 @@ export function activate(context: vscode.ExtensionContext) {
       );
 
       // Load and compile the MDX file
-      const content = fs.readFileSync(fileUri.fsPath, 'utf-8');
+      const content = await Bun.file(fileUri.fsPath).text();
       const previewHtml = await generatePreviewHtml(content, fileUri.fsPath);
 
       panel.webview.html = previewHtml;
@@ -90,7 +90,7 @@ export function activate(context: vscode.ExtensionContext) {
       // Set up file watcher for live updates
       const watcher = vscode.workspace.createFileSystemWatcher(fileUri.fsPath);
       watcher.onDidChange(async () => {
-        const updatedContent = fs.readFileSync(fileUri.fsPath, 'utf-8');
+        const updatedContent = await Bun.file(fileUri.fsPath).text();
         const updatedHtml = await generatePreviewHtml(updatedContent, fileUri.fsPath);
         panel.webview.html = updatedHtml;
       });
@@ -344,7 +344,7 @@ class BetterMDXCompletionProvider implements vscode.CompletionItemProvider {
 }
 
 class BetterMDXDiagnosticsProvider {
-  constructor(private diagnosticsCollection: vscode.DiagnosticCollection) {}
+  constructor(private diagnosticsCollection: vscode.DiagnosticCollection) { }
 
   updateDiagnostics(document: vscode.TextDocument) {
     const diagnostics: vscode.Diagnostic[] = [];

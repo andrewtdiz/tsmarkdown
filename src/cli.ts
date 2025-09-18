@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync, watchFile, unwatchFile } from 'fs';
+// Using Bun APIs for file operations instead of fs
+import { mkdirSync, existsSync, readdirSync, statSync, watchFile, unwatchFile } from 'node:fs';
 import { resolve, dirname, basename, join, extname } from 'path';
 import { parseMDX } from './parser';
 import { compile } from './compiler';
@@ -189,7 +190,7 @@ Visit https://github.com/better-mdx for documentation and examples.
       }
     };
 
-    writeFileSync(join(projectDir, 'package.json'), JSON.stringify(packageJson, null, 2));
+    await Bun.write(join(projectDir, 'package.json'), JSON.stringify(packageJson, null, 2));
 
     // Create sample MDX file
     const sampleMdx = `import { Button } from './components/Button';
@@ -227,7 +228,7 @@ function Welcome() {
   )
 }`;
 
-    writeFileSync(join(projectDir, 'mdx/Welcome.mdx'), sampleMdx);
+    await Bun.write(join(projectDir, 'mdx/Welcome.mdx'), sampleMdx);
 
     // Create TypeScript config
     const tsConfig = {
@@ -246,7 +247,7 @@ function Welcome() {
       exclude: ['node_modules', 'dist']
     };
 
-    writeFileSync(join(projectDir, 'tsconfig.json'), JSON.stringify(tsConfig, null, 2));
+    await Bun.write(join(projectDir, 'tsconfig.json'), JSON.stringify(tsConfig, null, 2));
 
     // Create sample React component
     const buttonComponent = `import React from 'react';
@@ -276,7 +277,7 @@ export function Button({ children, onClick, variant = 'primary' }: ButtonProps) 
 }`;
 
     mkdirSync(join(projectDir, 'src/components'), { recursive: true });
-    writeFileSync(join(projectDir, 'src/components/Button.tsx'), buttonComponent);
+    await Bun.write(join(projectDir, 'src/components/Button.tsx'), buttonComponent);
 
     console.log(`✅ Created Better-MDX project: ${projectName}`);
     console.log(`
@@ -344,7 +345,7 @@ Next steps:
     for (const filePath of mdxFiles) {
       try {
         const relativePath = filePath.replace(mdxDir + '/', '');
-        const content = readFileSync(filePath, 'utf-8');
+        const content = await Bun.file(filePath).text();
 
         if (options.verbose) {
           console.log(`  🔄 Compiling: ${relativePath}`);
@@ -358,7 +359,7 @@ Next steps:
         const outputPath = join(outputDir, relativePath.replace('.mdx', '.json'));
 
         mkdirSync(dirname(outputPath), { recursive: true });
-        writeFileSync(outputPath, JSON.stringify(compiled, null, 2));
+        await Bun.write(outputPath, JSON.stringify(compiled, null, 2));
 
         manifest.files.push({
           path: relativePath,
@@ -372,7 +373,7 @@ Next steps:
     }
 
     // Write manifest
-    writeFileSync(join(outputDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
+    await Bun.write(join(outputDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 
     console.log(`✅ Build complete! ${manifest.files.length} files compiled.`);
     console.log(`📊 Manifest written to: ${join(outputDir, 'manifest.json')}`);
@@ -384,7 +385,7 @@ Next steps:
     }
 
     const fullPath = resolve(filePath);
-    const content = readFileSync(fullPath, 'utf-8');
+    const content = await Bun.file(fullPath).text();
 
     console.log(`📄 Compiling MDX file: ${fullPath}`);
 
@@ -434,7 +435,7 @@ Next steps:
     if (options.output) {
       const outputPath = resolve(options.output);
       mkdirSync(dirname(outputPath), { recursive: true });
-      writeFileSync(outputPath, JSON.stringify(compiled, null, 2));
+      await Bun.write(outputPath, JSON.stringify(compiled, null, 2));
       console.log(`💾 Saved to: ${outputPath}`);
     } else {
       console.log('\n🎯 Compiled Output:');
@@ -448,7 +449,7 @@ Next steps:
     }
 
     const fullPath = resolve(filePath);
-    const content = readFileSync(fullPath, 'utf-8');
+    const content = await Bun.file(fullPath).text();
 
     console.log(`🚀 Executing MDX file: ${fullPath}`);
 

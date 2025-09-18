@@ -368,16 +368,17 @@ export class CacheWarmer {
    * Warm cache from file system
    */
   async warmFromFiles(directory: string): Promise<void> {
-    const fs = await import('fs');
     const path = await import('path');
 
-    if (!fs.existsSync(directory)) return;
+    if (!(await Bun.file(directory).exists())) return;
 
-    const files = fs.readdirSync(directory).filter(f => f.endsWith('.mdx'));
+    const { readdir } = await import('node:fs/promises');
+    const entries = await readdir(directory);
+    const files = entries.filter(file => file.endsWith('.mdx'));
 
     for (const file of files) {
       try {
-        const source = fs.readFileSync(path.join(directory, file), 'utf-8');
+        const source = await Bun.file(path.join(directory, file)).text();
 
         const { parseMDX } = await import('./parser');
         const { compile: compileMDX } = await import('./compiler');

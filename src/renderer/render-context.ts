@@ -1,4 +1,3 @@
-import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { CompiledMDX, compile } from '../compiler';
 import { parseMDX } from '../parser';
@@ -18,21 +17,21 @@ export interface RenderResult {
 
 export const componentRegistry: ComponentRegistry = {};
 
-export function loadDependencies(dependencies: string[], basePath: string, errors: string[]): void {
+export async function loadDependencies(dependencies: string[], basePath: string, errors: string[]): Promise<void> {
     for (const componentName of dependencies) {
         if (!componentRegistry[componentName]) {
             try {
                 // Try to find the component file
-                const componentPath = resolveComponentPath(componentName, basePath);
+                const componentPath = await resolveComponentPath(componentName, basePath);
                 if (componentPath) {
-                    const componentContent = readFileSync(componentPath, 'utf-8');
+                    const componentContent = await Bun.file(componentPath).text();
                     const parsed = parseMDX(componentContent);
                     const compiled = compile(parsed);
                     componentRegistry[componentName] = compiled;
 
                     // Recursively load dependencies of this component
                     if (compiled.dependencies && compiled.dependencies.length > 0) {
-                        loadDependencies(compiled.dependencies, basePath, errors);
+                        await loadDependencies(compiled.dependencies, basePath, errors);
                     }
                 }
             } catch (error) {
@@ -42,7 +41,7 @@ export function loadDependencies(dependencies: string[], basePath: string, error
     }
 }
 
-export function resolveComponentPath(componentName: string, basePath: string): string | null {
+export async function resolveComponentPath(componentName: string, basePath: string): Promise<string | null> {
     // Try different possible paths for the component
     const possiblePaths = [
         resolve(basePath, `${componentName}.mdx`),
@@ -55,7 +54,7 @@ export function resolveComponentPath(componentName: string, basePath: string): s
 
     for (const path of possiblePaths) {
         try {
-            readFileSync(path); // Test if file exists
+            await Bun.file(path).exists(); // Test if file exists
             return path;
         } catch (error) {
             // Continue to next path

@@ -3,8 +3,9 @@ import { compile } from './compiler';
 import { ClientRenderer } from './client-renderer';
 import { render } from './renderer';
 import { HotModuleReplacer, HMRConfig } from './hmr';
-import * as fs from 'fs';
+// Using Bun APIs for file operations instead of fs
 import * as path from 'path';
+import { readdir, stat } from 'node:fs/promises';
 
 export interface APIServerConfig {
   port?: number;
@@ -204,14 +205,14 @@ export class MDXAPIServer {
     try {
       const filePath = path.join(this.config.mdxDirectory, filename);
 
-      if (!fs.existsSync(filePath)) {
+      if (!(await Bun.file(filePath).exists())) {
         return {
           success: false,
           error: `File not found: ${filename}`
         };
       }
 
-      const source = fs.readFileSync(filePath, 'utf-8');
+      const source = await Bun.file(filePath).text();
 
       return {
         success: true,
@@ -235,20 +236,23 @@ export class MDXAPIServer {
    */
   async listFiles(): Promise<APIResponse> {
     try {
-      if (!fs.existsSync(this.config.mdxDirectory)) {
+      if (!(await Bun.file(this.config.mdxDirectory).exists())) {
         return {
           success: true,
           data: { files: [] }
         };
       }
 
-      const files = fs.readdirSync(this.config.mdxDirectory)
-        .filter(file => file.endsWith('.mdx'))
-        .map(file => ({
-          name: file,
-          path: path.join(this.config.mdxDirectory, file),
-          stats: fs.statSync(path.join(this.config.mdxDirectory, file))
-        }));
+      const files = await readdir(this.config.mdxDirectory)
+        .then(entries => Promise.all(
+          entries
+            .filter(file => file.endsWith('.mdx'))
+            .map(async file => ({
+              name: file,
+              path: path.join(this.config.mdxDirectory, file),
+              stats: await stat(path.join(this.config.mdxDirectory, file))
+            }))
+        ));
 
       return {
         success: true,

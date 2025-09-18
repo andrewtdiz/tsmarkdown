@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import { readdirSync, existsSync } from 'fs';
 import { resolve, join, extname } from 'path';
+import { readdir } from "node:fs/promises";
 import {
   MDXTestRunner,
   MDXTestSuite,
@@ -17,6 +17,7 @@ interface TestCLIOptions {
   updateSnapshots?: boolean;
   generateReport?: boolean;
   timeout?: number;
+  help?: boolean;
 }
 
 class BetterMDXTestCLI {
@@ -146,7 +147,7 @@ EXAMPLES:
 
   private async runTests(pattern?: string, options: TestCLIOptions = {}) {
     const testPattern = pattern || '**/*.test.ts';
-    const testFiles = this.findTestFiles(testPattern);
+    const testFiles = await this.findTestFiles(testPattern);
 
     if (testFiles.length === 0) {
       console.log(`⚠️ No test files found matching pattern: ${testPattern}`);
@@ -208,9 +209,9 @@ EXAMPLES:
     await this.runTests(pattern, options);
 
     // Set up file watching (simplified implementation)
-    const { watchFile } = require('fs');
+    const { watchFile } = require('node:fs');
     const testPattern = pattern || '**/*.test.ts';
-    const testFiles = this.findTestFiles(testPattern);
+    const testFiles = await this.findTestFiles(testPattern);
 
     for (const testFile of testFiles) {
       watchFile(testFile, { interval: 1000 }, async () => {
@@ -253,12 +254,12 @@ EXAMPLES:
     console.log(`📁 Initializing test project in: ${projectDir}`);
 
     // Create directories
-    const { mkdirSync } = require('fs');
+    const { mkdirSync } = require('node:fs');
     mkdirSync(testDir, { recursive: true });
     mkdirSync(snapshotDir, { recursive: true });
 
     // Create example test file
-    const { writeFileSync } = require('fs');
+    // Using Bun.write() for file operations
 
     const exampleTest = `import { test, expect, describe } from 'bun:test';
 import { MDXTestRunner, createMDXTest } from '../src/testing-utilities';
@@ -288,7 +289,7 @@ function ExampleTest() {
 });
 `;
 
-    writeFileSync(join(testDir, 'example.test.ts'), exampleTest);
+    await Bun.write(join(testDir, 'example.test.ts'), exampleTest);
 
     // Create test configuration
     const testConfig = {
@@ -299,7 +300,7 @@ function ExampleTest() {
       generateReport: true
     };
 
-    writeFileSync(join(projectDir, 'test.config.json'), JSON.stringify(testConfig, null, 2));
+    await Bun.write(join(projectDir, 'test.config.json'), JSON.stringify(testConfig, null, 2));
 
     console.log('✅ Test project initialized');
     console.log(`
@@ -313,14 +314,14 @@ Next steps:
   private async validateMDXFiles(dir?: string, options: TestCLIOptions = {}) {
     const mdxDir = resolve(dir || './mdx');
 
-    if (!existsSync(mdxDir)) {
+    if (!(await Bun.file(mdxDir).exists())) {
       console.error(`❌ Directory not found: ${mdxDir}`);
       process.exit(1);
     }
 
     console.log(`🔍 Validating MDX files in: ${mdxDir}`);
 
-    const mdxFiles = this.findMDXFiles(mdxDir);
+    const mdxFiles = await this.findMDXFiles(mdxDir);
 
     if (mdxFiles.length === 0) {
       console.log('⚠️ No MDX files found');
@@ -332,8 +333,7 @@ Next steps:
 
     for (const filePath of mdxFiles) {
       try {
-        const { readFileSync } = require('fs');
-        const content = readFileSync(filePath, 'utf-8');
+        const content = await Bun.file(filePath).text();
 
         const testCase = createMDXTest(`Validation: ${filePath}`, content)
           .skipExecution()
@@ -363,28 +363,28 @@ Next steps:
     }
   }
 
-  private findTestFiles(pattern: string): string[] {
+  private async findTestFiles(pattern: string): Promise<string[]> {
     // Simplified file finding - in real implementation would use glob
     const testDir = resolve('./test');
-    if (!existsSync(testDir)) {
+    if (!(await Bun.file(testDir).exists())) {
       return [];
     }
 
-    return readdirSync(testDir)
-      .filter(file => file.endsWith('.test.ts') || file.endsWith('.test.js'))
-      .map(file => join(testDir, file));
+    const entries = await readdir(testDir);
+    return entries
+      .filter((entry: any) => entry.isFile() && (entry.name.endsWith('.test.ts') || entry.name.endsWith('.test.js')))
+      .map((entry: any) => join(testDir, entry.name));
   }
 
-  private findMDXFiles(dir: string): string[] {
+  private async findMDXFiles(dir: string): Promise<string[]> {
     const files: string[] = [];
 
-    function traverse(currentDir: string) {
-      const items = readdirSync(currentDir);
+    async function traverse(currentDir: string) {
+      const items = await readdir(currentDir);
 
       for (const item of items) {
         const itemPath = join(currentDir, item);
-        const { statSync } = require('fs');
-        const stat = statSync(itemPath);
+        const stat = await Bun.file(itemPath).stat();
 
         if (stat.isDirectory()) {
           traverse(itemPath);
@@ -418,8 +418,8 @@ function TestFunction() {
 }
           `.trim()
         )
-        .expectContains('Test value')
-        .build()
+          .expectContains('Test value')
+          .build()
       )
       .build();
   }

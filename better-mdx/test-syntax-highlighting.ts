@@ -5,12 +5,12 @@
  * This tests the key features identified in the TASKS.md file
  */
 
-import fs from 'fs';
+// Using Bun.file() for file operations instead of fs
 import path from 'path';
 
 // Read the example file
 const testFile = path.join(__dirname, '..', 'bmdx', 'TestExample.bmdx');
-const content = fs.readFileSync(testFile, 'utf8');
+const content = await Bun.file(testFile).text();
 
 console.log('Testing Better MDX Syntax Highlighting');
 console.log('====================================');

@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
-import { readFileSync, existsSync, watchFile, unwatchFile, Stats } from 'fs';
+// Using Bun APIs for file operations instead of fs
+import { watchFile, unwatchFile, Stats, readdirSync, statSync } from 'node:fs';
 import { resolve, relative } from 'path';
 import { parseMDX } from './parser';
 import { compile } from './compiler';
@@ -300,20 +301,20 @@ export class HotModuleReplacer extends EventEmitter {
     `;
   }
 
-  private watchFile(filePath: string): void {
+  private async watchFile(filePath: string): Promise<void> {
     const resolvedPath = resolve(this.config.rootDir, filePath);
 
-    if (!existsSync(resolvedPath) || this.watchedFiles.has(resolvedPath)) {
+    if (!(await Bun.file(resolvedPath).exists()) || this.watchedFiles.has(resolvedPath)) {
       return;
     }
 
     // Store initial file stats
-    const stats = require('fs').statSync(resolvedPath);
+    const stats = await Bun.file(resolvedPath).stat();
     this.watchedFiles.set(resolvedPath, stats);
 
     // Read and cache initial content
     try {
-      const content = readFileSync(resolvedPath, 'utf-8');
+      const content = await Bun.file(resolvedPath).text();
       this.fileContents.set(resolvedPath, content);
 
       // Pre-compile the file
@@ -367,7 +368,7 @@ export class HotModuleReplacer extends EventEmitter {
     const relativePath = relative(this.config.rootDir, filePath);
 
     try {
-      const newContent = readFileSync(filePath, 'utf-8');
+      const newContent = await Bun.file(filePath).text();
       const previousContent = this.fileContents.get(filePath);
 
       // Skip if content hasn't actually changed
@@ -468,7 +469,7 @@ export class HotModuleReplacer extends EventEmitter {
   }
 
   private findFiles(patterns: string[]): string[] {
-    const { readdirSync, statSync } = require('fs');
+    // Using node:fs for directory operations
     const { join } = require('path');
     const files: string[] = [];
 

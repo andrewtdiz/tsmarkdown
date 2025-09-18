@@ -76,61 +76,97 @@ export function processConditionalBlocksForParsing(
     let startIndex = 0;
 
     while (startIndex < processedContent.length) {
-        // Find the next { pattern
-        const openIndex = processedContent.indexOf('{', startIndex);
-        if (openIndex === -1) break;
+        // Find the next { pattern that might be a conditional
+        const openBraceIndex = processedContent.indexOf('{', startIndex);
+        if (openBraceIndex === -1) break;
 
         // Skip if it's a double brace {{ }}
-        if (processedContent[openIndex + 1] === '{') {
-            startIndex = openIndex + 2;
+        if (processedContent[openBraceIndex + 1] === '{') {
+            startIndex = openBraceIndex + 2;
             continue;
         }
 
-        // Check if this looks like a conditional block (contains &&)
-        const beforeClose = processedContent.substring(openIndex);
-        const nextClose = beforeClose.indexOf('}');
-        if (nextClose === -1) {
-            startIndex = openIndex + 1;
-            continue;
-        }
-
-        const potentialCondition = processedContent.substring(openIndex + 1, openIndex + nextClose);
-        if (!potentialCondition.includes('&&')) {
-            startIndex = openIndex + 1;
-            continue;
-        }
-
-        // Find the matching closing brace using proper brace matching
-        const endIndex = findMatchingBrace(processedContent, openIndex);
+        // Find the matching closing brace
+        const endIndex = findMatchingBrace(processedContent, openBraceIndex);
         if (endIndex === -1) {
-            startIndex = openIndex + 1;
+            startIndex = openBraceIndex + 1;
             continue;
         }
 
-        // Extract the full expression
-        const fullExpression = processedContent.substring(openIndex + 1, endIndex);
+        const expression = processedContent.substring(openBraceIndex + 1, endIndex);
+        const trimmedExpression = expression.trim();
 
-        // Check if this is a conditional block with parentheses
-        const conditionalMatch = fullExpression.match(/^([^{}]+?)\s*&&\s*\(\s*([\s\S]*?)\s*\)\s*$/);
-        if (!conditionalMatch) {
-            startIndex = openIndex + 1;
-            continue;
+        // Check if this is a conditional block (contains && and parentheses)
+        if (trimmedExpression.includes('&&') && trimmedExpression.includes('(') && trimmedExpression.includes(')')) {
+            // Find the last && operator before the opening parenthesis
+            let lastAndIndex = -1;
+            let parenIndex = -1;
+
+            // Find the opening parenthesis
+            for (let i = 0; i < trimmedExpression.length; i++) {
+                if (trimmedExpression[i] === '(') {
+                    parenIndex = i;
+                    break;
+                }
+            }
+
+            if (parenIndex !== -1) {
+                // Find the last && before the opening parenthesis
+                for (let i = parenIndex - 1; i >= 0; i--) {
+                    if (trimmedExpression.substring(i, i + 2) === '&&') {
+                        lastAndIndex = i;
+                        break;
+                    }
+                }
+
+                if (lastAndIndex !== -1) {
+                    const condition = trimmedExpression.substring(0, lastAndIndex).trim();
+                    const afterAnd = trimmedExpression.substring(lastAndIndex + 2).trim();
+
+                    // Check if there's a matching opening parenthesis after &&
+                    if (afterAnd.startsWith('(')) {
+                        // Find the matching closing parenthesis
+                        let parenCount = 0;
+                        let contentStart = -1;
+                        let contentEnd = -1;
+
+                        for (let i = 0; i < afterAnd.length; i++) {
+                            const char = afterAnd[i];
+                            if (char === '(') {
+                                if (parenCount === 0) {
+                                    contentStart = i + 1;
+                                }
+                                parenCount++;
+                            } else if (char === ')') {
+                                parenCount--;
+                                if (parenCount === 0) {
+                                    contentEnd = i;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (contentStart !== -1 && contentEnd !== -1) {
+                            const blockContent = afterAnd.substring(contentStart, contentEnd);
+
+                            const placeholder = `__CONDITIONAL_${conditionalBlocks.length}__`;
+                            conditionalBlocks.push({
+                                condition: condition,
+                                content: blockContent.trim(),
+                            });
+
+                            processedContent = processedContent.substring(0, openBraceIndex) +
+                                placeholder +
+                                processedContent.substring(endIndex + 1);
+                            startIndex = openBraceIndex + placeholder.length;
+                            continue;
+                        }
+                    }
+                }
+            }
         }
 
-        const [, condition, blockContent] = conditionalMatch;
-        const placeholder = `__CONDITIONAL_${conditionalBlocks.length}__`;
-        conditionalBlocks.push({
-            condition: condition.trim(),
-            content: blockContent.trim(),
-        });
-
-        // Replace the entire conditional block with the placeholder
-        processedContent = processedContent.substring(0, openIndex) +
-            placeholder +
-            processedContent.substring(endIndex + 1);
-
-        // Update startIndex to continue from the placeholder
-        startIndex = openIndex + placeholder.length;
+        startIndex = openBraceIndex + 1;
     }
 
     return processedContent;
@@ -256,8 +292,9 @@ export function processJSXExpressionsForParsing(
             continue;
         }
 
-        // Skip if it's a ternary expression (contains ? and :) and doesn't contain JSX
-        if (trimmedExpression.includes('?') && trimmedExpression.includes(':') && !trimmedExpression.includes('<')) {
+        // Skip if it's a ternary expression (contains ? and :) and doesn't contain JSX or map
+        if (trimmedExpression.includes('?') && trimmedExpression.includes(':') &&
+            !trimmedExpression.includes('<') && !trimmedExpression.includes('.map(')) {
             startIndex = endIndex + 1;
             continue;
         }
@@ -268,10 +305,26 @@ export function processJSXExpressionsForParsing(
             continue;
         }
 
-        const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
-        jsxExpressions.push({ placeholder, expression: trimmedExpression });
-        processedContent = processedContent.substring(0, openBraceIndex) + placeholder + processedContent.substring(endIndex + 1);
-        startIndex = openBraceIndex + placeholder.length;
+        // Check if this expression contains nested JSX expressions that need to be processed first
+        if (trimmedExpression.includes('{') && trimmedExpression.includes('}')) {
+            // Process nested JSX expressions recursively
+            const nestedExpressions: Array<{ placeholder: string; expression: string }> = [];
+            const processedNestedExpression = processJSXExpressionsForParsing(trimmedExpression, nestedExpressions);
+
+            // Add nested expressions to the main array
+            jsxExpressions.push(...nestedExpressions);
+
+            // Use the processed expression
+            const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
+            jsxExpressions.push({ placeholder, expression: processedNestedExpression });
+            processedContent = processedContent.substring(0, openBraceIndex) + placeholder + processedContent.substring(endIndex + 1);
+            startIndex = openBraceIndex + placeholder.length;
+        } else {
+            const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
+            jsxExpressions.push({ placeholder, expression: trimmedExpression });
+            processedContent = processedContent.substring(0, openBraceIndex) + placeholder + processedContent.substring(endIndex + 1);
+            startIndex = openBraceIndex + placeholder.length;
+        }
     }
 
     return processedContent;

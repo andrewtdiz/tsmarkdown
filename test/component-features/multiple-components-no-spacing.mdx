@@ -1,0 +1,19 @@
+import { Header } from "./Header"
+import { Content } from "./Content"
+import { Footer } from "./Footer"
+
+function MultipleComponentsNoSpacing() {
+  const someFalseCondition = false
+  const someTrueCondition = true
+
+  return (
+    <@Header />
+    { someTrueCondition && (
+      <@Content />
+    )}
+    { someFalseCondition && (
+      Don't render me!
+    )}
+    <@Footer />
+  )
+}

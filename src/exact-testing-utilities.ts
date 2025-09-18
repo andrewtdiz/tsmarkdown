@@ -4,6 +4,46 @@ import { compile } from './compiler';
 import { render } from './renderer';
 import { ClientRenderer } from './client-renderer';
 
+/**
+ * Generate clickable file links for different IDEs and terminals
+ */
+function generateFileLink(filePath: string, lineNumber: number): string {
+    if (!filePath) return '';
+
+    const absolutePath = resolve(filePath);
+
+    // Check if terminal supports hyperlinks (OSC 8)
+    const supportsHyperlinks = process.env.TERM_PROGRAM === 'vscode' ||
+        process.env.TERM_PROGRAM === 'iTerm.app' ||
+        process.env.TERM_PROGRAM === 'Hyper' ||
+        process.env.TERM_PROGRAM === 'Terminal.app' ||
+        process.env.COLORTERM === 'truecolor';
+
+    // Detect IDE based on environment variables
+    const vscode = process.env.VSCODE_PID || process.env.VSCODE_INJECTION;
+    const webstorm = process.env.WEBSTORM_PID || process.env.JETBRAINS_IDE;
+
+    let linkUrl: string;
+    if (vscode) {
+        // VS Code format: vscode://file/path/to/file:line:column
+        linkUrl = `vscode://file${absolutePath}:${lineNumber}:1`;
+    } else if (webstorm) {
+        // WebStorm/IntelliJ format: webstorm://open?file=path&line=line
+        linkUrl = `webstorm://open?file=${absolutePath}&line=${lineNumber}`;
+    } else {
+        // Fallback: file:// URL
+        linkUrl = `file://${absolutePath}:${lineNumber}`;
+    }
+
+    if (supportsHyperlinks) {
+        // Generate hyperlink using OSC 8 escape sequence
+        return `\x1b]8;;${linkUrl}\x1b\\${filePath}:${lineNumber}\x1b]8;;\x1b\\`;
+    } else {
+        // Fallback: just show the file path and line
+        return `${filePath}:${lineNumber}`;
+    }
+}
+
 export interface ExactMDXTestCase {
     name: string;
     input: string;
@@ -20,6 +60,7 @@ export interface ExactMDXTestCase {
         skipCompilation?: boolean;
         normalizeWhitespace?: boolean;
     };
+    sourceFile?: string; // Path to the source file for clickable links
 }
 
 export interface ExactMDXTestResult {
@@ -83,7 +124,7 @@ export class ExactMDXTestRunner {
                     result.details!.executed = executed;
 
                     // Render phase
-                    const rendered = this.renderer.render(compiled, testCase.context || {});
+                    const rendered = await this.renderer.render(compiled, testCase.context || {});
                     result.details!.rendered = rendered;
 
                     // Validate results with exact matching
@@ -98,6 +139,10 @@ export class ExactMDXTestRunner {
                         // Log detailed error information when test fails
                         if (!result.passed) {
                             console.log(`\n❌ Test "${testCase.name}" failed:`);
+                            if (testCase.sourceFile) {
+                                const sourceLink = generateFileLink(testCase.sourceFile, 1);
+                                console.log(`   Source: ${sourceLink}`);
+                            }
                             console.log(`   Error: ${result.error}`);
                             if (result.details?.expectedContent !== undefined) {
                                 console.log(`   Expected content: "${result.details.expectedContent}"`);
@@ -108,7 +153,9 @@ export class ExactMDXTestRunner {
                             if (result.details?.lineDifferences && result.details.lineDifferences.length > 0) {
                                 console.log(`   Line differences:`);
                                 result.details.lineDifferences.forEach(diff => {
-                                    console.log(`     Line ${diff.lineNumber}: Expected "${diff.expected}", Got "${diff.actual}"`);
+                                    const fileLink = testCase.sourceFile ? generateFileLink(testCase.sourceFile, diff.lineNumber) : '';
+                                    const linkText = fileLink ? ` (${fileLink})` : '';
+                                    console.log(`     Line ${diff.lineNumber}${linkText}: Expected "${diff.expected}", Got "${diff.actual}"`);
                                 });
                             }
                             console.log(`   Executed errors: ${executed.errors.join(', ') || 'none'}`);
@@ -161,8 +208,6 @@ export class ExactMDXTestRunner {
         try {
             // Run test cases
             for (const testCase of suite.testCases) {
-                console.log(`  🔄 Running: ${testCase.name}`);
-
                 const result = await this.runTestCase(testCase);
                 suiteResults.push(result);
 
@@ -173,7 +218,9 @@ export class ExactMDXTestRunner {
                     if (result.details?.lineDifferences && result.details.lineDifferences.length > 0) {
                         console.log(`     Line differences:`);
                         result.details.lineDifferences.forEach(diff => {
-                            console.log(`     Line ${diff.lineNumber}: Expected "${diff.expected}", Got "${diff.actual}"`);
+                            const fileLink = testCase.sourceFile ? generateFileLink(testCase.sourceFile, diff.lineNumber) : '';
+                            const linkText = fileLink ? ` (${fileLink})` : '';
+                            console.log(`     Line ${diff.lineNumber}${linkText}: Expected "${diff.expected}", Got "${diff.actual}"`);
                         });
                     }
                 }
@@ -409,6 +456,11 @@ export class ExactMDXTestBuilder {
         return this;
     }
 
+    withSourceFile(sourceFile: string): ExactMDXTestBuilder {
+        this.testCase.sourceFile = sourceFile;
+        return this;
+    }
+
     build(): ExactMDXTestCase {
         return { ...this.testCase };
     }
@@ -419,6 +471,14 @@ export class ExactMDXTestBuilder {
  */
 export function createExactMDXTest(name: string, input: string): ExactMDXTestBuilder {
     return new ExactMDXTestBuilder(name, input);
+}
+
+/**
+ * Factory function for creating exact test builders with automatic source file detection
+ */
+export function createExactMDXTestFromFile(name: string, filePath: string): ExactMDXTestBuilder {
+    const input = require('fs').readFileSync(filePath, 'utf8');
+    return new ExactMDXTestBuilder(name, input).withSourceFile(filePath);
 }
 
 /**

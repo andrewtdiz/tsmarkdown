@@ -16,7 +16,7 @@ export async function render(compiled: CompiledMDX, context: RenderContext = {},
 
   try {
     if (basePath) {
-      loadDependencies(compiled.dependencies, basePath, errors);
+      await loadDependencies(compiled.dependencies, basePath, errors);
     }
 
     // Add basePath to context for component resolution

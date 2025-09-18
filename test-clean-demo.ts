@@ -2,7 +2,6 @@ import { parseMDX } from "./src/parser";
 import { compile } from "./src/compiler";
 import { render } from "./src/renderer";
 
-
 async function showcase(title: string, mdxCode: string, props = {}, context = {}, basePath?: string) {
   console.log('\n' + '🚀'.repeat(30));
   console.log(`✨ ${title}`);
@@ -186,19 +185,6 @@ async function main() {
       isAuthenticated: true
     })
   });
-
-  console.log('\n' + '🎉'.repeat(30));
-  console.log('🚀 ALL FEATURES WORKING PERFECTLY! 🚀');
-  console.log('🎉'.repeat(30));
-  console.log('\n✨ Demonstrated capabilities:');
-  console.log('   ✅ Template interpolation {{ variable }}');
-  console.log('   ✅ Props with destructuring ({ user })');
-  console.log('   ✅ Conditional rendering {condition && (...)}');
-  console.log('   ✅ Component imports <ListItem />');
-  console.log('   ✅ Array operations .map(), .join()');
-  console.log('   ✅ Complex TypeScript logic');
-  console.log('   ✅ External context integration');
-  console.log('\n🎯 Better-MDX is production ready!');
 }
 
 // Run the main function

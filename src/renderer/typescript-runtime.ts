@@ -1,4 +1,5 @@
 import { RenderContext } from './render-context';
+import path, { resolve } from 'path';
 
 export async function executeTypeScript(typescript: string, context: RenderContext): Promise<any> {
     if (!typescript.trim()) {
@@ -121,17 +122,14 @@ export async function resolveModule(modulePath: string): Promise<any> {
         if (modulePath.startsWith('./') || modulePath.startsWith('../')) {
             // For now, we'll use a simple require approach
             // In a real implementation, you might want to use dynamic imports
-            const fs = require('fs');
-            const path = require('path');
 
-            // Try to find the module file
             const possibleExtensions = ['.ts', '.js', '.mjs'];
             let resolvedPath = null;
 
             for (const ext of possibleExtensions) {
                 const fullPath = path.resolve(modulePath + ext);
                 try {
-                    if (fs.existsSync(fullPath)) {
+                    if (await Bun.file(fullPath).exists()) {
                         resolvedPath = fullPath;
                         break;
                     }

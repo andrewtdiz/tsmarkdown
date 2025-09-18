@@ -78,7 +78,13 @@ export async function renderComponent(compiled: CompiledMDX, context: RenderCont
     // Clean up extra whitespace and normalize spacing
     processedContent = processedContent
         .split('\n')
-        .map(line => line.trimEnd()) // Remove trailing spaces
+        .map(line => {
+            // Preserve trailing spaces for block quote lines (lines that start with >)
+            if (line.match(/^\s*>\s*$/)) {
+                return line; // Keep block quote lines with trailing spaces as-is
+            }
+            return line.trimEnd(); // Remove trailing spaces for other lines
+        })
         .join('\n')
         .replace(/\n{3,}/g, '\n\n') // Replace multiple consecutive newlines with double newlines
         .trim(); // Remove leading/trailing whitespace

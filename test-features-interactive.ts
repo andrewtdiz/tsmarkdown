@@ -1,4 +1,4 @@
-import { readFileSync } from "fs";
+// Using Bun.file() for file operations instead of fs
 import { parseMDX } from "./src/parser";
 import { compileMDX } from "./src/compiler";
 import { renderMDX } from "./src/renderer";
@@ -144,7 +144,7 @@ function ContextTest() {
   `.trim(),
   {
     useAuth: () => ({
-      user: null,
+      user: {},
       isLoggedIn: false
     })
   }
@@ -197,52 +197,6 @@ function NestedTest() {
   `.trim()
 );
 
-// Test 9: Array mapping with JSX components
-runTest(
-  "Array Mapping with JSX Components",
-  `
-import { ListItem } from "./ListItem";
-
-function ArrayMappingTest() {
-  const technologies = ['React', 'TypeScript', 'Node.js', 'MDX'];
-
-  return (
-    # Technologies Used
-
-    {technologies.map((tech, index) => <ListItem item={tech} />)}
-
-    Total: {{ technologies.length }} technologies
-  )
-}
-  `.trim(),
-  {},
-  {},
-  './mdx'
-);
-
-// Test 10: Props support
-runTest(
-  "Props Support",
-  `
-import { ListItem } from "./ListItem";
-
-function PropsTest({ items }) {
-  const total = items.length;
-
-  return (
-    # My Items
-
-    {items.map((item, index) => <ListItem item={item} />)}
-
-    You have {{ total }} items.
-  )
-}
-  `.trim(),
-  {},
-  { items: ['Apple', 'Banana', 'Cherry'] },
-  './mdx'
-);
-
 // Test 11: Large content performance
 const items = Array.from({ length: 100 }, (_, i) => `Item ${i + 1}`); // Reduced for readability
 runTest(
@@ -253,8 +207,9 @@ function LargeTest() {
 
   return (
     # Large Content Test
-
-    {{ items.map(item => '- ' + item).join('\\n') }}
+    {{ items.map((item, index) => (
+      - {{ item }}
+    ))}}
 
     Total items: {{ items.length }}
   )

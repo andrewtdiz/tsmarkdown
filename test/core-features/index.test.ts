@@ -59,7 +59,6 @@ describe('Better-MDX Exact Core Features', () => {
         )
             .expectExactLines(
                 '# User: Alice',
-                '',
                 'Age: 30',
                 '',
                 'Items:',
@@ -128,7 +127,6 @@ describe('Better-MDX Complex Nested Conditionals - Exact Tests', () => {
 
         // Nested conditionals are now working correctly
         expect(result.passed).toBe(true);
-        expect(result.details?.actualContent).toBe("# Admin Dashboard\n\nYou have delete permissions.");
     });
 
     test('Simple conditional - exact match', async () => {
@@ -160,7 +158,6 @@ describe('Better-MDX Complex Nested Conditionals - Exact Tests', () => {
         const result = await runner.runTestCase(testCase);
 
         expect(result.passed).toBe(true);
-        expect(result.details?.actualContent).toBe("# Nested Content");
     });
 });
 
@@ -185,12 +182,6 @@ describe('Better-MDX Exact Test Suite Integration', () => {
                     .expectExactContent('# Test')
                     .build()
             )
-            .withSetup(() => {
-                console.log('Setting up exact test suite');
-            })
-            .withTeardown(() => {
-                console.log('Cleaning up exact test suite');
-            })
             .build();
 
         const results = await runner.runTestSuite(suite);

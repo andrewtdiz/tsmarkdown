@@ -1,12 +1,11 @@
-import { readFileSync } from "fs";
+// Using Bun.file() for file operations instead of fs
 import { parseMDX } from "./src/parser";
 import { compile } from "./src/compiler";
 import { render } from "./src/renderer";
 
 // Test with different contexts
 const testFile = "./mdx/AsyncExample.mdx";
-const content = readFileSync(testFile, "utf-8");
-
+const content = await Bun.file(testFile).text();
 
 const parsed = parseMDX(content);
 console.log(parsed);
