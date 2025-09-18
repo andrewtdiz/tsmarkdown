@@ -965,9 +965,17 @@ export async function processJSXExpressions(
 
     for (const jsxExpr of jsxExpressions) {
         try {
+            // Skip JSX expressions that are simple variable names not in context
+            // These are typically map function parameters that are only valid within map context
+            const isSimpleVariable = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(jsxExpr.expression);
+            if (isSimpleVariable && !(jsxExpr.expression in context)) {
+                // Skip this expression - it's likely a map function parameter
+                continue;
+            }
+
             // Evaluate the JSX expression
             const result = await evaluateJSXExpression(jsxExpr.expression, context);
-            const stringValue = jsxResultToString(result);
+            const stringValue = await jsxResultToString(result);
 
             processedContent = processedContent.replace(
                 jsxExpr.placeholder,
@@ -1273,12 +1281,23 @@ export async function renderJSXComponent(jsxElement: string, context: any): Prom
     return `<${componentName} ${Object.entries(propValues).map(([k, v]) => `${k}="${v}"`).join(' ')} />`;
 }
 
-export function jsxResultToString(result: any): string {
+export async function jsxResultToString(result: any): Promise<string> {
     if (result === null || result === undefined) {
         return '';
     }
+
+    // Handle Promise results from async JSX expressions
+    if (result instanceof Promise) {
+        const resolvedResult = await result;
+        return await jsxResultToString(resolvedResult);
+    }
+
     if (Array.isArray(result)) {
-        return result.map(item => valueToString(item)).join('\n');
+        // Handle arrays that might contain Promises
+        const resolvedItems = await Promise.all(result.map(item =>
+            item instanceof Promise ? item : Promise.resolve(item)
+        ));
+        return resolvedItems.map(item => valueToString(item)).join('\n');
     }
     return valueToString(result);
 }

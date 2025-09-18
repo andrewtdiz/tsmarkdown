@@ -1,77 +1,19 @@
-# Better-MDX Implementation Task List
+# Task List
 
-Based on the PRD, this task list implements the Better-MDX framework in incremental, testable phases.
+## Parser front-end overhaul
+- [ ] Replace the line-oriented scanning in `src/parser.ts:29-105` with a TypeScript compiler-API pass that preserves existing statements, locates every return ( BMDX fragment (including guarded/multi-return cases), and actually populates returnStatements; add fixtures that cover async functions, nested blocks, and non-standard whitespace.
 
-## Phase 1: Core Parser and Compiler (Tasks 1-6) ✅ COMPLETE
-**Testable Goal**: Parse .mdx files and generate string format for API consumption
+## AST & span model
+- [ ] Evolve ParsedMDX in `src/parser.ts:14-27` into a typed BMDX AST (root → fragments → Markdown/element/inline nodes) with start/end offsets on every node so diagnostics/source-maps become possible; verify via parser snapshot tests that spans remain stable as content shifts.
 
-- [x] Set up project structure and basic tooling (package.json, TypeScript config, build scripts)
-- [x] Create basic .mdx file parser to separate TypeScript and Markdown sections
-- [x] Implement AST generation for parsed .mdx content
-- [x] Build TypeScript compiler integration for extracted TS sections
-- [x] Create string format generator for API consumption
-- [ ] Write tests for Phase 1 core functionality (parser, compiler, string generation)
+## Markdown + inline parsing
+- [ ] Replace the placeholder-based processTemplateContent flow in `src/parser/parser-utils.ts:360-379` with a tokenizer that emits headings, paragraphs, ordered/unordered lists, and text nodes interleaved with explicit inline-expression tokens instead of raw strings; add golden tests to prove blank-line retention and `{{ expr }}`.
 
-## Phase 2: Template System (Tasks 7-14) ✅ COMPLETE
-**Testable Goal**: Support dynamic content with interpolation and conditional rendering
+## Element semantics
+- [ ] Upgrade the regex helpers in `src/parser/parser-utils.ts:145-170` so they handle `<@Component>` versus `<element>` tagging, full attribute syntax, and nested children while flagging rendered components vs markup elements; unit-test attribute parsing (string, boolean, JSX) and mixed component/markup nesting.
 
-- [x] Implement template interpolation with {{ }} syntax parser
-- [x] Add conditional rendering block support (JSX-style)
-- [x] Build React component integration system
-- [x] Create template execution engine for interpolation
-- [x] Write tests for Phase 2 template system features
-- [x] Add props support for MDX components (function parameters)
-- [x] Implement array iteration and mapping in templates (.map() support)
-- [x] Add component imports and rendering inside markdown (import/export support)
+## Static compiler pipeline
+- [ ] Replace the pass-through behavior in `src/compiler.ts:30-47` and `src/compiler/compiler-utils.ts:61-64` plus the runtime templating in `src/renderer/render-utils.ts:1305-1384` with an AST-driven emitter that generates JSX/TypeScript, maps Markdown structures to configured JSX tags, resolves `<@Component>` to imports, and rewrites `{{ expr }}` into JSX expression containers; add integration tests comparing emitted `.tsx` against expected output.
 
-## Phase 3: Runtime and API (Tasks 12-16) ✅ COMPLETE
-**Testable Goal**: Full client-server integration with rendering and API endpoints
-
-- [x] Build client-side rendering system for compiled strings
-- [x] Create API server endpoints for MDX compilation and serving
-- [x] Implement useMDXComponent React hook
-- [x] Add caching and optimization features
-- [x] Write tests for Phase 3 runtime and API functionality
-
-## Phase 4: Developer Tooling (Tasks 17-21)
-**Testable Goal**: Complete developer experience with tooling and documentation
-
-- [ ] Create CLI tool for development and build commands
-- [ ] Build VS Code extension for syntax highlighting
-- [ ] Add hot module replacement support
-- [ ] Create comprehensive testing utilities
-- [ ] Write documentation and example projects
-
-## Testing Strategy
-
-Each phase builds on the previous one and can be independently tested:
-
-- **Phase 1**: Unit tests for parsing, AST generation, and string compilation
-- **Phase 2**: Integration tests for template interpolation and component rendering
-- **Phase 3**: End-to-end tests for client-server communication and React hooks
-- **Phase 4**: Developer workflow tests and tooling validation
-
-## Success Criteria per Phase
-
-- **Phase 1**: ✅ Successfully parse .mdx files and output JSON string format matching API specification
-- **Phase 2**: ✅ Render dynamic content with working interpolation, conditional blocks, props, array mapping, and component imports
-- **Phase 3**: ✅ Complete React integration with server endpoints and client hooks
-- **Phase 4**: Full developer experience with CLI, VS Code support, and comprehensive docs
-
-## Recent Accomplishments ✅
-
-**Completed Phase 2 - All Advanced Template Features:**
-- ✅ **Props Support**: Function parameter destructuring (`{ items }`, `{ user }`)
-- ✅ **Array Mapping**: JSX expressions with `.map()` (`{items.map((item) => <ListItem item={item} />)}`)
-- ✅ **Component Imports**: Import and render external MDX components (`import { ListItem } from "./ListItem"`)
-- ✅ **Template Interpolation**: Dynamic content with `{{ variable }}` syntax
-- ✅ **Conditional Rendering**: Complex conditional blocks (`{condition && (...)}`)
-- ✅ **Component Architecture**: Clean separation of concerns with reusable components
-
-**Demonstrated Features:**
-- Created comprehensive test suites showing all functionality working
-- Built example components (ListItem.mdx, SalesItem.mdx)
-- Showed best practices vs anti-patterns (component-based vs string interpolation)
-- All features from TestExample.mdx now fully functional
-
-**Next Phase Ready:** Phase 4 (Developer Tooling) can now begin with all core template system features complete.
+## Formatting, maps, diagnostics
+- [ ] Layer a structured pretty-printer and source-map builder atop the new emitter (none exist today, see `src/compiler/compiler-utils.ts:27-35` and `src/renderer.ts:11-33`), and surface parser/compiler errors with file:line:column precision leveraging the recorded spans; extend the test harness to assert idempotent formatting and accurate error locations.

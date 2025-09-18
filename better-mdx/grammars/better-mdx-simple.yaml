@@ -11,7 +11,7 @@ patterns:
   # First match functions with MDX return statements
   - include: '#function_with_mdx_return'
   # Then fallback to regular TypeScript for everything else
-  - include: 'source.ts'
+  - include: 'source.tsx'
 
 # Repository of named patterns
 repository:
@@ -27,7 +27,7 @@ repository:
       '4': { name: entity.name.function.better-mdx }
     patterns:
       - include: '#mdx_return_content'
-      - include: 'source.ts'
+      - include: 'source.tsx'
 
 
   # MDX content inside return statement
@@ -45,6 +45,7 @@ repository:
       - include: '#expressions'
       - include: '#jsx_elements'
       - include: '#mdx_block'
+      - include: '#mdx_inline'
 
   # String interpolation patterns {{ }}
   interpolation:
@@ -57,7 +58,7 @@ repository:
       '0': { name: punctuation.definition.interpolation.end.better-mdx }
     contentName: source.ts.embedded.better-mdx
     patterns:
-      - include: 'source.ts'
+      - include: 'source.tsx'
 
   interpolation_content:
     name: variable.other.interpolation.better-mdx
@@ -76,9 +77,42 @@ repository:
       '0': { name: punctuation.definition.expression.begin.better-mdx }
     endCaptures:
       '0': { name: punctuation.definition.expression.end.better-mdx }
-    contentName: source.ts.embedded.better-mdx
+    contentName: source.tsx.embedded.better-mdx
     patterns:
-      - include: 'source.ts'
+      - include: '#mdx_jsx_expression_content'
+
+  # JSX expression content with special handling for ternary operators
+  mdx_jsx_expression_content:
+    patterns:
+      - include: '#mdx_ternary_expression'
+      - include: 'source.tsx'
+
+  # Ternary expressions with markdown content in parentheses
+  mdx_ternary_expression:
+    name: meta.conditional.better-mdx
+    begin: '\\s*(\\w+)\\s*(\\?)\\s*(\\()'
+    end: '\\)'
+    beginCaptures:
+      '1': { name: variable.other.readwrite.tsx }
+      '2': { name: keyword.operator.ternary.tsx }
+      '3': { name: punctuation.section.group.begin.better-mdx }
+    endCaptures:
+      '0': { name: punctuation.section.group.end.better-mdx }
+    contentName: text.html.markdown.better-mdx
+    patterns:
+      - include: '#mdx_block'
+      - include: '#mdx_inline'
+      - match: '\\)\\s*(:)\\s*(\\()'
+        captures:
+          '1': { name: keyword.operator.ternary.tsx }
+          '2': { name: punctuation.section.group.begin.better-mdx }
+        push:
+          - match: '\\)'
+            captures:
+              '0': { name: punctuation.section.group.end.better-mdx }
+            pop: true
+          - include: '#mdx_block'
+          - include: '#mdx_inline'
 
   # JSX elements like <List items={items} />
   jsx_elements:
@@ -92,15 +126,24 @@ repository:
       '0': { name: punctuation.definition.tag.end.better-mdx }
     patterns:
       - include: '#jsx_attributes'
-      - include: 'source.ts'
+      - include: 'source.tsx'
 
   # JSX attributes
   jsx_attributes:
-    name: meta.jsx.attributes.better-mdx
-    match: "([a-zA-Z][a-zA-Z0-9]*)\\s*=\\s*(\\{[^}]*\\}|\"[^\"]*\"|'[^']*')"
-    captures:
-      '1': { name: entity.other.attribute-name.better-mdx }
-      '2': { name: string.quoted.attribute.better-mdx }
+    patterns:
+      - name: meta.jsx.attribute.better-mdx
+        match: "([a-zA-Z][a-zA-Z0-9]*)\\s*=\\s*\\{"
+        captures:
+          '1': { name: entity.other.attribute-name.better-mdx }
+        push:
+          - match: '\\}'
+            pop: true
+          - include: 'source.tsx'
+      - name: meta.jsx.attribute.better-mdx
+        match: "([a-zA-Z][a-zA-Z0-9]*)\\s*=\\s*(\"[^\"]*\"|'[^']*')"
+        captures:
+          '1': { name: entity.other.attribute-name.better-mdx }
+          '2': { name: string.quoted.attribute.better-mdx }
 
   # Function declarations
   function_declarations:

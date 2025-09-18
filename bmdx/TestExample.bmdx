@@ -3,10 +3,14 @@ import { List } from "./List";
 function TestExample({ items }: { items: string[] }) {
   const userName = 'Developer';
   const score = 79;
+  const doubleScore = score * 2;
   const isHighScore = score > 80;
 
   return (
     # Test MDX Component
+    ## Another test component
+    **Bolded**
+    *italics*
 
     Welcome {{ userName }}! Your score is {{ score }}.
     
@@ -17,6 +21,6 @@ function TestExample({ items }: { items: string[] }) {
     )}
 
     ## Technologies Used
-    <List items={items} />
+    { List({ items }) }
   )
 }

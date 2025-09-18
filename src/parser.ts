@@ -56,8 +56,8 @@ export function parseMDX(content: string): ParsedMDX {
       continue;
     }
 
-    if (trimmed.startsWith("function ") || trimmed.startsWith("async function ")) {
-      const match = trimmed.match(/(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)/);
+    if (trimmed.startsWith("function ") || trimmed.startsWith("async function ") || trimmed.startsWith("await function ")) {
+      const match = trimmed.match(/(?:async\s+|await\s+)?function\s+(\w+)\s*\(([^)]*)\)/);
       if (match) {
         functionName = match[1];
         rawParams = match[2].trim();

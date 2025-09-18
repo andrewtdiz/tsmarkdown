@@ -368,16 +368,18 @@ export function processTemplateContent(
   );
 
   // Process JSX elements first (like <Component prop={value} />)
-  processedContent = processJSXElements(
-    processedContent,
-    jsxExpressions,
-  );
+  // TEMPORARILY DISABLED: JSX support is temporarily deprecated
+  // processedContent = processJSXElements(
+  //   processedContent,
+  //   jsxExpressions,
+  // );
 
   // Process JSX expressions - handle {expression} that are not interpolations, conditionals, or ternary expressions
-  processedContent = processJSXExpressions(
-    processedContent,
-    jsxExpressions,
-  );
+  // TEMPORARILY DISABLED: JSX support is temporarily deprecated
+  // processedContent = processJSXExpressions(
+  //   processedContent,
+  //   jsxExpressions,
+  // );
 
   return processedContent;
 }

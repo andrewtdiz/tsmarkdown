@@ -48,10 +48,6 @@ function Welcome() {
       ## Development Mode 🚧
       You're in development mode with hot reload enabled.
     )}
-
-    <Button onClick={() => alert('Hello from Better-MDX!')}>
-      Get Started
-    </Button>
   )
 }
 ```
@@ -137,7 +133,6 @@ function Dashboard() {
 Seamlessly use React components:
 
 ```mdx
-import { Card, Button, Icon } from './components';
 import { useUser } from './hooks';
 
 function Homepage() {
