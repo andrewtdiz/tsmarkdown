@@ -72,20 +72,68 @@ export function processConditionalBlocksForParsing(
     content: string,
     conditionalBlocks: Array<{ condition: string; content: string }>,
 ): string {
-    // Match conditional blocks with proper nesting
-    const conditionalRegex = /\{([^{}]+?)\s*&&\s*\(\s*([\s\S]*?)\s*\)\s*\}/g;
+    let processedContent = content;
+    let startIndex = 0;
 
-    return content.replace(
-        conditionalRegex,
-        (match, condition, blockContent) => {
-            const placeholder = `__CONDITIONAL_${conditionalBlocks.length}__`;
-            conditionalBlocks.push({
-                condition: condition.trim(),
-                content: blockContent.trim(),
-            });
-            return placeholder;
-        },
-    );
+    while (startIndex < processedContent.length) {
+        // Find the next { pattern
+        const openIndex = processedContent.indexOf('{', startIndex);
+        if (openIndex === -1) break;
+
+        // Skip if it's a double brace {{ }}
+        if (processedContent[openIndex + 1] === '{') {
+            startIndex = openIndex + 2;
+            continue;
+        }
+
+        // Check if this looks like a conditional block (contains &&)
+        const beforeClose = processedContent.substring(openIndex);
+        const nextClose = beforeClose.indexOf('}');
+        if (nextClose === -1) {
+            startIndex = openIndex + 1;
+            continue;
+        }
+
+        const potentialCondition = processedContent.substring(openIndex + 1, openIndex + nextClose);
+        if (!potentialCondition.includes('&&')) {
+            startIndex = openIndex + 1;
+            continue;
+        }
+
+        // Find the matching closing brace using proper brace matching
+        const endIndex = findMatchingBrace(processedContent, openIndex);
+        if (endIndex === -1) {
+            startIndex = openIndex + 1;
+            continue;
+        }
+
+        // Extract the full expression
+        const fullExpression = processedContent.substring(openIndex + 1, endIndex);
+
+        // Check if this is a conditional block with parentheses
+        const conditionalMatch = fullExpression.match(/^([^{}]+?)\s*&&\s*\(\s*([\s\S]*?)\s*\)\s*$/);
+        if (!conditionalMatch) {
+            startIndex = openIndex + 1;
+            continue;
+        }
+
+        const [, condition, blockContent] = conditionalMatch;
+        const placeholder = `__CONDITIONAL_${conditionalBlocks.length}__`;
+        conditionalBlocks.push({
+            condition: condition.trim(),
+            content: blockContent.trim(),
+        });
+
+        // Replace the entire conditional block with the placeholder
+        processedContent = processedContent.substring(0, openIndex) +
+            placeholder +
+            processedContent.substring(endIndex + 1);
+
+        // Update startIndex to continue from the placeholder
+        startIndex = openIndex + placeholder.length;
+    }
+
+    return processedContent;
 }
 
 export function processTernaryExpressionsForParsing(

@@ -58,14 +58,49 @@ export async function processConditionalBlocks(
                 // Normalize indentation within the conditional block
                 blockContent = normalizeIndentation(blockContent.trim());
 
-                // Process interpolations first
-                blockContent = processInterpolations(blockContent, interpolations, context, errors);
+                // Process nested conditionals recursively
+                const nestedConditionalBlocks: Array<{ condition: string; content: string }> = [];
+                const nestedInterpolations: Array<{ placeholder: string; expression: string }> = [];
+                const nestedTernaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
+                const nestedJsxExpressions: Array<{ placeholder: string; expression: string }> = [];
+
+                // Parse the block content for nested expressions
+                const { processTemplateContent } = await import('./template-parsing');
+                blockContent = processTemplateContent(
+                    blockContent,
+                    nestedInterpolations,
+                    nestedConditionalBlocks,
+                    nestedTernaryExpressions,
+                    nestedJsxExpressions
+                );
+
+                // Process nested conditionals recursively
+                blockContent = await processConditionalBlocks(
+                    blockContent,
+                    nestedConditionalBlocks,
+                    nestedInterpolations,
+                    context,
+                    errors,
+                    nestedJsxExpressions
+                );
+
+                // Process interpolations
+                blockContent = processInterpolations(blockContent, nestedInterpolations, context, errors);
+
+                // Process ternary expressions
+                blockContent = processTernaryExpressions(
+                    blockContent,
+                    nestedTernaryExpressions,
+                    context,
+                    errors,
+                    nestedInterpolations
+                );
 
                 // Process JSX expressions
-                blockContent = await processJSXExpressions(blockContent, jsxExpressions, context, errors);
+                blockContent = await processJSXExpressions(blockContent, nestedJsxExpressions, context, errors);
 
                 // Process JSX elements
-                blockContent = await processJSXElements(blockContent, jsxExpressions, context, errors, {});
+                blockContent = await processJSXElements(blockContent, nestedJsxExpressions, context, errors, {});
             }
 
             // Replace placeholder and normalize line spacing
