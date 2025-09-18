@@ -6,10 +6,6 @@ author: Better-MDX Team
 tags: [quick-start, tutorial, getting-started]
 ---
 
-# Quick Start Guide
-
-Get started with Better-MDX in just a few minutes! This guide will walk you through creating your first dynamic content.
-
 ## 5-Minute Setup
 
 ### Step 1: Create a New Project

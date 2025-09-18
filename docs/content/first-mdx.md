@@ -6,10 +6,6 @@ author: Better-MDX Team
 tags: [tutorial, first-file, complete-example]
 ---
 
-# Create Your First File
-
-Let's build a complete Better-MDX application that demonstrates all the key features. We'll create a personal dashboard that shows dynamic content, user interactions, and real-time updates.
-
 ## Project Structure
 
 First, let's set up our project structure:

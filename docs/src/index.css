@@ -1,4 +1,5 @@
 @import "../styles/globals.css";
+@import "highlight.js/styles/github.css";
 
 @layer base {
   :root {
@@ -14,6 +15,7 @@
   from {
     background-position: 0 0;
   }
+
   to {
     background-position: 256px 224px;
   }
@@ -23,12 +25,14 @@
   from {
     transform: rotate(0);
   }
+
   to {
     transform: rotate(360deg);
   }
 }
 
 @media (prefers-reduced-motion) {
+
   *,
   ::before,
   ::after {

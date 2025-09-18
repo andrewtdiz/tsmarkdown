@@ -1,14 +1,8 @@
----
-title: About TypeScript Markdown
-description: A framework and runtime for generating Markdown in a type-safe, component-based way
-date: 2024-01-15
-version: 1.0.0
-features: [typescript, markdown, components, type-safety]
----
-
-## Overview
+# TypeScript Markdown
 
 TypeScript Markdown is a **framework and runtime** for generating Markdown in a type-safe, component-based way.
+
+## Overview
 
 Instead of template literals, string concatenation, or manual newlines, TypeScript Markdown lets you write **React-style components** with full **type checking** and **auto-completion**.  
 The output is pure Markdown, but authoring feels like building a React app.
@@ -37,32 +31,19 @@ The output is pure Markdown, but authoring feels like building a React app.
 
 ## Current & Emerging Use Cases
 
-{% callout type="info" %}
-**MCP Servers**: Replace fragile template-based Markdown with reusable `<@>` components.
-{% /callout %}
-
-{% callout type="info" %}
-**Prompt Engineering**: Structure LLM prompts as composable components instead of arrays of `{ role, content }` message objects.
-{% /callout %}
-
-{% callout type="info" %}
-**API-Driven Content**: Pull data from back-end services at render time without messy string concatenation.
-{% /callout %}
+- **MCP Servers**  
+  Replace fragile template-based Markdown with reusable `<@>` components.
+- **Prompt Engineering**  
+  Structure LLM prompts as composable components instead of arrays of `{ role, content }` message objects.
+- **API-Driven Content**  
+  Pull data from back-end services at render time without messy string concatenation.
 
 ## Benefits
 
-{% callout type="check" %}
-**Cleaner, more maintainable Markdown**: Component-based approach reduces duplication and improves organization.
-{% /callout %}
+- Cleaner, more maintainable Markdown.
+- Reusable components that reduce duplication.
+- Natural fit for dynamic, data-driven documents and AI prompt pipelines.
 
-{% callout type="check" %}
-**Type Safety**: Full TypeScript support with compile-time checking and IntelliSense.
-{% /callout %}
+---
 
-{% callout type="check" %}
-**Developer Experience**: Natural fit for dynamic, data-driven documents and AI prompt pipelines.
-{% /callout %}
-
-## Getting Started
-
-TypeScript Markdown brings the ergonomics of React and the safety of TypeScript to Markdown generation, eliminating messy string concatenation and unlocking powerful, future-friendly use cases.
+> **In short:** TypeScript Markdown brings the ergonomics of React and the safety of TypeScript to Markdown generation, eliminating messy string concatenation and unlocking powerful, future-friendly use cases.

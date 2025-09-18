@@ -1,9 +1,6 @@
 import matter from 'gray-matter';
-import Markdoc from '@markdoc/markdoc';
-import { markdocConfig } from './markdoc-config';
 
 export interface ContentData {
-    content: any;
     frontmatter: any;
     rawContent: string;
 }
@@ -37,17 +34,8 @@ async function initializeContentCache() {
             if (response.ok) {
                 const data = await response.json();
 
-                // Parse and transform markdown on client side
-                const ast = Markdoc.parse(data.rawContent);
-                const content = Markdoc.transform(ast, {
-                    ...markdocConfig,
-                    variables: {
-                        frontmatter: data.frontmatter
-                    }
-                });
-
+                // Just store the raw content - ReactMarkdown will handle the parsing
                 contentCache[path] = {
-                    content,
                     frontmatter: data.frontmatter,
                     rawContent: data.rawContent
                 };
@@ -98,7 +86,6 @@ export async function loadMarkdownContent(path: string): Promise<ContentData> {
         const { data: frontmatter, content: markdownContent } = matter(fileContent);
 
         return {
-            content: null, // Will be set by Markdoc parsing
             frontmatter,
             rawContent: markdownContent
         };

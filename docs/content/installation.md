@@ -6,10 +6,6 @@ author: Better-MDX Team
 tags: [installation, setup, getting-started]
 ---
 
-# Install Better-MDX
-
-Get Better-MDX up and running in your project with these simple installation steps.
-
 ## Prerequisites
 
 Before installing Better-MDX, make sure you have:

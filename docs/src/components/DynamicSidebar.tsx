@@ -83,7 +83,7 @@ export function DynamicSidebar({ sections }: DynamicSidebarProps) {
                                         <Button
                                             variant={'ghost'}
                                             className={cn(
-                                                "w-full justify-start font-normal text-foreground/90 hover:text-foreground rounded-none text-left h-auto py-1 px-3 font-normal",
+                                                "w-full justify-start font-normal text-foreground/90 hover:text-foreground rounded-xs text-left h-auto py-1 px-3 font-normal",
                                                 isActive && "text-foreground bg-muted"
                                             )}
                                             onClick={() => navigate(link.href)}
