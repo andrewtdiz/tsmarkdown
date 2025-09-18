@@ -1,5 +1,210 @@
 
 
+// Unified parsing architecture interfaces
+export interface ParseContext {
+  interpolations: Array<{ placeholder: string, expression: string }>;
+  conditionalBlocks: Array<{ condition: string, content: string }>;
+  ternaryExpressions: Array<{ condition: string, trueValue: string, falseValue: string }>;
+  jsxExpressions: Array<{ placeholder: string, expression: string }>;
+}
+
+// Unified parsing entry point - applies the full parsing pipeline recursively
+export function parseContent(content: string, context: ParseContext): string {
+  let processed = content;
+
+  // Apply full parsing pipeline recursively
+  processed = parseInterpolations(processed, context);
+  processed = parseConditionals(processed, context);
+  processed = parseTernary(processed, context);
+  processed = parseJSX(processed, context);
+
+  return processed;
+}
+
+// Recursive interpolation parser
+export function parseInterpolations(content: string, context: ParseContext): string {
+  let processedContent = content;
+  let startIndex = 0;
+
+  while (startIndex < processedContent.length) {
+    // Find the next {{ pattern
+    const openIndex = processedContent.indexOf('{{', startIndex);
+    if (openIndex === -1) break;
+
+    // Find the matching }} by counting nested braces
+    let braceCount = 0;
+    let closeIndex = openIndex + 2; // Start after {{
+
+    while (closeIndex < processedContent.length) {
+      const char = processedContent[closeIndex];
+      const nextChar = processedContent[closeIndex + 1];
+
+      if (char === '{' && nextChar === '{') {
+        // Found nested {{
+        braceCount++;
+        closeIndex += 2;
+      } else if (char === '}' && nextChar === '}') {
+        // Found }}
+        if (braceCount === 0) {
+          // This is the matching closing }}
+          break;
+        } else {
+          // This is a nested closing }}, decrement count
+          braceCount--;
+          closeIndex += 2;
+        }
+      } else {
+        closeIndex++;
+      }
+    }
+
+    if (closeIndex >= processedContent.length) {
+      // No matching }} found, skip this one
+      startIndex = openIndex + 2;
+      continue;
+    }
+
+    // Extract the expression (everything between {{ and }})
+    const expression = processedContent.substring(openIndex + 2, closeIndex).trim();
+
+    if (expression) {
+      const placeholder = `__INTERPOLATION_${context.interpolations.length}__`;
+      context.interpolations.push({ placeholder, expression });
+
+      // Replace the entire {{ expression }} with the placeholder
+      processedContent = processedContent.substring(0, openIndex) +
+        placeholder +
+        processedContent.substring(closeIndex + 2);
+
+      // Update startIndex to continue from the placeholder
+      startIndex = openIndex + placeholder.length;
+    } else {
+      // Empty expression, skip
+      startIndex = closeIndex + 2;
+    }
+  }
+
+  return processedContent;
+}
+
+// Recursive conditional parser
+export function parseConditionals(content: string, context: ParseContext): string {
+  let processedContent = content;
+  let startIndex = 0;
+
+  while (startIndex < processedContent.length) {
+    const openBraceIndex = processedContent.indexOf('{', startIndex);
+    if (openBraceIndex === -1) break;
+
+    // Skip if it's a double brace {{ }}
+    if (processedContent[openBraceIndex + 1] === '{') {
+      startIndex = openBraceIndex + 2;
+      continue;
+    }
+
+    // Find the matching closing brace
+    const endIndex = findMatchingBrace(processedContent, openBraceIndex);
+    if (endIndex === -1) {
+      startIndex = openBraceIndex + 1;
+      continue;
+    }
+
+    const expression = processedContent.substring(openBraceIndex + 1, endIndex);
+    const trimmedExpression = expression.trim();
+
+    // Check if this is a conditional block (contains && and parentheses)
+    if (trimmedExpression.includes('&&') && trimmedExpression.includes('(') && trimmedExpression.includes(')')) {
+      // Look for the pattern: condition && (content)
+      const andPattern = /&&\s*\(/;
+      const match = trimmedExpression.match(andPattern);
+
+      if (!match) {
+        startIndex = endIndex + 1;
+        continue;
+      }
+
+      const andIndex = match.index!;
+      const condition = trimmedExpression.substring(0, andIndex).trim();
+
+      // Find the opening parenthesis that comes after the &&
+      const parenStart = andIndex + match[0].length - 1; // -1 because we want the position of the (
+      if (parenStart === -1) {
+        startIndex = endIndex + 1;
+        continue;
+      }
+
+      // Find the matching closing parenthesis
+      const parenEnd = findMatchingParen(trimmedExpression, parenStart);
+      if (parenEnd === -1) {
+        startIndex = endIndex + 1;
+        continue;
+      }
+
+      const blockContent = trimmedExpression.substring(parenStart + 1, parenEnd).trim();
+
+      // RECURSIVE: Apply the full parsing pipeline to nested content
+      const parsedNested = parseContent(blockContent, context);
+
+      const placeholder = `__CONDITIONAL_${context.conditionalBlocks.length}__`;
+      context.conditionalBlocks.push({
+        condition: condition,
+        content: parsedNested,
+      });
+
+      // Replace the entire conditional block with the placeholder
+      processedContent = processedContent.substring(0, openBraceIndex) +
+        placeholder +
+        processedContent.substring(endIndex + 1);
+
+      // Update startIndex to continue from the placeholder
+      startIndex = openBraceIndex + placeholder.length;
+    } else {
+      startIndex = endIndex + 1;
+    }
+  }
+
+  return processedContent;
+}
+
+// Recursive ternary parser
+export function parseTernary(content: string, context: ParseContext): string {
+  // Match ternary expressions - {condition ? trueValue : falseValue}
+  const ternaryRegex = /\{([^{}<>]*(?:\{[^}]*\}[^{}<>]*)*)\s*\?\s*([^{}:<>]*(?:\{[^}]*\}[^{}:<>]*)*(?:\([^)]*\)[^{}:<>]*)*)\s*:\s*([^{}<>]*(?:\{[^}]*\}[^{}<>]*)*(?:\([^)]*\)[^{}<>]*)*)\}/g;
+
+  return content.replace(
+    ternaryRegex,
+    (match, condition, trueValue, falseValue) => {
+      const trimmedCondition = condition.trim();
+      const trimmedTrueValue = trueValue.trim();
+      const trimmedFalseValue = falseValue.trim();
+
+      // Skip if any part is empty
+      if (!trimmedCondition || !trimmedTrueValue || !trimmedFalseValue) {
+        return match;
+      }
+
+      // RECURSIVE: Apply the full parsing pipeline to both true and false values
+      const parsedTrueValue = parseContent(trimmedTrueValue, context);
+      const parsedFalseValue = parseContent(trimmedFalseValue, context);
+
+      const placeholder = `__TERNARY_${context.ternaryExpressions.length}__`;
+      context.ternaryExpressions.push({
+        condition: trimmedCondition,
+        trueValue: parsedTrueValue,
+        falseValue: parsedFalseValue,
+      });
+      return placeholder;
+    },
+  );
+}
+
+// Recursive JSX parser
+export function parseJSX(content: string, context: ParseContext): string {
+  // For now, JSX support is temporarily disabled
+  // This function is a placeholder for future JSX support
+  return content;
+}
+
 export function parseParameters(params: string): string[] {
   const parameters: string[] = [];
 
@@ -529,38 +734,16 @@ export function processTemplateContent(
   ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>,
   jsxExpressions: Array<{ placeholder: string; expression: string }>,
 ): string {
-  // Process interpolations first with support for nested interpolations
-  let processedContent = processNestedInterpolations(content, interpolations);
-
-  // Process conditional blocks - handle multiline {condition && (content)}
-  processedContent = processConditionalBlocks(
-    processedContent,
+  // Create unified parsing context
+  const context: ParseContext = {
+    interpolations,
     conditionalBlocks,
     ternaryExpressions,
-    interpolations,
-  );
+    jsxExpressions,
+  };
 
-  // Process ternary expressions - handle {condition ? trueValue : falseValue}
-  processedContent = processTernaryExpressions(
-    processedContent,
-    ternaryExpressions,
-  );
-
-  // Process JSX elements first (like <Component prop={value} />)
-  // TEMPORARILY DISABLED: JSX support is temporarily deprecated
-  // processedContent = processJSXElements(
-  //   processedContent,
-  //   jsxExpressions,
-  // );
-
-  // Process JSX expressions - handle {expression} that are not interpolations, conditionals, or ternary expressions
-  // TEMPORARILY DISABLED: JSX support is temporarily deprecated
-  // processedContent = processJSXExpressions(
-  //   processedContent,
-  //   jsxExpressions,
-  // );
-
-  return processedContent;
+  // Use the new unified parsing architecture
+  return parseContent(content, context);
 }
 
 export function generatePropsInterface(functionName: string, parameterTypes: Array<{ name: string; type: string; required: boolean }>): string {
