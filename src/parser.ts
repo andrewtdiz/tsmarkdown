@@ -1,15 +1,7 @@
-import {
-  parseParameters,
-  parseParameterTypes,
-  generatePropsInterface,
-  normalizeIndentation,
-  processTemplateContent,
-  processConditionalBlocks,
-  processTernaryExpressions,
-  processJSXElements,
-  processJSXExpressions,
-  findMatchingBrace
-} from './parser/parser-utils';
+import { generatePropsInterface, parseParameters, parseParameterTypes } from "./parser/parameters";
+import { processJSXExpressions } from "./renderer/jsx-runtime";
+import { normalizeIndentation } from "./renderer/string-helpers";
+import { processTemplateContent } from "./renderer/template-parsing";
 
 export interface ParsedMDX {
   imports: string[];
@@ -109,7 +101,7 @@ export function parseMDX(content: string): ParsedMDX {
   const normalizedMarkdown = normalizeIndentation(markdown).trim();
 
   // Process JSX expressions first to populate the jsxExpressions array
-  processJSXExpressions(normalizedMarkdown, jsxExpressions);
+  processJSXExpressions(normalizedMarkdown, jsxExpressions, {}, []);
 
   markdown = processTemplateContent(
     normalizedMarkdown,

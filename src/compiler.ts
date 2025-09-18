@@ -46,3 +46,6 @@ export function compile(parsed: ParsedMDX): CompiledMDX {
     }
   };
 }
+
+// Backward compatibility alias
+export const compileMDX = compile;

@@ -1,0 +1,14 @@
+function Component() {
+    const user = { name: 'Bob', points: 1200, level: 'gold' };
+    const showRewards = user.points > 1000;
+
+    return (
+    # User Profile
+    Name: {{ user.name }}
+    Points: {{ user.points }}
+
+    {showRewards && (
+        🎉 Congratulations {{ user.name }}! You've reached {{ user.level }} level!
+    )}
+    )
+}

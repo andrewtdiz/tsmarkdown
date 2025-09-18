@@ -29,7 +29,7 @@ for (let i = 0; i < listCompiled.jsxExpressions.length; i++) {
     console.log(`\n--- Testing JSX Expression ${i} ---`);
     console.log("Placeholder:", jsxExpr.placeholder);
     console.log("Expression:", jsxExpr.expression);
-    
+
     try {
         const result = await evaluateJSXExpression(jsxExpr.expression, context);
         console.log("Result:", result);

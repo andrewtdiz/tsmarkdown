@@ -8,6 +8,9 @@ import {
 
 export type RenderedResult = RenderResult;
 
+// Backward compatibility alias
+export const renderMDX = render;
+
 export async function render(compiled: CompiledMDX, context: RenderContext = {}, props: any = {}, basePath?: string): Promise<RenderedResult> {
   const errors: string[] = [];
 

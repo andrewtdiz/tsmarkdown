@@ -1,6 +1,8 @@
+import { CommaList } from './CommaList'
+
 async function ConditionalExample() {
     // Simulate async user data fetching (self-contained)
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 10));
 
     // Mock user data - this demonstrates async content generation
     const user = {
@@ -27,7 +29,7 @@ async function ConditionalExample() {
         {isLoggedIn && (
             ## Your Dashboard
             Here are your current items:
-            <CommaList items={user.items} />
+            <@CommaList items={user.items} />
         )}
 
         {!isLoggedIn && (
