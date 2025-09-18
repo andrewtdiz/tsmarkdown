@@ -200,9 +200,13 @@ export function parseTernary(content: string, context: ParseContext): string {
 
 // Recursive JSX parser
 export function parseJSX(content: string, context: ParseContext): string {
-  // For now, JSX support is temporarily disabled
-  // This function is a placeholder for future JSX support
-  return content;
+  // Process JSX elements first (like <@Component />)
+  let processed = processJSXElements(content, context.jsxExpressions);
+
+  // Then process JSX expressions (like {expression})
+  processed = processJSXExpressions(processed, context.jsxExpressions);
+
+  return processed;
 }
 
 export function parseParameters(params: string): string[] {
@@ -351,10 +355,23 @@ export function processJSXElements(
   content: string,
   jsxExpressions: Array<{ placeholder: string; expression: string }>,
 ): string {
-  // Find JSX elements like <Component prop={value} /> and <@Component prop={value} />
+  // First, process JSX expressions that contain JSX elements (like ternary expressions with JSX)
+  let processedContent = content;
+
+  // Find JSX expressions that contain JSX elements (like ternary expressions)
+  // This regex matches {expression} where expression contains JSX elements
+  const jsxExpressionRegex = /\{([^{}]*(?:<[^>]*>[^{}]*)*)\}/g;
+
+  processedContent = processedContent.replace(jsxExpressionRegex, (match, expression) => {
+    const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
+    jsxExpressions.push({ placeholder, expression: expression.trim() });
+    return `{${placeholder}}`;
+  });
+
+  // Then process individual JSX elements like <Component prop={value} /> and <@Component prop={value} />
   const jsxElementRegex = /<(@?)(\w+)([^/>]*)\/>/g;
 
-  return content.replace(jsxElementRegex, (match, atSymbol, componentName, props) => {
+  return processedContent.replace(jsxElementRegex, (match, atSymbol, componentName, props) => {
     // Parse props to extract JSX expressions within them
     const propMatches = props.match(/(\w+)=\{([^}]+)\}/g) || [];
     const processedProps: string[] = [];
@@ -382,9 +399,12 @@ export function processJSXElements(
       }
     }
 
-    // Reconstruct the JSX element with processed props, preserving the @ symbol
+    // Convert the entire JSX element to a placeholder
     const processedPropsString = processedProps.length > 0 ? ' ' + processedProps.join(' ') : '';
-    return `<${atSymbol}${componentName}${processedPropsString} />`;
+    const jsxElementPlaceholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
+    const fullJsxElement = `<${atSymbol}${componentName}${processedPropsString} />`;
+    jsxExpressions.push({ placeholder: jsxElementPlaceholder, expression: fullJsxElement });
+    return jsxElementPlaceholder;
   });
 }
 
@@ -743,7 +763,12 @@ export function processTemplateContent(
   };
 
   // Use the new unified parsing architecture
-  return parseContent(content, context);
+  let processed = parseContent(content, context);
+
+  // Ensure JSX elements are processed after other content processing
+  processed = processJSXElements(processed, jsxExpressions);
+
+  return processed;
 }
 
 export function generatePropsInterface(functionName: string, parameterTypes: Array<{ name: string; type: string; required: boolean }>): string {

@@ -2,25 +2,33 @@ import { parseMDX as parse } from "./src/parser";
 import { compile } from "./src/compiler";
 import { render } from "./src/renderer";
 
-const content = `
-function TestComponent() {
-  return (
-    {<@OlItem item="test" />}
-  )
-}
-`;
+// Debug component loading specifically
+const listFile = "./mdx/List.mdx";
+const listContent = await Bun.file(listFile).text();
+const listParsed = parse(listContent);
+const listCompiled = compile(listParsed);
 
-console.log("=== Component Loading Debug ===");
+console.log("=== List component dependencies ===");
+console.log("Dependencies:", listCompiled.dependencies);
 
-const parsed = parse(content);
-const compiled = compile(parsed);
+console.log("\n=== Testing component loading ===");
 
-// Test with basePath
-const result = await render(compiled, { basePath: "./mdx" }, {}, "./mdx");
-console.log("Rendered content:", result.content);
-console.log("Errors:", result.errors);
+// Test loading dependencies manually
+const { loadDependencies } = await import("./src/renderer/render-utils");
+const errors: string[] = [];
+loadDependencies(listCompiled.dependencies, "./mdx", errors);
 
-// Test without basePath
-const result2 = await render(compiled, {}, {}, "./mdx");
-console.log("Rendered content (no basePath in context):", result2.content);
-console.log("Errors:", result2.errors);
+console.log("Loading errors:", errors);
+
+// Check if components are in registry
+const { componentRegistry } = await import("./src/renderer/render-utils");
+console.log("Component registry keys:", Object.keys(componentRegistry));
+
+// Test rendering with loaded dependencies
+console.log("\n=== Testing rendering with loaded dependencies ===");
+const result = await render(listCompiled, {}, {
+  items: ["First", "Second", "Third"],
+  ordered: false,
+}, "./mdx");
+
+console.log("Result:", JSON.stringify(result, null, 2));

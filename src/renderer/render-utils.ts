@@ -16,7 +16,7 @@ export interface RenderResult {
     errors: string[];
 }
 
-const componentRegistry: ComponentRegistry = {};
+export const componentRegistry: ComponentRegistry = {};
 
 export async function processMultipleReturnStatements(
     returnStatements: Array<{ condition?: string; content: string; isTemplate: boolean }>,
@@ -268,10 +268,10 @@ export function processJSXElementsForParsing(
     content: string,
     jsxExpressions: Array<{ placeholder: string; expression: string }>,
 ): string {
-    // Find JSX elements like <Component prop={value} />
-    const jsxElementRegex = /<(\w+)([^/>]*)\/>/g;
+    // Find JSX elements like <Component prop={value} /> and <@Component prop={value} />
+    const jsxElementRegex = /<(@?)(\w+)([^/>]*)\/>/g;
 
-    return content.replace(jsxElementRegex, (match, componentName, props) => {
+    return content.replace(jsxElementRegex, (match, atSymbol, componentName, props) => {
         // Parse props to extract JSX expressions within them
         const propMatches = props.match(/(\w+)=\{([^}]+)\}/g) || [];
         const processedProps: string[] = [];
@@ -299,9 +299,12 @@ export function processJSXElementsForParsing(
             }
         }
 
-        // Reconstruct the JSX element with processed props
+        // Convert the entire JSX element to a placeholder
         const processedPropsString = processedProps.length > 0 ? ' ' + processedProps.join(' ') : '';
-        return `<${componentName}${processedPropsString} />`;
+        const jsxElementPlaceholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
+        const fullJsxElement = `<${atSymbol}${componentName}${processedPropsString} />`;
+        jsxExpressions.push({ placeholder: jsxElementPlaceholder, expression: fullJsxElement });
+        return jsxElementPlaceholder;
     });
 }
 
@@ -1071,38 +1074,112 @@ export async function processJSXExpressions(
 ): Promise<string> {
     let processedContent = content;
 
-    for (const jsxExpr of jsxExpressions) {
-        try {
-            // Skip JSX expressions that are simple variable names not in context
-            // These are typically map function parameters that are only valid within map context
-            const isSimpleVariable = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(jsxExpr.expression);
-            if (isSimpleVariable && !(jsxExpr.expression in context)) {
-                // Skip this expression - it's likely a map function parameter
-                continue;
-            }
+    // Process JSX expressions in multiple passes to resolve nested placeholders
+    let maxPasses = 10; // Prevent infinite loops
+    let passCount = 0;
 
-            // Check if this JSX expression contains component calls
-            if (jsxExpr.expression.includes('<') && jsxExpr.expression.includes('>')) {
-                // This is a JSX expression with component calls, render it as a component
-                const result = await renderJSXComponent(jsxExpr.expression, context);
-                processedContent = processedContent.replace(
-                    jsxExpr.placeholder,
-                    result
-                );
-            } else {
-                // This is a regular JSX expression, evaluate it normally
-                const result = await evaluateJSXExpression(jsxExpr.expression, context);
-                const stringValue = await jsxResultToString(result);
+    while (passCount < maxPasses) {
+        let hasChanges = false;
 
-                processedContent = processedContent.replace(
-                    jsxExpr.placeholder,
-                    stringValue
-                );
+        for (const jsxExpr of jsxExpressions) {
+            try {
+                // Skip if placeholder is not in content
+                if (!processedContent.includes(jsxExpr.placeholder)) {
+                    continue;
+                }
+
+                // First, resolve any nested placeholder references in the expression
+                let resolvedExpression = jsxExpr.expression;
+                let nestedResolved = false;
+
+                // Find and replace placeholder references with their actual values
+                for (const otherExpr of jsxExpressions) {
+                    if (otherExpr.placeholder !== jsxExpr.placeholder &&
+                        resolvedExpression.includes(otherExpr.placeholder)) {
+
+                        // Check if the referenced expression is a simple variable in context
+                        const isSimpleVariable = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(otherExpr.expression);
+                        if (isSimpleVariable && otherExpr.expression in context) {
+                            // Direct variable reference - use the actual value
+                            resolvedExpression = resolvedExpression.replace(otherExpr.placeholder, otherExpr.expression);
+                            nestedResolved = true;
+                        } else if (isSimpleVariable && !(otherExpr.expression in context)) {
+                            // This is likely a map function parameter, keep the placeholder for now
+                            continue;
+                        } else if (otherExpr.expression.startsWith('__JSX_EXPRESSION_') && otherExpr.expression.endsWith('__')) {
+                            // This is a reference to another placeholder - resolve it recursively
+                            const referencedPlaceholder = otherExpr.expression;
+                            const referencedExpr = jsxExpressions.find(expr => expr.placeholder === referencedPlaceholder);
+                            if (referencedExpr) {
+                                // Replace with the referenced expression
+                                resolvedExpression = resolvedExpression.replace(otherExpr.placeholder, referencedExpr.expression);
+                                nestedResolved = true;
+                            }
+                        } else {
+                            // Complex expression - evaluate it
+                            const referencedValue = await evaluateJSXExpression(otherExpr.expression, context);
+                            const stringValue = await jsxResultToString(referencedValue);
+                            resolvedExpression = resolvedExpression.replace(otherExpr.placeholder, stringValue);
+                            nestedResolved = true;
+                        }
+                    }
+                }
+
+                // Skip JSX expressions that are simple variable names not in context
+                // These are typically map function parameters that are only valid within map context
+                const isSimpleVariable = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(resolvedExpression);
+                if (isSimpleVariable && !(resolvedExpression in context)) {
+                    // Skip this expression - it's likely a map function parameter
+                    continue;
+                }
+
+                // Check if this JSX expression contains component calls
+                if (resolvedExpression.includes('<') && resolvedExpression.includes('>')) {
+                    // This is a JSX expression with component calls
+                    // First, check if it's a ternary expression that contains JSX
+                    if (resolvedExpression.includes('?')) {
+                        // This is a ternary expression with JSX components, evaluate it as a JSX expression
+                        const result = await evaluateJSXExpression(resolvedExpression, context);
+                        const stringValue = await jsxResultToString(result);
+
+                        processedContent = processedContent.replace(
+                            jsxExpr.placeholder,
+                            stringValue
+                        );
+                        hasChanges = true;
+                    } else {
+                        // This is a direct JSX component call, render it as a component
+                        const result = await renderJSXComponent(resolvedExpression, context);
+                        processedContent = processedContent.replace(
+                            jsxExpr.placeholder,
+                            result
+                        );
+                        hasChanges = true;
+                    }
+                } else {
+                    // This is a regular JSX expression, evaluate it normally
+                    const result = await evaluateJSXExpression(resolvedExpression, context);
+                    const stringValue = await jsxResultToString(result);
+
+                    processedContent = processedContent.replace(
+                        jsxExpr.placeholder,
+                        stringValue
+                    );
+                    hasChanges = true;
+                }
+            } catch (error) {
+                errors.push(`JSX expression error in "${jsxExpr.expression}": ${error}`);
+                processedContent = processedContent.replace(jsxExpr.placeholder, '');
+                hasChanges = true;
             }
-        } catch (error) {
-            errors.push(`JSX expression error in "${jsxExpr.expression}": ${error}`);
-            processedContent = processedContent.replace(jsxExpr.placeholder, '');
         }
+
+        // If no changes were made in this pass, we're done
+        if (!hasChanges) {
+            break;
+        }
+
+        passCount++;
     }
 
     return processedContent;
@@ -1110,14 +1187,15 @@ export async function processJSXExpressions(
 
 export async function evaluateJSXExpression(expression: string, context: any): Promise<any> {
     try {
-        // Check if this is a ternary expression first
-        if (expression.includes('?')) {
-            return await evaluateTernaryExpression(expression, context);
-        }
-
-        // Check if this is a .map() expression for arrays
+        // Check if this is a .map() expression for arrays first
+        // This takes priority over ternary expressions because map expressions can contain ternary operators
         if (expression.includes('.map(')) {
             return await evaluateMapExpression(expression, context);
+        }
+
+        // Check if this is a ternary expression
+        if (expression.includes('?')) {
+            return await evaluateTernaryExpression(expression, context);
         }
 
         // For other JSX expressions, evaluate normally
@@ -1173,7 +1251,28 @@ export async function evaluateTernaryExpression(expression: string, context: any
     const conditionResult = conditionFunc(...Object.values(context));
 
     // Choose the appropriate value based on the condition
-    const selectedExpression = conditionResult ? trueValue : falseValue;
+    let selectedExpression = conditionResult ? trueValue : falseValue;
+
+    // Remove wrapping parentheses if they exist
+    if (selectedExpression.startsWith('(') && selectedExpression.endsWith(')')) {
+        selectedExpression = selectedExpression.slice(1, -1).trim();
+    }
+
+    // Check if this is a JSX expression wrapped in braces {expression}
+    if (selectedExpression.startsWith('{') && selectedExpression.endsWith('}')) {
+        // Extract the inner expression
+        const innerExpression = selectedExpression.slice(1, -1).trim();
+        
+        // Process the inner expression
+        if (innerExpression.includes('.map(')) {
+            return await evaluateMapExpression(innerExpression, context);
+        } else if (innerExpression.includes('<') && innerExpression.includes('>')) {
+            return await evaluateTernaryJSXExpression(innerExpression, context);
+        } else {
+            // Regular JSX expression
+            return await evaluateJSXExpression(innerExpression, context);
+        }
+    }
 
     // If the selected expression contains JSX or map, evaluate it appropriately
     if (selectedExpression.includes('.map(')) {
@@ -1188,15 +1287,43 @@ export async function evaluateTernaryExpression(expression: string, context: any
 
 export async function evaluateMapExpression(expression: string, context: any): Promise<string> {
     // Parse expressions like: items.map((item, index) => <ListItem item={item} />)
-    const mapMatch = expression.match(/(.+)\.map\s*\(\s*\(([^)]+)\)\s*=>\s*(.+)\s*\)/);
-
-    if (!mapMatch) {
+    // We need to handle nested parentheses in the callback expression
+    const mapStartMatch = expression.match(/(.+)\.map\s*\(\s*\(([^)]+)\)\s*=>\s*/);
+    
+    if (!mapStartMatch) {
         // Fall back to regular evaluation
         const func = new Function(...Object.keys(context), `return (${expression})`);
         return func(...Object.values(context));
     }
 
-    const [, arrayExpr, params, elementExpr] = mapMatch;
+    // Extract the array expression and parameters
+    const arrayExpr = mapStartMatch[1];
+    const params = mapStartMatch[2];
+    
+    // Find the callback expression by counting parentheses
+    const callbackStart = mapStartMatch[0].length;
+    let parenCount = 0;
+    let callbackEnd = -1;
+    
+    for (let i = callbackStart; i < expression.length; i++) {
+        const char = expression[i];
+        if (char === '(') parenCount++;
+        else if (char === ')') {
+            parenCount--;
+            if (parenCount < 0) {
+                callbackEnd = i;
+                break;
+            }
+        }
+    }
+    
+    if (callbackEnd === -1) {
+        // Fall back to regular evaluation
+        const func = new Function(...Object.keys(context), `return (${expression})`);
+        return func(...Object.values(context));
+    }
+    
+    const elementExpr = expression.substring(callbackStart, callbackEnd).trim();
 
     // Get the array
     const arrayFunc = new Function(...Object.keys(context), `return (${arrayExpr})`);
@@ -1223,13 +1350,7 @@ export async function evaluateMapExpression(expression: string, context: any): P
             // Check if this is a ternary expression with JSX components
             if (elementExpr.includes('?')) {
                 // Handle ternary expressions like: ordered ? <OlItem item={item} index={index} /> : <UlItem item={item} />
-                // First, resolve any placeholders in the expression with actual values
-                let resolvedExpr = elementExpr;
-                resolvedExpr = resolvedExpr.replace(/__JSX_EXPRESSION_0__/g, 'item');
-                resolvedExpr = resolvedExpr.replace(/__JSX_EXPRESSION_1__/g, 'index');
-                resolvedExpr = resolvedExpr.replace(/__JSX_EXPRESSION_2__/g, 'item');
-
-                return await evaluateTernaryJSXExpression(resolvedExpr, iterationContext);
+                return await evaluateTernaryJSXExpression(elementExpr, iterationContext);
             } else {
                 // Handle direct JSX components
                 return await renderJSXComponent(elementExpr, iterationContext);
@@ -1237,32 +1358,104 @@ export async function evaluateMapExpression(expression: string, context: any): P
         }
 
         // For regular expressions, evaluate them
-        const elemFunc = new Function(...Object.keys(iterationContext), `return (${elementExpr})`);
-        return elemFunc(...Object.values(iterationContext));
+        try {
+            const elemFunc = new Function(...Object.keys(iterationContext), `return (${elementExpr})`);
+            return elemFunc(...Object.values(iterationContext));
+        } catch (error) {
+            // If evaluation fails, it might be because the expression contains JSX syntax
+            // that wasn't caught by the previous checks
+            console.warn(`Failed to evaluate element expression: ${elementExpr}`, error);
+            return elementExpr; // Return the expression as-is
+        }
     }));
 
     return results.join('\n');
 }
 
 export async function evaluateTernaryJSXExpression(expression: string, context: any): Promise<string> {
-    // Parse ternary expressions like: ordered ? <OlItem item={item} index={index} /> : <UlItem item={item} />
-    const ternaryMatch = expression.match(/^(.+)\s*\?\s*(.+)\s*:\s*(.+)$/);
+    // Parse ternary expressions like: ordered ? ( <OlItem item={item} index={index} /> ) : ( <UlItem item={item} /> )
+    // We need to find the outermost ternary operator, accounting for parentheses
+    let parenCount = 0;
+    let questionIndex = -1;
+    let colonIndex = -1;
 
-    if (!ternaryMatch) {
-        throw new Error(`Invalid ternary expression: ${expression}`);
+    for (let i = 0; i < expression.length; i++) {
+        const char = expression[i];
+        if (char === '(') parenCount++;
+        else if (char === ')') parenCount--;
+        else if (char === '?' && parenCount === 0) {
+            questionIndex = i;
+            break;
+        }
     }
 
-    const [, condition, trueValue, falseValue] = ternaryMatch;
+    if (questionIndex === -1) {
+        throw new Error(`No ternary operator found in expression: ${expression}`);
+    }
+
+    // Find the matching colon
+    for (let i = questionIndex + 1; i < expression.length; i++) {
+        const char = expression[i];
+        if (char === '(') parenCount++;
+        else if (char === ')') parenCount--;
+        else if (char === ':' && parenCount === 0) {
+            colonIndex = i;
+            break;
+        }
+    }
+
+    if (colonIndex === -1) {
+        throw new Error(`No matching colon found in ternary expression: ${expression}`);
+    }
+
+    const condition = expression.substring(0, questionIndex).trim();
+    let trueValue = expression.substring(questionIndex + 1, colonIndex).trim();
+    let falseValue = expression.substring(colonIndex + 1).trim();
+
+    // Remove wrapping parentheses if they exist
+    if (trueValue.startsWith('(') && trueValue.endsWith(')')) {
+        trueValue = trueValue.slice(1, -1).trim();
+    }
+    if (falseValue.startsWith('(') && falseValue.endsWith(')')) {
+        falseValue = falseValue.slice(1, -1).trim();
+    }
 
     // Evaluate the condition
     const conditionFunc = new Function(...Object.keys(context), `return (${condition})`);
     const conditionResult = conditionFunc(...Object.values(context));
 
     // Choose the appropriate JSX component based on the condition
-    const selectedExpression = conditionResult ? trueValue.trim() : falseValue.trim();
+    const selectedExpression = conditionResult ? trueValue : falseValue;
 
-    // Render the selected JSX component with proper context
-    return await renderJSXComponent(selectedExpression, context);
+    // Process the selected JSX expression through the JSX processing pipeline
+    // This handles JSX elements with proper prop evaluation
+    const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
+    const processedContent = processJSXElementsForParsing(selectedExpression, jsxExpressions);
+    
+    // If we have JSX expressions to process, handle them
+    if (jsxExpressions.length > 0) {
+        // Process the JSX expressions
+        let result = processedContent;
+        for (const jsxExpr of jsxExpressions) {
+            try {
+                const evaluated = await evaluateJSXExpression(jsxExpr.expression, context);
+                const stringValue = await jsxResultToString(evaluated);
+                result = result.replace(jsxExpr.placeholder, stringValue);
+            } catch (error) {
+                // If evaluation fails, try to render as a JSX component
+                try {
+                    const rendered = await renderJSXComponent(jsxExpr.expression, context);
+                    result = result.replace(jsxExpr.placeholder, rendered);
+                } catch (renderError) {
+                    result = result.replace(jsxExpr.placeholder, `<JSX_ERROR:${jsxExpr.expression}>`);
+                }
+            }
+        }
+        return result;
+    } else {
+        // No JSX expressions found, try to render as a JSX component directly
+        return await renderJSXComponent(selectedExpression, context);
+    }
 }
 
 export async function renderJSXElement(
@@ -1349,6 +1542,7 @@ export async function renderJSXComponent(jsxElement: string, context: any): Prom
     }
 
     const [, atSymbol, componentName, props] = componentMatch;
+
 
     // Parse props - handle both {expression} and placeholder patterns
     const propMatches = props.match(/(\w+)=(?:\{([^}]+)\}|([^}\s]+))/g) || [];
@@ -1472,6 +1666,7 @@ export async function renderComponent(compiled: CompiledMDX, context: RenderCont
         const runtimeContext = await executeTypeScript(compiled.typescript, mergedContext);
         const fullContext = { ...mergedContext, ...runtimeContext };
 
+
         // Handle multiple return statements if they exist
         if (compiled.returnStatements && compiled.returnStatements.length > 0) {
             processedContent = await processMultipleReturnStatements(
@@ -1536,6 +1731,7 @@ export async function renderComponent(compiled: CompiledMDX, context: RenderCont
         .join('\n')
         .replace(/\n{3,}/g, '\n\n') // Replace multiple consecutive newlines with double newlines
         .trim(); // Remove leading/trailing whitespace
+
 
     return {
         content: processedContent,
