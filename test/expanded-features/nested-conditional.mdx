@@ -1,0 +1,13 @@
+function TestComponent() {
+    const isLoggedIn = true;
+    const hasPermission = false;
+
+    return (
+    {isLoggedIn && (
+        Welcome back!
+    )}
+    {hasPermission && (
+        You have admin access.
+    )}
+    )
+}

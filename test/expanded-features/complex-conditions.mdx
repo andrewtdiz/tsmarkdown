@@ -1,0 +1,12 @@
+function TestComponent() {
+    const user = { role: 'admin', active: true };
+
+    return (
+        {user.role === 'admin' && user.active && (
+            Admin panel access
+        )}
+        {!user.active && (
+            Account is inactive
+        )}
+    )
+}

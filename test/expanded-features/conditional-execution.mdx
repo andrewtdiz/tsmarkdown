@@ -1,0 +1,13 @@
+function TestComponent() {
+    const showGreeting = true;
+    const showWarning = false;
+
+    return (
+        {showGreeting && (
+            Hello there!
+        )}
+        {showWarning && (
+            Warning message
+        )}
+    )
+}

@@ -1,0 +1,9 @@
+function TestComponent() {
+    const items = ['a', 'b', 'c'];
+    const user = { name: 'Alice' };
+
+    return (
+        Items: {{ items.join(', ') }}
+        User: {{ user.name.toUpperCase() }}
+    )
+}

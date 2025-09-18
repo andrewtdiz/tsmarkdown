@@ -351,8 +351,8 @@ export function processJSXElements(
   content: string,
   jsxExpressions: Array<{ placeholder: string; expression: string }>,
 ): string {
-  // Find JSX elements like <Component prop={value} />
-  const jsxElementRegex = /<(\w+)([^/>]*)\/>/g;
+  // Find JSX elements like <Component prop={value} /> and <@Component prop={value} />
+  const jsxElementRegex = /<(@?)(\w+)([^/>]*)\/>/g;
 
   return content.replace(jsxElementRegex, (match, componentName, props) => {
     // Parse props to extract JSX expressions within them
