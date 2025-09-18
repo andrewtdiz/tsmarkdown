@@ -1033,19 +1033,20 @@ export async function processJSXElements(
     errors: string[],
     originalProps: any = {}
 ): Promise<string> {
-    // Find JSX elements like <Component prop={value} />
-    const jsxElementRegex = /<(\w+)([^/>]*)\/>/g;
+    // Find JSX elements like <Component prop={value} /> and <@Component prop={value} />
+    const jsxElementRegex = /<(@?)(\w+)([^/>]*)\/>/g;
     let processedContent = content;
 
-    const jsxElements: Array<{ match: string; componentName: string; props: string }> = [];
+    const jsxElements: Array<{ match: string; componentName: string; props: string; atSymbol: string }> = [];
     let match;
 
     // First pass: collect all JSX elements
     while ((match = jsxElementRegex.exec(content)) !== null) {
         jsxElements.push({
             match: match[0],
-            componentName: match[1],
-            props: match[2]
+            componentName: match[2], // componentName is now the second capture group
+            props: match[3], // props is now the third capture group
+            atSymbol: match[1] // atSymbol is the first capture group
         });
     }
 
@@ -1080,14 +1081,24 @@ export async function processJSXExpressions(
                 continue;
             }
 
-            // Evaluate the JSX expression
-            const result = await evaluateJSXExpression(jsxExpr.expression, context);
-            const stringValue = await jsxResultToString(result);
+            // Check if this JSX expression contains component calls
+            if (jsxExpr.expression.includes('<') && jsxExpr.expression.includes('>')) {
+                // This is a JSX expression with component calls, render it as a component
+                const result = await renderJSXComponent(jsxExpr.expression, context);
+                processedContent = processedContent.replace(
+                    jsxExpr.placeholder,
+                    result
+                );
+            } else {
+                // This is a regular JSX expression, evaluate it normally
+                const result = await evaluateJSXExpression(jsxExpr.expression, context);
+                const stringValue = await jsxResultToString(result);
 
-            processedContent = processedContent.replace(
-                jsxExpr.placeholder,
-                stringValue
-            );
+                processedContent = processedContent.replace(
+                    jsxExpr.placeholder,
+                    stringValue
+                );
+            }
         } catch (error) {
             errors.push(`JSX expression error in "${jsxExpr.expression}": ${error}`);
             processedContent = processedContent.replace(jsxExpr.placeholder, '');
@@ -1255,12 +1266,12 @@ export async function evaluateTernaryJSXExpression(expression: string, context: 
 }
 
 export async function renderJSXElement(
-    jsxElement: { match: string; componentName: string; props: string },
+    jsxElement: { match: string; componentName: string; props: string; atSymbol: string },
     jsxExpressions: Array<{ placeholder: string; expression: string }>,
     context: any,
     originalProps: any = {}
 ): Promise<string> {
-    const { componentName, props } = jsxElement;
+    const { componentName, props, atSymbol } = jsxElement;
 
     // Parse props - handle both direct expressions and placeholders
     // Match both {value} and placeholder patterns
@@ -1330,14 +1341,14 @@ export async function renderJSXElement(
 }
 
 export async function renderJSXComponent(jsxElement: string, context: any): Promise<string> {
-    // Parse JSX like: <ListItem item={item} /> or <OlItem item=__JSX_EXPRESSION_0__ index=__JSX_EXPRESSION_1__ />
-    const componentMatch = jsxElement.match(/<(\w+)([^/>]*)\/>/);
+    // Parse JSX like: <ListItem item={item} /> or <@Component prop={value} /> or <OlItem item=__JSX_EXPRESSION_0__ index=__JSX_EXPRESSION_1__ />
+    const componentMatch = jsxElement.match(/<(@?)(\w+)([^/>]*)\/>/);
 
     if (!componentMatch) {
         return jsxElement; // Return as-is if we can't parse it
     }
 
-    const [, componentName, props] = componentMatch;
+    const [, atSymbol, componentName, props] = componentMatch;
 
     // Parse props - handle both {expression} and placeholder patterns
     const propMatches = props.match(/(\w+)=(?:\{([^}]+)\}|([^}\s]+))/g) || [];
@@ -1367,7 +1378,46 @@ export async function renderJSXComponent(jsxElement: string, context: any): Prom
         }
     }
 
-    // Check if we have the component in our registry
+    // Handle @ syntax for imported MDX components
+    if (atSymbol === '@') {
+        // Check if we have the component in our registry (imported MDX components)
+        if (componentRegistry[componentName]) {
+            try {
+                // Merge JSX props with default values from component metadata
+                const mergedProps = mergePropsWithDefaults(propValues, componentRegistry[componentName]);
+                const componentResult = await renderComponent(componentRegistry[componentName], {}, mergedProps);
+                return componentResult.content;
+            } catch (error) {
+                return `<@${componentName}:ERROR>`;
+            }
+        }
+
+        // If not found in registry, try to load it as a dependency
+        try {
+            const basePath = context.basePath || process.cwd();
+            const componentPath = resolveComponentPath(componentName, basePath);
+            if (componentPath) {
+                const componentContent = readFileSync(componentPath, 'utf-8');
+                const parsed = parseMDX(componentContent);
+                const compiled = compile(parsed);
+
+                // Register the component for future use
+                componentRegistry[componentName] = compiled;
+
+                // Render the component
+                const mergedProps = mergePropsWithDefaults(propValues, compiled);
+                const componentResult = await renderComponent(compiled, {}, mergedProps);
+                return componentResult.content;
+            }
+        } catch (error) {
+            // Component not found or failed to load
+        }
+
+        // Fallback representation for @ components
+        return `<@${componentName} ${Object.entries(propValues).map(([k, v]) => `${k}="${v}"`).join(' ')} />`;
+    }
+
+    // Handle regular React components (no @ symbol)
     if (componentRegistry[componentName]) {
         try {
             // Merge JSX props with default values from component metadata

@@ -16,7 +16,10 @@ export async function render(compiled: CompiledMDX, context: RenderContext = {},
       loadDependencies(compiled.dependencies, basePath, errors);
     }
 
-    const result = await renderComponent(compiled, context, props);
+    // Add basePath to context for component resolution
+    const contextWithBasePath = { ...context, basePath };
+
+    const result = await renderComponent(compiled, contextWithBasePath, props);
 
     return {
       content: result.content,

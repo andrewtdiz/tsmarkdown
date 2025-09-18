@@ -76,8 +76,10 @@ export class ExactMDXTestRunner {
                 result.details!.compiled = compiled;
 
                 if (!testCase.options?.skipExecution) {
-                    // Execute phase
-                    const executed = await render(compiled, testCase.context || {});
+                    // Execute phase - pass basePath from context if available
+                    const context = testCase.context || {};
+                    const basePath = context.basePath;
+                    const executed = await render(compiled, context, {}, basePath);
                     result.details!.executed = executed;
 
                     // Render phase

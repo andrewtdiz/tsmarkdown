@@ -106,8 +106,13 @@ export function parseMDX(content: string): ParsedMDX {
   }
 
   // Second pass: process markdown for interpolations, conditionals, ternary expressions, and JSX expressions
+  const normalizedMarkdown = normalizeIndentation(markdown).trim();
+
+  // Process JSX expressions first to populate the jsxExpressions array
+  processJSXExpressions(normalizedMarkdown, jsxExpressions);
+
   markdown = processTemplateContent(
-    normalizeIndentation(markdown).trim(),
+    normalizedMarkdown,
     interpolations,
     conditionalBlocks,
     ternaryExpressions,

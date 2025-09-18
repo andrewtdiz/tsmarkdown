@@ -354,7 +354,7 @@ export function processJSXElements(
   // Find JSX elements like <Component prop={value} /> and <@Component prop={value} />
   const jsxElementRegex = /<(@?)(\w+)([^/>]*)\/>/g;
 
-  return content.replace(jsxElementRegex, (match, componentName, props) => {
+  return content.replace(jsxElementRegex, (match, atSymbol, componentName, props) => {
     // Parse props to extract JSX expressions within them
     const propMatches = props.match(/(\w+)=\{([^}]+)\}/g) || [];
     const processedProps: string[] = [];
@@ -382,9 +382,9 @@ export function processJSXElements(
       }
     }
 
-    // Reconstruct the JSX element with processed props
+    // Reconstruct the JSX element with processed props, preserving the @ symbol
     const processedPropsString = processedProps.length > 0 ? ' ' + processedProps.join(' ') : '';
-    return `<${componentName}${processedPropsString} />`;
+    return `<${atSymbol}${componentName}${processedPropsString} />`;
   });
 }
 

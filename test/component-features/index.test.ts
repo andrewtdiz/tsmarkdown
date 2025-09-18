@@ -14,6 +14,7 @@ describe('Better-MDX Component Import Features', () => {
             'Simple component import - exact match',
             mdxContent
         )
+            .withContext({ basePath: import.meta.dir })
             .expectExactLines(
                 '# Hello, Bob!',
                 'Welcome to markdown!'
@@ -30,6 +31,7 @@ describe('Better-MDX Component Import Features', () => {
             'Component import - contains check',
             mdxContent
         )
+            .withContext({ basePath: import.meta.dir })
             .expectExactContent('# Hello, Bob!\nWelcome to markdown!')
             .build();
 
