@@ -40,9 +40,9 @@ export async function processConditionalBlocks(
 ): Promise<string> {
     let processedContent = content;
 
-    // Process conditionals in reverse order to handle nested conditionals correctly
-    // Inner conditionals (lower indices) need to be resolved before outer ones (higher indices)
-    for (let i = conditionalBlocks.length - 1; i >= 0; i--) {
+    // Process conditionals in forward order to handle nested conditionals correctly
+    // Outer conditionals (lower indices) need to be resolved before inner ones (higher indices)
+    for (let i = 0; i < conditionalBlocks.length; i++) {
         const block = conditionalBlocks[i];
         const placeholder = `__CONDITIONAL_${i}__`;
 
@@ -58,49 +58,26 @@ export async function processConditionalBlocks(
                 // Normalize indentation within the conditional block
                 blockContent = normalizeIndentation(blockContent.trim());
 
-                // Process nested conditionals recursively
-                const nestedConditionalBlocks: Array<{ condition: string; content: string }> = [];
-                const nestedInterpolations: Array<{ placeholder: string; expression: string }> = [];
-                const nestedTernaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
-                const nestedJsxExpressions: Array<{ placeholder: string; expression: string }> = [];
-
-                // Parse the block content for nested expressions
-                const { processTemplateContent } = await import('./template-parsing');
-                blockContent = processTemplateContent(
-                    blockContent,
-                    nestedInterpolations,
-                    nestedConditionalBlocks,
-                    nestedTernaryExpressions,
-                    nestedJsxExpressions
-                );
-
-                // Process nested conditionals recursively
-                blockContent = await processConditionalBlocks(
-                    blockContent,
-                    nestedConditionalBlocks,
-                    nestedInterpolations,
-                    context,
-                    errors,
-                    nestedJsxExpressions
-                );
+                // The block content already contains processed placeholders (like __CONDITIONAL_1__)
+                // We don't need to re-parse it, just process any remaining interpolations, ternary expressions, and JSX
 
                 // Process interpolations
-                blockContent = processInterpolations(blockContent, nestedInterpolations, context, errors);
+                blockContent = processInterpolations(blockContent, interpolations, context, errors);
 
                 // Process ternary expressions
                 blockContent = processTernaryExpressions(
                     blockContent,
-                    nestedTernaryExpressions,
+                    [],
                     context,
                     errors,
-                    nestedInterpolations
+                    interpolations
                 );
 
                 // Process JSX expressions
-                blockContent = await processJSXExpressions(blockContent, nestedJsxExpressions, context, errors);
+                blockContent = await processJSXExpressions(blockContent, jsxExpressions, context, errors);
 
                 // Process JSX elements
-                blockContent = await processJSXElements(blockContent, nestedJsxExpressions, context, errors, {});
+                blockContent = await processJSXElements(blockContent, jsxExpressions, context, errors, {});
             }
 
             // Replace placeholder with more intelligent handling of empty lines
@@ -290,8 +267,11 @@ export function detectParentIndentation(content: string, jsxMatch: string): stri
 
     // Calculate relative indentation
     if (parentIndentation.length > 0 && jsxIndentation.length > 0) {
-        // Use 3 spaces for the relative indentation (this matches the test expectation)
-        return '   '; // 3 spaces
+        // Calculate the relative indentation between the JSX element and its parent
+        const relativeIndent = jsxIndentation.length - parentIndentation.length;
+        if (relativeIndent > 0) {
+            return ' '.repeat(relativeIndent);
+        }
     }
 
     return jsxIndentation;
@@ -320,6 +300,7 @@ export async function processJSXElements(
             atSymbol: match[1] // atSymbol is the first capture group
         });
     }
+
 
     // Second pass: process each JSX element
     for (const jsxElement of jsxElements) {
@@ -912,6 +893,12 @@ export async function renderJSXElement(
                 const indentedLines = lines.map((line, index) => {
                     // Don't indent empty lines
                     if (line.trim() === '') return line;
+
+                    // Check if the line already has the correct indentation to avoid double-indenting
+                    if (line.startsWith(parentIndentation)) {
+                        return line; // Already has correct indentation
+                    }
+
                     // Apply parent indentation to non-empty lines
                     return parentIndentation + line;
                 });

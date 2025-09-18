@@ -3,20 +3,20 @@ function NestedTest() {
   const isActive = true;
 
   return (
-    {user && isActive && (
-      {user.role === 'admin' && (
+    {{user && isActive && (
+      {{user.role === 'admin' && (
         # Admin Dashboard
 
-        {user.permissions.includes('delete') ? (
+        {{user.permissions.includes('delete') ? (
           You have delete permissions.
         ) : (
           Limited permissions.
-        )}
-      )}
+        )}}
+      )}}
 
-      {user.role !== 'admin' && (
+      {{user.role !== 'admin' && (
         # User Dashboard
-      )}
-    )}
+      )}}
+    )}}
   )
 }

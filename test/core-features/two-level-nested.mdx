@@ -3,10 +3,10 @@ function TwoLevelNestedTest() {
   const inner = true;
 
   return (
-    {outer && (
-      {inner && (
+    {{outer && (
+      {{inner && (
         # Nested Content
-      )}
-    )}
+      )}}
+    )}}
   )
 }

@@ -86,8 +86,8 @@ export async function renderComponent(compiled: CompiledMDX, context: RenderCont
             return line.trimEnd(); // Remove trailing spaces for other lines
         })
         .join('\n')
-        .replace(/\n{3,}/g, '\n\n') // Replace multiple consecutive newlines with double newlines
-        .trim(); // Remove leading/trailing whitespace
+        .replace(/\n{3,}/g, '\n\n'); // Replace multiple consecutive newlines with double newlines
+    // Note: Removed .trim() to preserve indentation structure for components
 
     return {
         content: processedContent,

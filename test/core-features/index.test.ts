@@ -44,7 +44,10 @@ describe('Better-MDX Exact Core Features', () => {
             'Conditional rendering - falsy exact match',
             mdxContent
         )
-            .expectExactContent('# Test')
+            .expectExactLines(
+                '# Test',
+                '',
+            )
             .build();
 
         const result = await runner.runTestCase(testCase);

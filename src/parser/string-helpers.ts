@@ -42,6 +42,36 @@ export function findMatchingParen(content: string, startIndex: number): number {
     return -1; // No matching parenthesis found
 }
 
+export function findMatchingDoubleBrace(content: string, startIndex: number): number {
+    let braceCount = 0;
+    let i = startIndex + 2; // Start after the opening {{
+
+    while (i < content.length - 1) {
+        const char = content[i];
+        const nextChar = content[i + 1];
+
+        if (char === '{' && nextChar === '{') {
+            // Found nested {{
+            braceCount++;
+            i += 2;
+        } else if (char === '}' && nextChar === '}') {
+            // Found }}
+            if (braceCount === 0) {
+                // This is the matching closing }}
+                return i;
+            } else {
+                // This is a nested closing }}, decrement count
+                braceCount--;
+                i += 2;
+            }
+        } else {
+            i++;
+        }
+    }
+
+    return -1; // No matching }} found
+}
+
 export function normalizeIndentation(content: string): string {
     const lines = content.split("\n");
     if (lines.length === 0) return content;

@@ -118,8 +118,8 @@ describe('Better-MDX Component Import Features', () => {
                 '# Component Header',
                 'This is rendered by a component',
                 '<content>',
-                '    This is the main content area.',
-                'It contains multiple lines of text.',
+                '  This is the main content area.',
+                '  It contains multiple lines of text.',
                 '</content>',
                 '</description>'
             )
