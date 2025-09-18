@@ -73,7 +73,7 @@ export async function processTemplate(
     );
 
     // Process conditional blocks first (they may contain interpolations)
-    processedContent = processConditionalBlocks(
+    processedContent = await processConditionalBlocks(
         processedContent,
         conditionalBlocks,
         interpolations,
@@ -94,7 +94,8 @@ export async function processTemplate(
         processedContent,
         ternaryExpressions,
         context,
-        errors
+        errors,
+        interpolations
     );
 
     // Process JSX expressions
@@ -108,6 +109,74 @@ export async function processTemplate(
     return processedContent;
 }
 
+export function processNestedInterpolations(
+    content: string,
+    interpolations: Array<{ placeholder: string; expression: string }>,
+): string {
+    let processedContent = content;
+    let startIndex = 0;
+
+    while (startIndex < processedContent.length) {
+        // Find the next {{ pattern
+        const openIndex = processedContent.indexOf('{{', startIndex);
+        if (openIndex === -1) break;
+
+        // Find the matching }} by counting nested braces
+        let braceCount = 0;
+        let closeIndex = openIndex + 2; // Start after {{
+
+        while (closeIndex < processedContent.length) {
+            const char = processedContent[closeIndex];
+            const nextChar = processedContent[closeIndex + 1];
+
+            if (char === '{' && nextChar === '{') {
+                // Found nested {{
+                braceCount++;
+                closeIndex += 2;
+            } else if (char === '}' && nextChar === '}') {
+                // Found }}
+                if (braceCount === 0) {
+                    // This is the matching closing }}
+                    break;
+                } else {
+                    // This is a nested closing }}, decrement count
+                    braceCount--;
+                    closeIndex += 2;
+                }
+            } else {
+                closeIndex++;
+            }
+        }
+
+        if (closeIndex >= processedContent.length) {
+            // No matching }} found, skip this one
+            startIndex = openIndex + 2;
+            continue;
+        }
+
+        // Extract the expression (everything between {{ and }})
+        const expression = processedContent.substring(openIndex + 2, closeIndex).trim();
+
+        if (expression) {
+            const placeholder = `__INTERPOLATION_${interpolations.length}__`;
+            interpolations.push({ placeholder, expression });
+
+            // Replace the entire {{ expression }} with the placeholder
+            processedContent = processedContent.substring(0, openIndex) +
+                placeholder +
+                processedContent.substring(closeIndex + 2);
+
+            // Update startIndex to continue from the placeholder
+            startIndex = openIndex + placeholder.length;
+        } else {
+            // Empty expression, skip
+            startIndex = closeIndex + 2;
+        }
+    }
+
+    return processedContent;
+}
+
 export function processTemplateContent(
     content: string,
     interpolations: Array<{ placeholder: string; expression: string }>,
@@ -115,15 +184,8 @@ export function processTemplateContent(
     ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>,
     jsxExpressions: Array<{ placeholder: string; expression: string }>,
 ): string {
-    // Process interpolations first
-    let processedContent = content.replace(
-        /\{\{\s*([^}]+)\s*\}\}/g,
-        (match, expression) => {
-            const placeholder = `__INTERPOLATION_${interpolations.length}__`;
-            interpolations.push({ placeholder, expression: expression.trim() });
-            return placeholder;
-        },
-    );
+    // Process interpolations first with support for nested interpolations
+    let processedContent = processNestedInterpolations(content, interpolations);
 
     // Process conditional blocks - handle multiline {condition && (content)}
     processedContent = processConditionalBlocksForParsing(
@@ -718,16 +780,18 @@ export function processInterpolations(
     return processedContent;
 }
 
-export function processConditionalBlocks(
+export async function processConditionalBlocks(
     content: string,
     conditionalBlocks: Array<{ condition: string; content: string }>,
     interpolations: Array<{ placeholder: string; expression: string }>,
     context: any,
     errors: string[]
-): string {
+): Promise<string> {
     let processedContent = content;
 
-    for (let i = 0; i < conditionalBlocks.length; i++) {
+    // Process conditionals in reverse order to handle nested conditionals correctly
+    // Inner conditionals (lower indices) need to be resolved before outer ones (higher indices)
+    for (let i = conditionalBlocks.length - 1; i >= 0; i--) {
         const block = conditionalBlocks[i];
         const placeholder = `__CONDITIONAL_${i}__`;
 
@@ -742,6 +806,8 @@ export function processConditionalBlocks(
 
                 // Normalize indentation within the conditional block
                 blockContent = normalizeIndentation(blockContent.trim());
+
+                // Process interpolations only - nested conditionals are handled by the main loop
                 blockContent = processInterpolations(blockContent, interpolations, context, errors);
             }
 
@@ -768,7 +834,8 @@ export function processTernaryExpressions(
     content: string,
     ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>,
     context: any,
-    errors: string[]
+    errors: string[],
+    interpolations: Array<{ placeholder: string; expression: string }> = []
 ): string {
     let processedContent = content;
 
@@ -798,22 +865,8 @@ export function processTernaryExpressions(
                 // Normalize indentation within the ternary value
                 processedValue = normalizeIndentation(processedValue);
 
-                // Extract interpolations from the ternary value
-                const ternaryInterpolations: Array<{ placeholder: string; expression: string }> = [];
-                processedValue = processedValue.replace(
-                    /\{\{\s*([^}]+)\s*\}\}/g,
-                    (match, expression) => {
-                        const interpolationPlaceholder = `__INTERPOLATION_${ternaryInterpolations.length}__`;
-                        ternaryInterpolations.push({
-                            placeholder: interpolationPlaceholder,
-                            expression: expression.trim()
-                        });
-                        return interpolationPlaceholder;
-                    }
-                );
-
-                // Process the interpolations found in the ternary value
-                processedValue = processInterpolations(processedValue, ternaryInterpolations, context, errors);
+                // Process interpolations using the main interpolations array
+                processedValue = processInterpolations(processedValue, interpolations, context, errors);
             }
 
             // Replace placeholder and normalize line spacing
@@ -837,12 +890,66 @@ export function processTernaryExpressions(
 
 export function evaluateExpression(expression: string, context: any): any {
     try {
+        // Check if this is a map expression with JSX-like syntax
+        if (expression.includes('.map(') && expression.includes('{{')) {
+            return evaluateMapExpressionWithJSX(expression, context);
+        }
+
         // Create function with safe context
         const func = new Function(...Object.keys(context), `return (${expression})`);
         return func(...Object.values(context));
     } catch (error) {
         throw new Error(`Expression evaluation failed: ${error}`);
     }
+}
+
+export function evaluateMapExpressionWithJSX(expression: string, context: any): string {
+    // Parse the map expression: items.map((item, index) => (\n    - {{ item }}\n))
+    const mapMatch = expression.match(/(\w+)\.map\(\(([^)]+)\)\s*=>\s*\(([^)]+)\)\)/);
+    if (!mapMatch) {
+        throw new Error(`Invalid map expression: ${expression}`);
+    }
+
+    const [, arrayName, params, elementExpr] = mapMatch;
+    const array = context[arrayName];
+
+    if (!Array.isArray(array)) {
+        throw new Error(`Expected array but got ${typeof array}`);
+    }
+
+    // Parse parameters (e.g., "item, index")
+    const paramNames = params.split(',').map(p => p.trim());
+
+    // Map over the array
+    const results = array.map((item, index) => {
+        // Create context for this iteration
+        const iterationContext = { ...context };
+        paramNames.forEach((paramName, paramIndex) => {
+            if (paramIndex === 0) iterationContext[paramName] = item;
+            if (paramIndex === 1) iterationContext[paramName] = index;
+        });
+
+        // Process the element expression which contains JSX-like syntax
+        // Replace {{ variable }} with actual values
+        let processedExpr = elementExpr;
+
+        // Find all {{ variable }} patterns and replace them
+        const interpolationRegex = /\{\{\s*([^}]+)\s*\}\}/g;
+        processedExpr = processedExpr.replace(interpolationRegex, (match, varName) => {
+            const trimmedVarName = varName.trim();
+            if (trimmedVarName in iterationContext) {
+                return iterationContext[trimmedVarName];
+            }
+            return match; // Keep original if variable not found
+        });
+
+        // Clean up the expression (remove extra whitespace, newlines)
+        processedExpr = processedExpr.trim().replace(/\n\s*/g, ' ');
+
+        return processedExpr;
+    });
+
+    return results.join('\n');
 }
 
 export function processEscapeSequences(content: string): string {
@@ -1325,7 +1432,7 @@ export async function renderComponent(compiled: CompiledMDX, context: RenderCont
         } else {
             // Fall back to single template processing for backward compatibility
             // Process conditional blocks first (they may contain interpolations)
-            processedContent = processConditionalBlocks(
+            processedContent = await processConditionalBlocks(
                 processedContent,
                 compiled.conditionalBlocks,
                 compiled.interpolations,
@@ -1346,7 +1453,8 @@ export async function renderComponent(compiled: CompiledMDX, context: RenderCont
                 processedContent,
                 compiled.ternaryExpressions || [],
                 fullContext,
-                errors
+                errors,
+                compiled.interpolations || []
             );
 
             // Process JSX elements first (like <Component prop={value} />) before expressions

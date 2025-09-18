@@ -1,0 +1,12 @@
+function TwoLevelNestedTest() {
+  const outer = true;
+  const inner = true;
+
+  return (
+    {outer && (
+      {inner && (
+        # Nested Content
+      )}
+    )}
+  )
+}

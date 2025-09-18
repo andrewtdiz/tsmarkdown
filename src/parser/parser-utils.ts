@@ -292,6 +292,42 @@ export function findMatchingBrace(content: string, startIndex: number): number {
   return -1; // No matching brace found
 }
 
+export function findMatchingParen(content: string, startIndex: number): number {
+  let parenCount = 0;
+  let inString = false;
+  let stringChar = '';
+
+  for (let i = startIndex; i < content.length; i++) {
+    const char = content[i];
+    const prevChar = i > 0 ? content[i - 1] : '';
+
+    // Handle string literals
+    if (!inString && (char === '"' || char === "'" || char === '`')) {
+      inString = true;
+      stringChar = char;
+      continue;
+    }
+
+    if (inString && char === stringChar && prevChar !== '\\') {
+      inString = false;
+      continue;
+    }
+
+    if (inString) continue;
+
+    // Count parentheses
+    if (char === '(') {
+      parenCount++;
+    } else if (char === ')') {
+      parenCount--;
+      if (parenCount === 0) {
+        return i;
+      }
+    }
+  }
+
+  return -1; // No matching parenthesis found
+}
 
 export function normalizeIndentation(content: string): string {
   const lines = content.split("\n");
@@ -321,21 +357,169 @@ export function normalizeIndentation(content: string): string {
 export function processConditionalBlocks(
   content: string,
   conditionalBlocks: Array<{ condition: string; content: string }>,
+  ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [],
+  interpolations: Array<{ placeholder: string; expression: string }> = [],
 ): string {
-  // Match conditional blocks with proper nesting
-  const conditionalRegex = /\{([^{}]+?)\s*&&\s*\(\s*([\s\S]*?)\s*\)\s*\}/g;
+  let processedContent = content;
+  let startIndex = 0;
 
-  return content.replace(
-    conditionalRegex,
-    (match, condition, blockContent) => {
+  while (startIndex < processedContent.length) {
+    const openBraceIndex = processedContent.indexOf('{', startIndex);
+    if (openBraceIndex === -1) break;
+
+    // Skip if it's a double brace {{ }}
+    if (processedContent[openBraceIndex + 1] === '{') {
+      startIndex = openBraceIndex + 2;
+      continue;
+    }
+
+    // Find the matching closing brace
+    const endIndex = findMatchingBrace(processedContent, openBraceIndex);
+    if (endIndex === -1) {
+      startIndex = openBraceIndex + 1;
+      continue;
+    }
+
+    const expression = processedContent.substring(openBraceIndex + 1, endIndex);
+    const trimmedExpression = expression.trim();
+
+    // Check if this is a conditional block (contains && and parentheses)
+    if (trimmedExpression.includes('&&') && trimmedExpression.includes('(') && trimmedExpression.includes(')')) {
+      // Look for the pattern: condition && (content)
+      // We need to find the && that comes right before the opening parenthesis
+      const andPattern = /&&\s*\(/;
+      const match = trimmedExpression.match(andPattern);
+
+      if (!match) {
+        startIndex = endIndex + 1;
+        continue;
+      }
+
+      const andIndex = match.index!;
+      const condition = trimmedExpression.substring(0, andIndex).trim();
+
+      // Find the opening parenthesis that comes after the &&
+      const parenStart = andIndex + match[0].length - 1; // -1 because we want the position of the (
+      if (parenStart === -1) {
+        startIndex = endIndex + 1;
+        continue;
+      }
+
+      // Find the matching closing parenthesis
+      const parenEnd = findMatchingParen(trimmedExpression, parenStart);
+      if (parenEnd === -1) {
+        startIndex = endIndex + 1;
+        continue;
+      }
+
+      const blockContent = trimmedExpression.substring(parenStart + 1, parenEnd).trim();
+
+      // Process any nested conditionals, ternary expressions, and interpolations within this block recursively
+      let processedBlockContent = blockContent;
+      if (blockContent.includes('{') && blockContent.includes('&&')) {
+        processedBlockContent = processConditionalBlocks(processedBlockContent, conditionalBlocks, ternaryExpressions, interpolations);
+      }
+      if (blockContent.includes('{') && blockContent.includes('?')) {
+        processedBlockContent = processTernaryExpressions(processedBlockContent, ternaryExpressions);
+      }
+      if (blockContent.includes('{{')) {
+        processedBlockContent = processedBlockContent.replace(
+          /\{\{\s*([^}]+)\s*\}\}/g,
+          (match, expression) => {
+            const placeholder = `__INTERPOLATION_${interpolations.length}__`;
+            interpolations.push({ placeholder, expression: expression.trim() });
+            return placeholder;
+          },
+        );
+      }
+
       const placeholder = `__CONDITIONAL_${conditionalBlocks.length}__`;
       conditionalBlocks.push({
-        condition: condition.trim(),
-        content: blockContent.trim(),
+        condition: condition,
+        content: processedBlockContent,
       });
-      return placeholder;
-    },
-  );
+
+      // Replace the entire conditional block with the placeholder
+      processedContent = processedContent.substring(0, openBraceIndex) +
+        placeholder +
+        processedContent.substring(endIndex + 1);
+
+      // Update startIndex to continue from the placeholder
+      startIndex = openBraceIndex + placeholder.length;
+    } else {
+      startIndex = endIndex + 1;
+    }
+  }
+
+  return processedContent;
+}
+
+export function processNestedInterpolations(
+  content: string,
+  interpolations: Array<{ placeholder: string; expression: string }>,
+): string {
+  let processedContent = content;
+  let startIndex = 0;
+
+  while (startIndex < processedContent.length) {
+    // Find the next {{ pattern
+    const openIndex = processedContent.indexOf('{{', startIndex);
+    if (openIndex === -1) break;
+
+    // Find the matching }} by counting nested braces
+    let braceCount = 0;
+    let closeIndex = openIndex + 2; // Start after {{
+
+    while (closeIndex < processedContent.length) {
+      const char = processedContent[closeIndex];
+      const nextChar = processedContent[closeIndex + 1];
+
+      if (char === '{' && nextChar === '{') {
+        // Found nested {{
+        braceCount++;
+        closeIndex += 2;
+      } else if (char === '}' && nextChar === '}') {
+        // Found }}
+        if (braceCount === 0) {
+          // This is the matching closing }}
+          break;
+        } else {
+          // This is a nested closing }}, decrement count
+          braceCount--;
+          closeIndex += 2;
+        }
+      } else {
+        closeIndex++;
+      }
+    }
+
+    if (closeIndex >= processedContent.length) {
+      // No matching }} found, skip this one
+      startIndex = openIndex + 2;
+      continue;
+    }
+
+    // Extract the expression (everything between {{ and }})
+    const expression = processedContent.substring(openIndex + 2, closeIndex).trim();
+
+    if (expression) {
+      const placeholder = `__INTERPOLATION_${interpolations.length}__`;
+      interpolations.push({ placeholder, expression });
+
+      // Replace the entire {{ expression }} with the placeholder
+      processedContent = processedContent.substring(0, openIndex) +
+        placeholder +
+        processedContent.substring(closeIndex + 2);
+
+      // Update startIndex to continue from the placeholder
+      startIndex = openIndex + placeholder.length;
+    } else {
+      // Empty expression, skip
+      startIndex = closeIndex + 2;
+    }
+  }
+
+  return processedContent;
 }
 
 export function processTemplateContent(
@@ -345,20 +529,15 @@ export function processTemplateContent(
   ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>,
   jsxExpressions: Array<{ placeholder: string; expression: string }>,
 ): string {
-  // Process interpolations first
-  let processedContent = content.replace(
-    /\{\{\s*([^}]+)\s*\}\}/g,
-    (match, expression) => {
-      const placeholder = `__INTERPOLATION_${interpolations.length}__`;
-      interpolations.push({ placeholder, expression: expression.trim() });
-      return placeholder;
-    },
-  );
+  // Process interpolations first with support for nested interpolations
+  let processedContent = processNestedInterpolations(content, interpolations);
 
   // Process conditional blocks - handle multiline {condition && (content)}
   processedContent = processConditionalBlocks(
     processedContent,
     conditionalBlocks,
+    ternaryExpressions,
+    interpolations,
   );
 
   // Process ternary expressions - handle {condition ? trueValue : falseValue}

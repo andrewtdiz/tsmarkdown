@@ -1,0 +1,17 @@
+function ComplexTest() {
+  const items = ['Apple', 'Banana', 'Cherry'];
+  const user = { name: 'Alice', age: 30 };
+
+  return (
+    # User: {{ user.name }}
+
+    Age: {{ user.age }}
+
+    Items:
+    {{ items.map((item, index) => (
+        - {{ item }}
+    ))}}
+
+    Item count: {{ items.length }}
+  )
+}
