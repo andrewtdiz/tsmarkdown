@@ -45,8 +45,7 @@ describe('Better-MDX Exact Core Features', () => {
             mdxContent
         )
             .expectExactLines(
-                '# Test',
-                '',
+                '# Test'
             )
             .build();
 

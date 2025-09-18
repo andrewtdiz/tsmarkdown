@@ -4,7 +4,35 @@ export function extractDependencies(imports: string[]): string[] {
     const dependencies: string[] = [];
 
     for (const importLine of imports) {
-        // Extract component names from import statements
+        // Check if this is a TypeScript module import (ends with .ts, .tsx, .js, .jsx)
+        const modulePathMatch = importLine.match(/from\s*['"]([^'"]+)['"]/);
+        if (modulePathMatch) {
+            const modulePath = modulePathMatch[1];
+
+            // Skip TypeScript/JavaScript module imports - these are handled by the TypeScript runtime
+            if (modulePath.endsWith('.ts') || modulePath.endsWith('.tsx') ||
+                modulePath.endsWith('.js') || modulePath.endsWith('.jsx') ||
+                modulePath.endsWith('.json') || modulePath.endsWith('.yaml') ||
+                modulePath.endsWith('.yml') || modulePath.endsWith('.css') ||
+                modulePath.endsWith('.md') || modulePath.endsWith('.txt')) {
+                continue; // Skip TypeScript/asset imports
+            }
+
+            // Prohibit MDX imports
+            if (modulePath.endsWith('.mdx')) {
+                throw new Error('Cannot import MDX files directly. Use TypeScript entry points instead.');
+            }
+
+            // Skip imports without extensions - they will be resolved by the TypeScript runtime
+            // and could potentially resolve to TypeScript files
+            // Check if the path doesn't end with a file extension
+            const hasFileExtension = /\.\w+$/.test(modulePath);
+            if (!hasFileExtension) {
+                continue; // Skip imports without extensions
+            }
+        }
+
+        // Only extract dependencies for non-TypeScript imports (legacy component system)
         const defaultMatch = importLine.match(/import\s+(\w+)\s+from/);
         if (defaultMatch) {
             dependencies.push(defaultMatch[1]);

@@ -7,8 +7,8 @@ function TestComponent() {
     Name: {{ user.name }}
     Points: {{ user.points }}
 
-    {showRewards && (
+    {{showRewards && (
         🎉 Congratulations {{ user.name }}! You've reached {{ user.level }} level!
-    )}
+    )}}
     )
 }

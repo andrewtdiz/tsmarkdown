@@ -2,8 +2,8 @@ function TestComponent() {
     const user = { name: 'Alice', isVip: true };
 
     return (
-        {user.isVip && (
+        {{user.isVip && (
             Welcome VIP member {{ user.name }}!
-        )}
+        )}}
     )
 }

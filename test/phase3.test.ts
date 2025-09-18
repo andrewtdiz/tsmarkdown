@@ -302,9 +302,9 @@ function TestComponent() {
     # User Profile
     Name: {{ user.name }}
 
-    {user.isVip && (
+    {{user.isVip && (
       🌟 VIP Member!
-    )}
+    )}}
   )}`;
 
       // Test compilation

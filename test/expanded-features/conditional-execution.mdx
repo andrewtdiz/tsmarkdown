@@ -3,11 +3,11 @@ function TestComponent() {
     const showWarning = false;
 
     return (
-        {showGreeting && (
+        {{showGreeting && (
             Hello there!
-        )}
-        {showWarning && (
+        )}}
+        {{showWarning && (
             Warning message
-        )}
+        )}}
     )
 }

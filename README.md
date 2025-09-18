@@ -27,7 +27,6 @@ bun add better-mdx
 
 ```mdx
 // Welcome.mdx
-import { Button } from './components/Button';
 
 function Welcome() {
   const appName = 'My App';

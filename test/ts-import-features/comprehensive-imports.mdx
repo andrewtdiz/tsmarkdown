@@ -1,0 +1,13 @@
+import defaultExport from './fixtures/comprehensive';
+import { namedExport } from './fixtures/comprehensive';
+import * as namespaceExport from './fixtures/comprehensive';
+
+function ComprehensiveImports() {
+  return (
+    # Comprehensive Import Test
+    
+    Default: {{ defaultExport }}
+    Named: {{ namedExport }}
+    Namespace: {{ namespaceExport.namespaceValue }}
+  );
+}

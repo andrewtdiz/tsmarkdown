@@ -8,12 +8,12 @@ function MultipleComponentsNoSpacing() {
 
   return (
     <@Header />
-    { someTrueCondition && (
+    {{ someTrueCondition && (
       <@Content />
-    )}
-    { someFalseCondition && (
+    )}}
+    {{ someFalseCondition && (
       Don't render me!
-    )}
+    )}}
     <@Footer />
   )
 }

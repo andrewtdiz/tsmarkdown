@@ -1,0 +1,21 @@
+{
+    "title": "Complex Configuration",
+    "items": [
+        {
+            "name": "item1",
+            "value": 10
+        },
+        {
+            "name": "item2",
+            "value": 20
+        },
+        {
+            "name": "item3",
+            "value": 30
+        }
+    ],
+    "metadata": {
+        "version": "1.0.0",
+        "lastUpdated": "2024-01-01"
+    }
+}

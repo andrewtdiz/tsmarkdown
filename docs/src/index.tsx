@@ -37,7 +37,7 @@ const server = serve({
       });
     },
 
-    "/api/markdoc": {
+    "/api/content": {
       async GET(req) {
         const url = new URL(req.url);
         const path = url.searchParams.get('path') || '/welcome';
@@ -48,22 +48,8 @@ const server = serve({
           return Response.json({ error: 'Content not found' }, { status: 404 });
         }
 
-        const config = {
-          tags: {
-            callout
-          },
-          nodes: {
-            heading
-          },
-          variables: {
-            frontmatter: content.frontmatter
-          }
-        };
-
-        const transformedContent = Markdoc.transform(content.ast, config);
-
+        // Only return raw markdown content and frontmatter
         return Response.json({
-          content: transformedContent,
           frontmatter: content.frontmatter,
           rawContent: content.rawContent
         });

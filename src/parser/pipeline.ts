@@ -14,11 +14,8 @@ export function parseContent(content: string, context: ParseContext): string {
 
     let processed = protectedContent;
 
-    // Apply the unified double-brace dispatcher
-    // This now handles all dynamic constructs (interpolations, conditionals, ternaries, JSX)
     processed = parseInterpolations(processed, context);
 
-    // Finally, restore the protected code blocks
     processed = restoreCodeBlocks(processed, codeBlocks);
 
     return processed;

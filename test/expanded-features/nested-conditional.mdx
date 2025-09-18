@@ -3,11 +3,11 @@ function TestComponent() {
     const hasPermission = false;
 
     return (
-    {isLoggedIn && (
+    {{isLoggedIn && (
         Welcome back!
-    )}
-    {hasPermission && (
+    )}}
+    {{hasPermission && (
         You have admin access.
-    )}
+    )}}
     )
 }

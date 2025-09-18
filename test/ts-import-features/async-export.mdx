@@ -1,0 +1,11 @@
+import { getAsyncData } from './fixtures/async-helper';
+
+async function AsyncExport() {
+  const result = await getAsyncData();
+  
+  return (
+    # Async Export Test
+    
+    Async result: {{ result }}
+  );
+}

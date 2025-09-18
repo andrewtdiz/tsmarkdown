@@ -82,13 +82,15 @@ export async function processConditionalBlocks(
 
             // Replace placeholder with more intelligent handling of empty lines
             if (!blockContent.trim()) {
-                // False condition - remove the placeholder and any trailing newline
-                // This prevents empty lines from being created by false conditions
-                const placeholderRegex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\n?', 'g');
-                processedContent = processedContent.replace(placeholderRegex, '');
+                // False condition - remove the placeholder and clean up any extra newlines
+                // Check if the placeholder is on its own line and remove the entire line
+                const lines = processedContent.split('\n');
+                const updatedLines = lines.filter(line => !line.includes(placeholder));
+                processedContent = updatedLines.join('\n');
             } else {
-                // True condition - simple replacement
-                processedContent = processedContent.replace(placeholder, blockContent);
+                // True condition - trim trailing newlines from block content to prevent extra spacing
+                const trimmedBlockContent = blockContent.replace(/\n+$/, '');
+                processedContent = processedContent.replace(placeholder, trimmedBlockContent);
             }
         } catch (error) {
             errors.push(`Condition error in "${block.condition}": ${error}`);
@@ -221,6 +223,35 @@ export function evaluateMapExpressionWithJSX(expression: string, context: any): 
     return results.join('\n');
 }
 
+// Helper function to get the indentation of a JSX element in the template
+function getJSXElementIndentation(content: string, jsxMatch: string): string {
+    const lines = content.split('\n');
+
+    for (const line of lines) {
+        if (line.includes(jsxMatch)) {
+            const indentMatch = line.match(/^(\s*)/);
+            return indentMatch ? indentMatch[1] : '';
+        }
+    }
+
+    return '';
+}
+
+// Helper function to apply indentation to all lines of content
+function applyIndentationToAllLines(content: string, indentation: string): string {
+    if (!indentation || !content) return content;
+
+    const lines = content.split('\n');
+    return lines.map((line, index) => {
+        // Don't indent empty lines
+        if (line.trim() === '') return line;
+        // The first line doesn't need indentation since it replaces the JSX element
+        if (index === 0) return line;
+        // Apply indentation to subsequent lines
+        return indentation + line;
+    }).join('\n');
+}
+
 // Helper function to detect the indentation of a JSX element relative to its parent XML tag
 export function detectParentIndentation(content: string, jsxMatch: string): string {
     const lines = content.split('\n');
@@ -265,15 +296,7 @@ export function detectParentIndentation(content: string, jsxMatch: string): stri
         }
     }
 
-    // Calculate relative indentation
-    if (parentIndentation.length > 0 && jsxIndentation.length > 0) {
-        // Calculate the relative indentation between the JSX element and its parent
-        const relativeIndent = jsxIndentation.length - parentIndentation.length;
-        if (relativeIndent > 0) {
-            return ' '.repeat(relativeIndent);
-        }
-    }
-
+    // Return the absolute indentation of the JSX element
     return jsxIndentation;
 }
 
@@ -305,10 +328,14 @@ export async function processJSXElements(
     // Second pass: process each JSX element
     for (const jsxElement of jsxElements) {
         try {
-            // Detect the parent indentation for this JSX element
-            const parentIndentation = detectParentIndentation(content, jsxElement.match);
-            const rendered = await renderJSXElement(jsxElement, jsxExpressions, context, originalProps, parentIndentation);
-            processedContent = processedContent.replace(jsxElement.match, rendered);
+            // Don't apply parent indentation since the template replacement will preserve existing indentation
+            const rendered = await renderJSXElement(jsxElement, jsxExpressions, context, originalProps, '');
+
+            // Apply template indentation to all lines of the rendered content
+            const templateIndentation = getJSXElementIndentation(processedContent, jsxElement.match);
+            const indentedRendered = applyIndentationToAllLines(rendered, templateIndentation);
+
+            processedContent = processedContent.replace(jsxElement.match, indentedRendered);
         } catch (error) {
             errors.push(`JSX element error in "${jsxElement.match}": ${error}`);
             processedContent = processedContent.replace(jsxElement.match, `<${jsxElement.componentName}:ERROR>`);
@@ -893,11 +920,6 @@ export async function renderJSXElement(
                 const indentedLines = lines.map((line, index) => {
                     // Don't indent empty lines
                     if (line.trim() === '') return line;
-
-                    // Check if the line already has the correct indentation to avoid double-indenting
-                    if (line.startsWith(parentIndentation)) {
-                        return line; // Already has correct indentation
-                    }
 
                     // Apply parent indentation to non-empty lines
                     return parentIndentation + line;

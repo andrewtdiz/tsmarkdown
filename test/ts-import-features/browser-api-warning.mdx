@@ -1,0 +1,11 @@
+import { useBrowserAPI } from './fixtures/browser-api';
+
+function BrowserApiWarning() {
+  const result = useBrowserAPI();
+  
+  return (
+    # Browser API Warning Test
+    
+    Result: {{ result }}
+  );
+}

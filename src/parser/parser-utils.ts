@@ -1,5 +1,7 @@
 // Re-exports from modular parser architecture
 import type { ParseContext } from './types';
+import { parseContent } from './pipeline';
+import { processJSXElements } from './jsx';
 
 // Core pipeline and types
 export type { ParseContext } from './types';
@@ -31,10 +33,6 @@ export function processTemplateContent(
     ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>,
     jsxExpressions: Array<{ placeholder: string; expression: string }>,
 ): string {
-    // Import the functions we need
-    const { parseContent } = require('./pipeline');
-    const { processJSXElements } = require('./jsx');
-
     // Create unified parsing context
     const context: ParseContext = {
         interpolations,

@@ -1,4 +1,6 @@
 import matter from 'gray-matter';
+import Markdoc from '@markdoc/markdoc';
+import { markdocConfig } from './markdoc-config';
 
 export interface ContentData {
     content: any;
@@ -6,32 +8,79 @@ export interface ContentData {
     rawContent: string;
 }
 
-// Synchronous version for when content is pre-loaded
-export function loadMarkdownContentSync(path: string): ContentData {
+// Global content cache
+let contentCache: Record<string, ContentData> = {};
+let cacheInitialized = false;
+
+// Initialize content cache by loading all content
+async function initializeContentCache() {
+    if (cacheInitialized) return;
+
+    const paths = [
+        '/welcome',
+        '/about',
+        '/component-examples',
+        '/first-mdx',
+        '/frontmatter-examples',
+        '/installation',
+        '/overview',
+        '/quick-start',
+        '/test-markdoc-rendering'
+    ];
+
     try {
-        // Remove leading slash and convert to file path
-        const filePath = path === '/' ? 'welcome.md' : path.slice(1) + '.md';
+        const promises = paths.map(async (path) => {
+            const url = typeof window !== 'undefined'
+                ? `/api/content?path=${encodeURIComponent(path)}`
+                : `http://localhost:3000/api/content?path=${encodeURIComponent(path)}`;
+            const response = await fetch(url);
+            if (response.ok) {
+                const data = await response.json();
 
-        // For synchronous loading, we'll need to use a different approach
-        // This assumes content is available in a global object or imported statically
-        const contentMap = (window as any).__CONTENT_MAP__ || {};
-        const fileContent = contentMap[filePath];
+                // Parse and transform markdown on client side
+                const ast = Markdoc.parse(data.rawContent);
+                const content = Markdoc.transform(ast, {
+                    ...markdocConfig,
+                    variables: {
+                        frontmatter: data.frontmatter
+                    }
+                });
 
-        if (!fileContent) {
-            throw new Error(`Content not found: ${path}`);
-        }
+                contentCache[path] = {
+                    content,
+                    frontmatter: data.frontmatter,
+                    rawContent: data.rawContent
+                };
+            }
+        });
 
-        const { data: frontmatter, content: markdownContent } = matter(fileContent);
-
-        return {
-            content: null, // Will be set by Markdoc parsing
-            frontmatter,
-            rawContent: markdownContent
-        };
+        await Promise.all(promises);
+        cacheInitialized = true;
+        console.log('✅ Content cache initialized with', Object.keys(contentCache).length, 'documents');
     } catch (error) {
-        throw new Error(`Failed to load content for path: ${path}`);
+        console.error('❌ Error initializing content cache:', error);
     }
 }
+
+// Synchronous version using pre-loaded content cache
+export function loadMarkdownContentSync(path: string): ContentData {
+    // Handle root path
+    const contentPath = path === '/' ? '/welcome' : path;
+
+    if (!cacheInitialized) {
+        throw new Error('Content cache not initialized. Call initializeContentCache() first.');
+    }
+
+    const content = contentCache[contentPath];
+    if (!content) {
+        throw new Error(`Content not found: ${path}`);
+    }
+
+    return content;
+}
+
+// Export the initialization function
+export { initializeContentCache };
 
 // Keep the async version for backward compatibility
 export async function loadMarkdownContent(path: string): Promise<ContentData> {
@@ -69,6 +118,7 @@ export function getAvailableContentPaths(): string[] {
         '/frontmatter-examples',
         '/installation',
         '/overview',
-        '/quick-start'
+        '/quick-start',
+        '/test-markdoc-rendering'
     ];
 }

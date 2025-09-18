@@ -15,12 +15,14 @@
   "license": "MIT",
   "devDependencies": {
     "@types/bun": "^1.2.22",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0"
   },
   "dependencies": {
     "@types/react": "^19.1.13",
     "commander": "^11.0.0",
+    "js-yaml": "^4.1.0",
     "marked": "^12.0.0",
     "react": "^19.1.1"
   }

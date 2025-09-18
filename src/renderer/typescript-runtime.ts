@@ -9,7 +9,7 @@ export async function executeTypeScript(typescript: string, context: RenderConte
     try {
         // Extract imports and resolve them
         const imports = extractImports(typescript);
-        const resolvedImports = await resolveImports(imports);
+        const resolvedImports = await resolveImports(imports, context.basePath, context.aliasMap);
 
         // Create a safe execution environment with resolved imports
         const safeContext = createSafeContext(context, typescript, resolvedImports);
@@ -86,19 +86,21 @@ export function extractImports(code: string): string[] {
     return imports;
 }
 
-export async function resolveImports(imports: string[]): Promise<any> {
+export async function resolveImports(imports: string[], basePath?: string, aliasMap?: Record<string, string>): Promise<any> {
     const resolvedImports: any = {};
 
     for (const importLine of imports) {
         try {
-            // Parse the import statement
-            const importMatch = importLine.match(/import\s*\{\s*([^}]+)\s*\}\s*from\s*['"]([^'"]+)['"]/);
-            if (importMatch) {
-                const [, namedImports, modulePath] = importMatch;
+            // Parse the import statement - handle both named and default imports
+            const namedImportMatch = importLine.match(/import\s*\{\s*([^}]+)\s*\}\s*from\s*['"]([^'"]+)['"]/);
+            const defaultImportMatch = importLine.match(/import\s+(\w+)\s+from\s*['"]([^'"]+)['"]/);
+
+            if (namedImportMatch) {
+                const [, namedImports, modulePath] = namedImportMatch;
                 const importNames = namedImports.split(',').map(name => name.trim());
 
                 // Resolve the module path
-                const resolvedModule = await resolveModule(modulePath);
+                const resolvedModule = await resolveModule(modulePath, basePath, aliasMap);
                 if (resolvedModule) {
                     // Add each named import to the resolved imports
                     for (const importName of importNames) {
@@ -106,6 +108,15 @@ export async function resolveImports(imports: string[]): Promise<any> {
                             resolvedImports[importName] = resolvedModule[importName];
                         }
                     }
+                }
+            } else if (defaultImportMatch) {
+                const [, importName, modulePath] = defaultImportMatch;
+
+                // Resolve the module path
+                const resolvedModule = await resolveModule(modulePath, basePath, aliasMap);
+                if (resolvedModule) {
+                    // For default imports, use the default export or the entire module
+                    resolvedImports[importName] = resolvedModule.default || resolvedModule;
                 }
             }
         } catch (error) {
@@ -116,18 +127,46 @@ export async function resolveImports(imports: string[]): Promise<any> {
     return resolvedImports;
 }
 
-export async function resolveModule(modulePath: string): Promise<any> {
+export async function resolveModule(modulePath: string, basePath?: string, aliasMap?: Record<string, string>): Promise<any> {
     try {
+        // Handle alias resolution first
+        if (aliasMap) {
+            for (const [alias, aliasPath] of Object.entries(aliasMap)) {
+                if (modulePath.startsWith(alias)) {
+                    // Replace the alias with the actual path
+                    const remainingPath = modulePath.slice(alias.length);
+                    const resolvedPath = aliasPath + remainingPath;
+                    // Recursively resolve the aliased path
+                    return await resolveModule(resolvedPath, basePath, aliasMap);
+                }
+            }
+        }
+
         // Handle relative imports
         if (modulePath.startsWith('./') || modulePath.startsWith('../')) {
-            // For now, we'll use a simple require approach
-            // In a real implementation, you might want to use dynamic imports
+            // Resolve relative to basePath if provided
+            const resolvedBasePath = basePath ? path.resolve(basePath) : process.cwd();
 
-            const possibleExtensions = ['.ts', '.js', '.mjs'];
+            // Try with explicit extension first
+            if (modulePath.endsWith('.ts') || modulePath.endsWith('.js') || modulePath.endsWith('.tsx') || modulePath.endsWith('.jsx')) {
+                const fullPath = path.resolve(resolvedBasePath, modulePath);
+                try {
+                    if (await Bun.file(fullPath).exists()) {
+                        // Use require to load the module
+                        delete require.cache[require.resolve(fullPath)];
+                        return require(fullPath);
+                    }
+                } catch (error) {
+                    // Continue to extension search
+                }
+            }
+
+            // Try with different extensions in order: .tsx, .ts, .js, .jsx
+            const possibleExtensions = ['.tsx', '.ts', '.js', '.jsx'];
             let resolvedPath = null;
 
             for (const ext of possibleExtensions) {
-                const fullPath = path.resolve(modulePath + ext);
+                const fullPath = path.resolve(resolvedBasePath, modulePath + ext);
                 try {
                     if (await Bun.file(fullPath).exists()) {
                         resolvedPath = fullPath;

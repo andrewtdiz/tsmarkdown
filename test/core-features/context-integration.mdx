@@ -2,12 +2,12 @@ function ContextTest() {
   const { user, isLoggedIn } = useAuth();
 
   return (
-    {isLoggedIn && (
+    {{isLoggedIn && (
       Welcome back, {{ user.name }}!
-    )}
+    )}}
 
-    {!isLoggedIn && (
+    {{!isLoggedIn && (
       Please log in.
-    )}
+    )}}
   )
 }

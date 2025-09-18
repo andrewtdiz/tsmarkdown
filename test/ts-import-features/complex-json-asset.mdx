@@ -1,0 +1,11 @@
+import complexData from './fixtures/complex.json';
+
+function ComplexJsonAsset() {
+  return (
+    # Complex JSON Asset
+    
+    Title: {{ complexData.title }}
+    Count: {{ complexData.items.length }}
+    First Item: {{ complexData.items[0].name }}
+  );
+}

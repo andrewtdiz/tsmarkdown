@@ -1,0 +1,11 @@
+import { processData } from './fixtures/helper.ts';
+
+function RelativeTsImport() {
+  const result = processData('Hello World');
+  
+  return (
+    # TypeScript Helper Result
+    
+    Processed data: {{ result }}
+  );
+}

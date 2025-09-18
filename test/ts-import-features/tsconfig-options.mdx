@@ -1,0 +1,11 @@
+import { checkStrictMode } from './fixtures/tsconfig-module';
+
+function TsconfigOptions() {
+  const strictApplied = checkStrictMode();
+  
+  return (
+    # TypeScript Config Test
+    
+    Config applied: {{ strictApplied }}
+  );
+}

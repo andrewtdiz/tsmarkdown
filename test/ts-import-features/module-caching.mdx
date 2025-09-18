@@ -1,0 +1,13 @@
+import { getCachedValue } from './fixtures/cache';
+
+function ModuleCaching() {
+  const first = getCachedValue();
+  const second = getCachedValue();
+  
+  return (
+    # Module Caching Test
+    
+    First call: {{ first }}
+    Second call: {{ second }}
+  );
+}

@@ -7,7 +7,6 @@ import { PageActions } from './PageActions';
 import { sidebar } from '../sidebar';
 import markdownComponents from './markdown';
 import { loadMarkdownContentSync } from '../lib/content-loader';
-import { parseAndTransformMarkdown } from '../lib/markdoc-config';
 
 export function DocumentationLayout() {
     const location = useLocation();
@@ -24,8 +23,7 @@ export function DocumentationLayout() {
 
         try {
             // Load and process content synchronously
-            const { frontmatter, rawContent } = loadMarkdownContentSync(currentPath);
-            const { content } = parseAndTransformMarkdown(rawContent, frontmatter);
+            const { frontmatter, rawContent, content } = loadMarkdownContentSync(currentPath);
 
             // Update document title
             if (frontmatter?.title) {

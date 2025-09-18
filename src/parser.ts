@@ -80,15 +80,16 @@ export function parseMDX(content: string): ParsedMDX {
     }
 
     if (inReturn) {
-      // Check if this line contains the closing parenthesis of the return statement
-      const trimmedLine = line.trim();
-      if (trimmedLine === ")" && braceLevel === 0) {
-        break; // This is the end of the return statement
-      }
-
+      // Count braces first to get accurate brace level
       for (const char of line) {
         if (char === "{") braceLevel++;
         if (char === "}") braceLevel--;
+      }
+
+      // Check if this line contains the closing parenthesis of the return statement
+      const trimmedLine = line.trim();
+      if ((trimmedLine === ")" || trimmedLine === ");") && braceLevel === 0) {
+        break; // This is the end of the return statement
       }
 
       if (braceLevel < 0) {

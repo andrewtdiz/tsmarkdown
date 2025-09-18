@@ -1,0 +1,10 @@
+import config from './fixtures/config.yaml';
+
+function YamlImport() {
+  return (
+    # YAML Import Test
+    
+    Title: {{ config.title }}
+    Enabled: {{ config.enabled }}
+  );
+}
