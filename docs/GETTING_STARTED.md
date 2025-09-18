@@ -62,6 +62,10 @@ function Welcome() {
 
     Welcome to Better-MDX - the future of content creation.
 
+    <tone>
+    Be kind
+    </tone>
+
     {isExcited && (
       ## 🎉 Why You'll Love Better-MDX
 
@@ -72,7 +76,9 @@ function Welcome() {
 
     ## Key Features
 
-    {{ features.map((feature, index) => `${index + 1}. **${feature}**`).join('\n') }}
+    {{ features.map((feature, index) => (
+      {{index + 1}}. **{{feature}}**
+    ))}}
 
     ---
 
