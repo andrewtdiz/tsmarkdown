@@ -1400,10 +1400,10 @@ export async function renderJSXComponent(jsxElement: string, context: any): Prom
                 const componentContent = readFileSync(componentPath, 'utf-8');
                 const parsed = parseMDX(componentContent);
                 const compiled = compile(parsed);
-
+                
                 // Register the component for future use
                 componentRegistry[componentName] = compiled;
-
+                
                 // Render the component
                 const mergedProps = mergePropsWithDefaults(propValues, compiled);
                 const componentResult = await renderComponent(compiled, {}, mergedProps);
