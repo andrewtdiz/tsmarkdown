@@ -3,8 +3,8 @@ import type { ParseContext } from './types';
 import { parseContent } from './pipeline';
 import { processJSXElements } from './jsx';
 
-// ESLint integration (opt-in)
-import { parseForESLint, validateForESLint, extractTypeInfo, analyzeReturnStatements } from './eslint-parser';
+// TypeScript parser integration (replaces ESLint parser)
+import { parseWithTypeScript, validateWithTypeScript, extractTypeInfo, analyzeReturnStatements, extractParametersFromAST, extractExportedFunctions } from './typescript-parser';
 import { locateComponent, splitComponent, validateComponentStructure } from './component-scanner';
 
 // Core pipeline and types
@@ -54,10 +54,14 @@ export function processTemplateContent(
     return processed;
 }
 
-// ESLint integration exports (opt-in functionality)
-export { parseForESLint, validateForESLint, extractTypeInfo, analyzeReturnStatements } from './eslint-parser';
+// TypeScript parser integration exports (replaces ESLint parser)
+export { parseWithTypeScript, validateWithTypeScript, extractTypeInfo, analyzeReturnStatements, extractParametersFromAST, extractExportedFunctions } from './typescript-parser';
 export { locateComponent, splitComponent, validateComponentStructure } from './component-scanner';
 
-// ESLint integration types
-export type { ESLintParseResult, ESLintParseOptions } from './eslint-parser';
+// TypeScript parser types
+export type { TypeScriptParseResult, TypeScriptParseOptions } from './typescript-parser';
 export type { ComponentSplit, ComponentLocation } from './component-scanner';
+
+// Legacy compatibility - maintain ESLint parser interface for backward compatibility
+export { parseWithTypeScript as parseForESLint, validateWithTypeScript as validateForESLint } from './typescript-parser';
+export type { TypeScriptParseResult as ESLintParseResult, TypeScriptParseOptions as ESLintParseOptions } from './typescript-parser';

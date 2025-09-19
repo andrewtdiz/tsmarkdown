@@ -1,12 +1,12 @@
 import { test, expect, describe } from 'bun:test';
 import { createExactMDXTest, ExactMDXTestRunner } from '../../src/exact-testing-utilities';
-import { parseForESLint, validateComponentStructure, extractTypeInfo, analyzeReturnStatements } from '../../src/parser/parser-utils';
+import { parseWithTypeScript, validateComponentStructure, extractTypeInfo, analyzeReturnStatements } from '../../src/parser/parser-utils';
 
-describe('ESLint Typescript integration', () => {
+describe('TypeScript Parser integration', () => {
     const runner = new ExactMDXTestRunner();
 
     describe('Should do simple type checking', () => {
-        test('should validate component structure for ESLint', async () => {
+        test('should validate component structure for TypeScript parser', async () => {
             const mdx = await Bun.file(import.meta.dir + '/simple-component.mdx').text();
 
             const validation = validateComponentStructure(mdx);
@@ -16,20 +16,20 @@ describe('ESLint Typescript integration', () => {
             expect(validation.split?.markdownBody).toContain('Admin panel access');
         });
 
-        test('should parse component for ESLint AST', async () => {
+        test('should parse component for TypeScript AST', async () => {
             const mdx = await Bun.file(import.meta.dir + '/simple-component.mdx').text();
 
-            const parseResult = parseForESLint(mdx, {
+            const parseResult = parseWithTypeScript(mdx, {
                 includeMarkdownStub: true,
                 fileName: 'simple-component.mdx'
             });
 
             expect(parseResult.success).toBe(true);
             expect(parseResult.ast).toBeDefined();
-            expect(parseResult.ast?.type).toBe('Program');
-            expect(parseResult.ast?.body?.length).toBe(1);
-            expect(parseResult.ast?.body?.[0]?.type).toBe('FunctionDeclaration');
-            expect(parseResult.ast?.body?.[0]?.id?.name).toBe('TestComponent');
+            expect(parseResult.ast?.kind).toBe(308); // TypeScript SyntaxKind.SourceFile = 308
+            expect(parseResult.ast?.statements?.length).toBe(1);
+            expect(parseResult.ast?.statements?.[0]?.kind).toBe(263); // TypeScript SyntaxKind.FunctionDeclaration = 263
+            expect((parseResult.ast?.statements?.[0] as any)?.name?.text).toBe('TestComponent');
         });
 
         test('should extract type information', async () => {
@@ -41,7 +41,7 @@ describe('ESLint Typescript integration', () => {
             expect(typeInfo.interfaces).toEqual([]);
         });
 
-        test('should run existing MDX test with ESLint validation', async () => {
+        test('should run existing MDX test with TypeScript parser validation', async () => {
             const mdx = await Bun.file(import.meta.dir + '/simple-component.mdx').text();
 
             const validation = validateComponentStructure(mdx);
@@ -83,10 +83,10 @@ describe('ESLint Typescript integration', () => {
             expect(validation.split?.tsPrelude).toContain('const user: User');
         });
 
-        test('should parse typed component for ESLint', async () => {
+        test('should parse typed component for TypeScript parser', async () => {
             const mdx = await Bun.file(import.meta.dir + '/typed-component.mdx').text();
 
-            const parseResult = parseForESLint(mdx, {
+            const parseResult = parseWithTypeScript(mdx, {
                 includeMarkdownStub: true,
                 fileName: 'typed-component.mdx'
             });
@@ -95,7 +95,7 @@ describe('ESLint Typescript integration', () => {
             expect(parseResult.ast).toBeDefined();
         });
 
-        test('should demonstrate ESLint integration with TypeScript', async () => {
+        test('should demonstrate TypeScript parser integration', async () => {
             const mdx = await Bun.file(import.meta.dir + '/typed-component.mdx').text();
 
             const validation = validateComponentStructure(mdx);
@@ -105,7 +105,7 @@ describe('ESLint Typescript integration', () => {
             expect(validation.split?.tsPrelude).toContain('type UserRole');
             expect(validation.split?.tsPrelude).toContain('const user: User');
 
-            const parseResult = parseForESLint(mdx, {
+            const parseResult = parseWithTypeScript(mdx, {
                 includeMarkdownStub: true,
                 fileName: 'typed-component.mdx'
             });
@@ -121,7 +121,7 @@ describe('ESLint Typescript integration', () => {
 
     describe('Should handle multiple returns', () => {
 
-        test('should validate component structure for ESLint', async () => {
+        test('should validate component structure for TypeScript parser', async () => {
             const mdx = await Bun.file(import.meta.dir + '/multiple-returns.mdx').text();
 
             const validation = validateComponentStructure(mdx);
@@ -134,7 +134,7 @@ describe('ESLint Typescript integration', () => {
             const validation = validateComponentStructure(mdx);
             expect(validation.isValid).toBe(true);
 
-            // Analyze return statements using ESLint AST
+            // Analyze return statements using TypeScript AST
             const returnAnalysis = analyzeReturnStatements(mdx);
             expect(returnAnalysis.success).toBe(true);
             const expectedReturns = 2;
@@ -171,7 +171,7 @@ describe('ESLint Typescript integration', () => {
             const validation = validateComponentStructure(mdx);
             expect(validation.isValid).toBe(true);
 
-            // Analyze return statements using ESLint AST
+            // Analyze return statements using TypeScript AST
             const returnAnalysis = analyzeReturnStatements(mdx);
             expect(returnAnalysis.success).toBe(true);
             const expectedReturns = 4;
@@ -184,7 +184,7 @@ describe('ESLint Typescript integration', () => {
             const validation = validateComponentStructure(mdx);
             expect(validation.isValid).toBe(true);
 
-            // Analyze return statements using ESLint AST
+            // Analyze return statements using TypeScript AST
             const returnAnalysis = analyzeReturnStatements(mdx);
             expect(returnAnalysis.success).toBe(true);
             const expectedReturns = 6;
@@ -226,7 +226,7 @@ describe('ESLint Typescript integration', () => {
                 const validation = validateComponentStructure(mdx);
                 expect(validation.isValid).toBe(true);
 
-                // Analyze return statements using ESLint AST
+                // Analyze return statements using TypeScript AST
                 const returnAnalysis = analyzeReturnStatements(mdx);
                 expect(returnAnalysis.success).toBe(true);
                 expect(returnAnalysis.returnCount).toBe(testCase.expectedReturns);
@@ -238,7 +238,7 @@ describe('ESLint Typescript integration', () => {
             }
         });
 
-        test('should validate ESLint parsing for all multiple return components', async () => {
+        test('should validate TypeScript parser parsing for all multiple return components', async () => {
             const testFiles = [
                 'multiple-returns.mdx',
                 'basic-multiple-returns.mdx',
@@ -250,7 +250,7 @@ describe('ESLint Typescript integration', () => {
             for (const file of testFiles) {
                 const mdx = await Bun.file(import.meta.dir + '/' + file).text();
 
-                const parseResult = parseForESLint(mdx, {
+                const parseResult = parseWithTypeScript(mdx, {
                     includeMarkdownStub: true,
                     fileName: file
                 });
@@ -261,7 +261,7 @@ describe('ESLint Typescript integration', () => {
                     expect(parseResult.diagnostics.length).toBeGreaterThan(0);
                 } else {
                     expect(parseResult.ast).toBeDefined();
-                    expect(parseResult.ast?.type).toBe('Program');
+                    expect(parseResult.ast?.kind).toBe(308); // TypeScript SyntaxKind.SourceFile = 308
                 }
             }
         });
@@ -440,10 +440,10 @@ describe('ESLint Typescript integration', () => {
             expect(typeInfo.types).toContain('UserRole');
         });
 
-        test('should parse typed props component for ESLint', async () => {
+        test('should parse typed props component for TypeScript parser', async () => {
             const mdx = await Bun.file(import.meta.dir + '/typed-props.mdx').text();
 
-            const parseResult = parseForESLint(mdx, {
+            const parseResult = parseWithTypeScript(mdx, {
                 includeMarkdownStub: true,
                 fileName: 'typed-props.mdx'
             });

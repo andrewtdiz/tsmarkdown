@@ -1,6 +1,6 @@
 import { CompiledMDX } from '../compiler';
 import { RenderContext, RenderResult, createPropsContext } from './render-context';
-import { executeTypeScript } from './typescript-runtime';
+import { executeTypeScript, executeCompiledFunction } from './typescript-runtime';
 import { processMultipleReturnStatements } from './template-processing';
 import { processConditionalBlocks, processInterpolations, processTernaryExpressions, processJSXExpressions, processJSXElements } from './jsx-runtime';
 
@@ -31,15 +31,41 @@ export async function renderComponent(compiled: CompiledMDX, context: RenderCont
 
         // Handle multiple return statements if they exist
         if (compiled.returnStatements && compiled.returnStatements.length > 0) {
-            processedContent = await processMultipleReturnStatements(
-                compiled.returnStatements,
-                fullContext,
-                errors,
-                compiled.interpolations,
-                compiled.conditionalBlocks,
-                compiled.ternaryExpressions,
-                compiled.jsxExpressions
-            );
+            // For multiple return statements, execute the compiled TypeScript function directly
+            try {
+                const result = await executeCompiledFunction(compiled.typescript, fullContext);
+                processedContent = result;
+
+                // Process any remaining placeholders (ternary expressions, interpolations, etc.)
+                // Process ternary expressions
+                processedContent = await processTernaryExpressions(
+                    processedContent,
+                    compiled.ternaryExpressions || [],
+                    fullContext,
+                    errors,
+                    compiled.interpolations || []
+                );
+
+                // Process any remaining interpolations
+                processedContent = processInterpolations(
+                    processedContent,
+                    compiled.interpolations,
+                    fullContext,
+                    errors
+                );
+            } catch (error) {
+                errors.push(`Function execution failed: ${error}`);
+                // Fallback to template processing
+                processedContent = await processMultipleReturnStatements(
+                    compiled.returnStatements,
+                    fullContext,
+                    errors,
+                    compiled.interpolations,
+                    compiled.conditionalBlocks,
+                    compiled.ternaryExpressions,
+                    compiled.jsxExpressions
+                );
+            }
         } else {
             // Fall back to single template processing for backward compatibility
             // Process conditional blocks first (they may contain interpolations)

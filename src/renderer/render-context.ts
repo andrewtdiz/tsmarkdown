@@ -64,7 +64,7 @@ export async function resolveComponentPath(componentName: string, basePath: stri
     return null;
 }
 
-export function createPropsContext(functionParams: string[], props: any, parameterTypes?: Array<{ name: string; type: string; required: boolean }>): RenderContext {
+export function createPropsContext(functionParams: string[], props: any, parameterTypes?: Array<{ name: string; type: string; required: boolean; defaultValue?: string }>): RenderContext {
     const context: RenderContext = {};
 
     // If props is an object and we have parameters, map them
@@ -76,13 +76,29 @@ export function createPropsContext(functionParams: string[], props: any, paramet
                 // Check if this parameter has a default value (not required)
                 const paramType = parameterTypes?.find(p => p.name === param);
                 if (paramType && !paramType.required) {
-                    // For optional parameters, provide a default value based on type
-                    if (paramType.type === 'boolean') {
-                        context[param] = false;
-                    } else if (paramType.type.includes('[]')) {
-                        context[param] = [];
+                    // Use the actual default value if it exists, otherwise provide a default based on type
+                    if (paramType.defaultValue !== undefined) {
+                        // Parse the default value from the string representation
+                        if (paramType.defaultValue === 'true') {
+                            context[param] = true;
+                        } else if (paramType.defaultValue === 'false') {
+                            context[param] = false;
+                        } else if (paramType.defaultValue.startsWith('"') && paramType.defaultValue.endsWith('"')) {
+                            context[param] = paramType.defaultValue.slice(1, -1); // Remove quotes
+                        } else if (!isNaN(Number(paramType.defaultValue))) {
+                            context[param] = Number(paramType.defaultValue);
+                        } else {
+                            context[param] = paramType.defaultValue;
+                        }
                     } else {
-                        context[param] = undefined;
+                        // For optional parameters without explicit default, provide a default value based on type
+                        if (paramType.type === 'boolean') {
+                            context[param] = false;
+                        } else if (paramType.type.includes('[]')) {
+                            context[param] = [];
+                        } else {
+                            context[param] = undefined;
+                        }
                     }
                 } else if (paramType && paramType.required) {
                     // For required parameters that are missing, provide a default value based on type

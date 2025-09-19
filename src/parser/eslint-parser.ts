@@ -1,7 +1,7 @@
 // ESLint-compatible parser for Better MDX components
 
 import { parse as parseTypeScript } from '@typescript-eslint/typescript-estree';
-import { locateComponent, splitComponent, type ComponentSplit } from './component-scanner';
+import { locateComponent, splitComponent, type ComponentSplit, type ReturnStatement, extractMultipleReturnContent } from './component-scanner';
 import type { ParseContext } from './types';
 
 export interface ESLintParseResult {
@@ -11,6 +11,7 @@ export interface ESLintParseResult {
     componentSplit?: ComponentSplit;
     tsPrelude?: string;
     markdownBody?: string;
+    returnStatements?: ReturnStatement[];
 }
 
 export interface ESLintParseOptions {
@@ -80,7 +81,8 @@ export function parseForESLint(
             diagnostics,
             componentSplit,
             tsPrelude: componentSplit.tsPrelude,
-            markdownBody: componentSplit.markdownBody
+            markdownBody: componentSplit.markdownBody,
+            returnStatements: componentSplit.returnStatements
         };
 
     } catch (error) {
@@ -324,6 +326,7 @@ export function analyzeReturnStatements(source: string): {
 /**
  * Converts MDX syntax to valid TypeScript for return statement analysis
  * Replaces MDX-specific syntax with TypeScript-compatible equivalents
+ * Now handles multiple return statements with conditions
  */
 function convertMDXToTypeScriptForAnalysis(source: string): string {
     let converted = source;
@@ -334,11 +337,8 @@ function convertMDXToTypeScriptForAnalysis(source: string): string {
     // Convert markdown headers to JSX elements
     converted = converted.replace(/^(#{1,6})\s+(.*)$/gm, '<h$1>{/* MDX header: $2 */}</h$1>');
 
-    // For return statement analysis, we need to preserve the function structure
-    // but convert the return content to valid JSX
-    // This is a more targeted approach that only affects return statement content
-
-    // Find return statements and convert their content
+    // Handle multiple return statements by converting each one individually
+    // This preserves the conditional structure while making the content valid JSX
     const returnRegex = /return\s*\(\s*([\s\S]*?)\s*\)/g;
     converted = converted.replace(returnRegex, (match, content) => {
         // Convert the content inside return statements to valid JSX
@@ -465,6 +465,168 @@ function walkFunctionBody(node: any, callback: (node: any, depth: number) => voi
                 walkFunctionBody(node[key], callback, nextDepth);
             }
         }
+    }
+}
+
+/**
+ * Extracts parameter information from a function declaration AST node
+ */
+export function extractParametersFromAST(functionNode: any): Array<{ name: string; type: string; required: boolean; defaultValue?: string }> {
+    if (!functionNode || functionNode.type !== 'FunctionDeclaration') {
+        return [];
+    }
+
+    const parameters: Array<{ name: string; type: string; required: boolean; defaultValue?: string }> = [];
+
+    if (!functionNode.params || !Array.isArray(functionNode.params)) {
+        return parameters;
+    }
+
+    for (const param of functionNode.params) {
+        if (param.type === 'ObjectPattern') {
+            // Handle destructured parameters like { name, isLoggedIn = true }: { name: string; isLoggedIn: boolean }
+            // Extract type information from the type annotation
+            const typeAnnotation = param.typeAnnotation;
+            let typeMap: Map<string, { type: string; optional: boolean }> = new Map();
+
+            if (typeAnnotation && typeAnnotation.typeAnnotation && typeAnnotation.typeAnnotation.type === 'TSTypeLiteral') {
+                // Parse the type literal: { name: string; isLoggedIn: boolean }
+                for (const member of typeAnnotation.typeAnnotation.members) {
+                    if (member.type === 'TSPropertySignature') {
+                        const propName = member.key.name;
+                        const propType = extractTypeFromTypeAnnotation(member.typeAnnotation?.typeAnnotation);
+                        const isOptional = member.optional || false;
+                        typeMap.set(propName, { type: propType, optional: isOptional });
+                    }
+                }
+            }
+
+            for (const property of param.properties) {
+                if (property.type === 'Property') {
+                    const paramInfo = extractParameterInfo(property, typeMap);
+                    if (paramInfo) {
+                        parameters.push(paramInfo);
+                    }
+                }
+            }
+        } else if (param.type === 'Identifier') {
+            // Handle simple parameters like name: string
+            const paramInfo = extractParameterInfo(param, param.typeAnnotation);
+            if (paramInfo) {
+                parameters.push(paramInfo);
+            }
+        }
+    }
+
+    return parameters;
+}
+
+/**
+ * Extracts information from a single parameter AST node
+ */
+function extractParameterInfo(paramNode: any, typeInfo?: any): { name: string; type: string; required: boolean; defaultValue?: string } | null {
+    let name: string;
+    let defaultValue: string | undefined;
+    let isOptional = false;
+
+    if (paramNode.type === 'Property') {
+        // Destructured parameter property
+        name = paramNode.key.name;
+        isOptional = paramNode.optional || false;
+
+        if (paramNode.value && paramNode.value.type === 'AssignmentPattern') {
+            // Has default value: { name = "default" }
+            defaultValue = extractDefaultValueFromAST(paramNode.value.right);
+        } else if (paramNode.value && paramNode.value.type === 'Identifier') {
+            // Simple destructured property: { name }
+            // No default value
+        }
+    } else if (paramNode.type === 'Identifier') {
+        // Simple parameter
+        name = paramNode.name;
+        isOptional = paramNode.optional || false;
+    } else if (paramNode.type === 'AssignmentPattern') {
+        // Parameter with default value: name = "default"
+        name = paramNode.left.name;
+        defaultValue = extractDefaultValueFromAST(paramNode.right);
+    } else {
+        return null;
+    }
+
+    // Extract type information
+    let type = 'any';
+    let isTypeOptional = false;
+
+    if (typeInfo instanceof Map) {
+        // Type info from type map (for destructured parameters)
+        const typeData = typeInfo.get(name);
+        if (typeData) {
+            type = typeData.type;
+            isTypeOptional = typeData.optional;
+        }
+    } else if (typeInfo && typeInfo.typeAnnotation) {
+        // Direct type annotation
+        type = extractTypeFromTypeAnnotation(typeInfo.typeAnnotation);
+    }
+
+    // Determine if parameter is required
+    const required = !isOptional && !isTypeOptional && !defaultValue;
+
+    return {
+        name,
+        type,
+        required,
+        defaultValue
+    };
+}
+
+/**
+ * Extracts the default value from an AST node
+ */
+function extractDefaultValueFromAST(node: any): string | undefined {
+    if (!node) return undefined;
+
+    switch (node.type) {
+        case 'Literal':
+            if (typeof node.value === 'string') {
+                return `"${node.value}"`;
+            }
+            return String(node.value);
+        case 'Identifier':
+            return node.name;
+        case 'BooleanLiteral':
+            return String(node.value);
+        case 'NumericLiteral':
+            return String(node.value);
+        default:
+            // For complex expressions, we might need to reconstruct from source
+            return undefined;
+    }
+}
+
+/**
+ * Extracts type information from a TypeScript type annotation
+ */
+function extractTypeFromTypeAnnotation(typeAnnotation: any): string {
+    if (!typeAnnotation) return 'any';
+
+    switch (typeAnnotation.type) {
+        case 'TSStringKeyword':
+            return 'string';
+        case 'TSNumberKeyword':
+            return 'number';
+        case 'TSBooleanKeyword':
+            return 'boolean';
+        case 'TSArrayType':
+            const elementType = extractTypeFromTypeAnnotation(typeAnnotation.elementType);
+            return `${elementType}[]`;
+        case 'TSTypeReference':
+            return typeAnnotation.typeName.name;
+        case 'TSUnionType':
+            const types = typeAnnotation.types.map((t: any) => extractTypeFromTypeAnnotation(t));
+            return types.join(' | ');
+        default:
+            return 'any';
     }
 }
 

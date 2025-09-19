@@ -2,6 +2,14 @@
 
 import { findMatchingBrace, findMatchingParen } from './string-helpers';
 
+export interface ReturnStatement {
+    returnIndex: number;
+    contentStartIndex: number;
+    contentEndIndex: number;
+    condition?: string;
+    isConditional: boolean;
+}
+
 export interface ComponentSplit {
     tsPrelude: string;
     markdownBody: string;
@@ -9,6 +17,7 @@ export interface ComponentSplit {
     returnEndIndex: number;
     hasValidStructure: boolean;
     diagnostics: string[];
+    returnStatements: ReturnStatement[];
 }
 
 export interface ComponentLocation {
@@ -127,52 +136,70 @@ export function splitComponent(source: string): ComponentSplit {
             returnStartIndex: -1,
             returnEndIndex: -1,
             hasValidStructure: false,
-            diagnostics: ['No component function found']
+            diagnostics: ['No component function found'],
+            returnStatements: []
         };
     }
 
-    // Find the first return statement that's not nested in child functions
-    const returnMatch = findFirstReturn(source);
-    if (!returnMatch) {
+    // Find all return statements that are not nested in child functions
+    const returnStatements = findAllReturns(source);
+    if (returnStatements.length === 0) {
         return {
             tsPrelude: source,
             markdownBody: '',
             returnStartIndex: -1,
             returnEndIndex: -1,
             hasValidStructure: false,
-            diagnostics: ['No return statement found in component']
+            diagnostics: ['No return statement found in component'],
+            returnStatements: []
         };
     }
 
-    // Split the component
-    const tsPrelude = source.slice(0, returnMatch.returnIndex);
-    const markdownBody = source.slice(returnMatch.contentStartIndex, returnMatch.contentEndIndex);
+    // Use the first return statement for backward compatibility
+    const firstReturn = returnStatements[0];
 
-    // Validate structure
-    const hasValidStructure = returnMatch.returnIndex > 0 && markdownBody.length > 0;
+    // Find the opening parenthesis after 'return'
+    const afterReturn = source.slice(firstReturn.returnIndex + 6); // +6 for 'return'
+    const openParenIndex = afterReturn.indexOf('(');
 
-    return {
-        tsPrelude: tsPrelude.trim(),
-        markdownBody: markdownBody.trim(),
-        returnStartIndex: returnMatch.returnIndex,
-        returnEndIndex: returnMatch.contentEndIndex,
-        hasValidStructure,
-        diagnostics
-    };
+    if (openParenIndex !== -1) {
+        // Include the 'return (' part in the TypeScript prelude
+        const tsPrelude = source.slice(0, firstReturn.returnIndex + 6 + openParenIndex + 1);
+        const markdownBody = source.slice(firstReturn.contentStartIndex, firstReturn.contentEndIndex);
+
+        return {
+            tsPrelude: tsPrelude.trim(),
+            markdownBody: markdownBody.trim(),
+            returnStartIndex: firstReturn.returnIndex,
+            returnEndIndex: firstReturn.contentEndIndex,
+            hasValidStructure: true,
+            diagnostics,
+            returnStatements
+        };
+    } else {
+        // Fallback to original behavior
+        const tsPrelude = source.slice(0, firstReturn.returnIndex);
+        const markdownBody = source.slice(firstReturn.contentStartIndex, firstReturn.contentEndIndex);
+
+        return {
+            tsPrelude: tsPrelude.trim(),
+            markdownBody: markdownBody.trim(),
+            returnStartIndex: firstReturn.returnIndex,
+            returnEndIndex: firstReturn.contentEndIndex,
+            hasValidStructure: false,
+            diagnostics: ['Invalid return statement format'],
+            returnStatements
+        };
+    }
 }
 
 /**
- * Finds the first return statement that's not nested in child functions
+ * Finds all return statements that are not nested in child functions
  */
-function findFirstReturn(componentBody: string): {
-    returnIndex: number;
-    contentStartIndex: number;
-    contentEndIndex: number;
-} | null {
+function findAllReturns(componentBody: string): ReturnStatement[] {
+    const returnStatements: ReturnStatement[] = [];
     let braceLevel = 0;
-    let parenLevel = 0;
     let inFunction = false;
-    let returnFound = false;
 
     for (let i = 0; i < componentBody.length; i++) {
         const char = componentBody[i];
@@ -192,13 +219,12 @@ function findFirstReturn(componentBody: string): {
         }
 
         // Look for return statement
-        if (inFunction && !returnFound && nextChars === 'return') {
+        if (inFunction && nextChars === 'return') {
             // Check if this is a return statement (followed by whitespace or parenthesis)
-            const afterReturn = componentBody.slice(i + 6).trim();
-            if (afterReturn.startsWith('(')) {
-                returnFound = true;
-
-                // Find the opening parenthesis
+            const afterReturn = componentBody.slice(i + 6);
+            const trimmedAfterReturn = afterReturn.trim();
+            if (trimmedAfterReturn.startsWith('(')) {
+                // Find the opening parenthesis - account for the original whitespace
                 const openParenIndex = i + 6 + afterReturn.indexOf('(');
 
                 // Find the matching closing parenthesis
@@ -207,16 +233,79 @@ function findFirstReturn(componentBody: string): {
                     continue; // Invalid syntax, keep looking
                 }
 
-                return {
+                // Check if this return statement has a condition (if statement before it)
+                const condition = extractConditionBeforeReturn(componentBody, i);
+                const isConditional = condition !== undefined;
+
+                // Extract content and clean it up
+                let contentStartIndex = openParenIndex + 1;
+                let contentEndIndex = closeParenIndex;
+
+                // Find the actual start of content (skip leading whitespace, newlines, and opening parenthesis)
+                const rawContent = componentBody.slice(contentStartIndex, contentEndIndex);
+                const trimmedContent = rawContent.trim();
+
+                // Find the start of the trimmed content
+                const leadingWhitespace = rawContent.length - rawContent.trimStart().length;
+                contentStartIndex = contentStartIndex + leadingWhitespace;
+
+                // Find the end of the trimmed content
+                const trailingWhitespace = rawContent.trimStart().length - trimmedContent.length;
+                contentEndIndex = contentStartIndex + trimmedContent.length;
+
+                const returnStmt = {
                     returnIndex: i,
-                    contentStartIndex: openParenIndex + 1,
-                    contentEndIndex: closeParenIndex
+                    contentStartIndex,
+                    contentEndIndex,
+                    condition,
+                    isConditional
                 };
+
+                // Debug: Check what content is being extracted (can be removed in production)
+                // const extractedContent = componentBody.slice(returnStmt.contentStartIndex, returnStmt.contentEndIndex);
+                // console.log('Raw content between parens:', JSON.stringify(componentBody.slice(openParenIndex + 1, closeParenIndex)));
+                // console.log('Trimmed content:', JSON.stringify(trimmedContent));
+                // console.log('Final extracted content:', JSON.stringify(extractedContent));
+                // console.log('Content start index:', contentStartIndex, 'Content end index:', contentEndIndex);
+
+                returnStatements.push(returnStmt);
             }
         }
     }
 
-    return null;
+    return returnStatements;
+}
+
+
+/**
+ * Extracts the condition from an if statement that precedes a return statement
+ */
+function extractConditionBeforeReturn(source: string, returnIndex: number): string | undefined {
+    // Look backwards from the return statement to find a preceding if statement
+    const beforeReturn = source.slice(0, returnIndex);
+
+    // Find the last if statement before the return
+    const ifMatch = beforeReturn.match(/if\s*\(\s*([^)]+)\s*\)\s*$/m);
+    if (ifMatch) {
+        return ifMatch[1].trim();
+    }
+
+    return undefined;
+}
+
+/**
+ * Extracts content from multiple return statements
+ */
+export function extractMultipleReturnContent(source: string, returnStatements: ReturnStatement[]): Array<{
+    condition?: string;
+    content: string;
+    isConditional: boolean;
+}> {
+    return returnStatements.map(returnStmt => ({
+        condition: returnStmt.condition,
+        content: source.slice(returnStmt.contentStartIndex, returnStmt.contentEndIndex).trim(),
+        isConditional: returnStmt.isConditional
+    }));
 }
 
 /**

@@ -16,7 +16,7 @@ export interface CompiledMDX {
     functionName: string;
     lastModified: string;
     propsInterface?: string;
-    parameterTypes: Array<{ name: string; type: string; required: boolean }>;
+    parameterTypes: Array<{ name: string; type: string; required: boolean; defaultValue?: string }>;
   };
 }
 

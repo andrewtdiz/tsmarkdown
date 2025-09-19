@@ -102,7 +102,11 @@ export function generateCompleteFunction(parsed: ParsedMDX): string {
     let functionParams = '';
     if (hasProps) {
         const destructuredParams = parsed.parameterTypes.map(param => {
-            return param.name; // Remove optional markers from parameter names in destructuring
+            // Include default value if present
+            if (param.defaultValue) {
+                return `${param.name} = ${param.defaultValue}`;
+            }
+            return param.name;
         }).join(', ');
         functionParams = `{ ${destructuredParams} }: ${interfaceName}`;
     }
@@ -111,7 +115,12 @@ export function generateCompleteFunction(parsed: ParsedMDX): string {
     const returnStatement = generateReturnStatement(parsed);
 
     // Combine everything into a complete function
-    const functionBody = `${parsed.typescript}
+    // Remove any existing return statements and if statements from the TypeScript body to avoid duplication
+    const cleanTypeScript = parsed.typescript
+        .replace(/\s*return\s+[^;]+;?\s*$/gm, '')
+        .replace(/\s*if\s*\([^)]+\)\s*$/gm, '')
+        .trim();
+    const functionBody = `${cleanTypeScript}
   ${returnStatement}`;
 
     return `export function ${parsed.functionName}(${functionParams}): string {
@@ -120,6 +129,16 @@ export function generateCompleteFunction(parsed: ParsedMDX): string {
 }
 
 export function generateReturnStatement(parsed: ParsedMDX): string {
+    // Handle multiple return statements with conditions
+    if (parsed.returnStatements && parsed.returnStatements.length > 0) {
+        return generateMultipleReturnStatements(parsed);
+    }
+
+    // Fallback to single return statement for backward compatibility
+    return generateSingleReturnStatement(parsed);
+}
+
+function generateSingleReturnStatement(parsed: ParsedMDX): string {
     // Process interpolations in the markdown template
     let processedMarkdown = parsed.markdown;
 
@@ -143,12 +162,208 @@ export function generateReturnStatement(parsed: ParsedMDX): string {
         );
     }
 
+    // Replace ternary expression placeholders with actual ternary logic
+    // Process in reverse order to handle nested ternaries correctly
+    for (let i = parsed.ternaryExpressions.length - 1; i >= 0; i--) {
+        const ternary = parsed.ternaryExpressions[i];
+        const placeholder = `__TERNARY_${i}__`;
+
+        // Process the trueValue and falseValue to handle any interpolations within them
+        let processedTrueValue = ternary.trueValue;
+        let processedFalseValue = ternary.falseValue;
+
+        // Remove wrapping parentheses if they exist, but preserve indentation
+        if (processedTrueValue.trim().startsWith('(') && processedTrueValue.trim().endsWith(')')) {
+            // Find the first newline after the opening parenthesis
+            const firstNewline = processedTrueValue.indexOf('\n');
+            if (firstNewline !== -1) {
+                // Keep the content after the first newline, preserving indentation
+                processedTrueValue = processedTrueValue.substring(firstNewline + 1);
+                // Remove the closing parenthesis and any trailing whitespace
+                const lastParen = processedTrueValue.lastIndexOf(')');
+                if (lastParen !== -1) {
+                    processedTrueValue = processedTrueValue.substring(0, lastParen);
+                }
+            } else {
+                // Single line case
+                processedTrueValue = processedTrueValue.trim().slice(1, -1).trim();
+            }
+        }
+
+        if (processedFalseValue.trim().startsWith('(') && processedFalseValue.trim().endsWith(')')) {
+            // Find the first newline after the opening parenthesis
+            const firstNewline = processedFalseValue.indexOf('\n');
+            if (firstNewline !== -1) {
+                // Keep the content after the first newline, preserving indentation
+                processedFalseValue = processedFalseValue.substring(firstNewline + 1);
+                // Remove the closing parenthesis and any trailing whitespace
+                const lastParen = processedFalseValue.lastIndexOf(')');
+                if (lastParen !== -1) {
+                    processedFalseValue = processedFalseValue.substring(0, lastParen);
+                }
+            } else {
+                // Single line case
+                processedFalseValue = processedFalseValue.trim().slice(1, -1).trim();
+            }
+        }
+
+        // Process any interpolations within the ternary values
+        for (const interpolation of parsed.interpolations) {
+            const interpolationPlaceholder = interpolation.placeholder;
+            const interpolationExpression = interpolation.expression;
+
+            processedTrueValue = processedTrueValue.replace(
+                new RegExp(interpolationPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+                `\${${interpolationExpression}}`
+            );
+
+            processedFalseValue = processedFalseValue.replace(
+                new RegExp(interpolationPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+                `\${${interpolationExpression}}`
+            );
+        }
+
+        // Create the ternary expression using string concatenation to avoid escaping issues
+        const escapedTrueValue = processedTrueValue.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
+        const escapedFalseValue = processedFalseValue.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
+        const ternaryExpression = `\${${ternary.condition} ? \`${escapedTrueValue}\` : \`${escapedFalseValue}\`}`;
+
+        // Replace the placeholder with the ternary expression
+        processedMarkdown = processedMarkdown.replace(
+            new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+            ternaryExpression
+        );
+    }
+
     // Escape the template literal properly
-    const escapedMarkdown = processedMarkdown
-        .replace(/\\/g, '\\\\')
-        .replace(/`/g, '\\`');
+    // First escape backslashes
+    let escapedMarkdown = processedMarkdown.replace(/\\/g, '\\\\');
+
+    // Don't escape backticks since ternary expressions already have properly escaped backticks
+    // and we don't want to double-escape them
 
     return `return \`${escapedMarkdown}\`;`;
+}
+
+function generateMultipleReturnStatements(parsed: ParsedMDX): string {
+    const returnStatements: string[] = [];
+
+    for (const returnStmt of parsed.returnStatements) {
+        if (returnStmt.isTemplate) {
+            // Process interpolations in the markdown template
+            let processedMarkdown = returnStmt.content;
+
+            // Clean up the markdown - remove leading/trailing whitespace and fix common issues
+            processedMarkdown = processedMarkdown.trim();
+
+            // Remove the opening parenthesis and newline if it starts with "(\n"
+            if (processedMarkdown.startsWith('(\n')) {
+                processedMarkdown = processedMarkdown.substring(2);
+            }
+
+            // Replace interpolation placeholders with actual expressions
+            for (const interpolation of parsed.interpolations) {
+                const placeholder = interpolation.placeholder;
+                const expression = interpolation.expression;
+
+                // Replace the placeholder with the expression wrapped in ${}
+                processedMarkdown = processedMarkdown.replace(
+                    new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+                    `\${${expression}}`
+                );
+            }
+
+            // Replace ternary expression placeholders with actual ternary logic
+            // Process in reverse order to handle nested ternaries correctly
+            for (let i = parsed.ternaryExpressions.length - 1; i >= 0; i--) {
+                const ternary = parsed.ternaryExpressions[i];
+                const placeholder = `__TERNARY_${i}__`;
+
+                // Process the trueValue and falseValue to handle any interpolations within them
+                let processedTrueValue = ternary.trueValue;
+                let processedFalseValue = ternary.falseValue;
+
+                // Remove wrapping parentheses if they exist, but preserve indentation
+                if (processedTrueValue.trim().startsWith('(') && processedTrueValue.trim().endsWith(')')) {
+                    // Find the first newline after the opening parenthesis
+                    const firstNewline = processedTrueValue.indexOf('\n');
+                    if (firstNewline !== -1) {
+                        // Keep the content after the first newline, preserving indentation
+                        processedTrueValue = processedTrueValue.substring(firstNewline + 1);
+                        // Remove the closing parenthesis and any trailing whitespace
+                        const lastParen = processedTrueValue.lastIndexOf(')');
+                        if (lastParen !== -1) {
+                            processedTrueValue = processedTrueValue.substring(0, lastParen);
+                        }
+                    } else {
+                        // Single line case
+                        processedTrueValue = processedTrueValue.trim().slice(1, -1).trim();
+                    }
+                }
+
+                if (processedFalseValue.trim().startsWith('(') && processedFalseValue.trim().endsWith(')')) {
+                    // Find the first newline after the opening parenthesis
+                    const firstNewline = processedFalseValue.indexOf('\n');
+                    if (firstNewline !== -1) {
+                        // Keep the content after the first newline, preserving indentation
+                        processedFalseValue = processedFalseValue.substring(firstNewline + 1);
+                        // Remove the closing parenthesis and any trailing whitespace
+                        const lastParen = processedFalseValue.lastIndexOf(')');
+                        if (lastParen !== -1) {
+                            processedFalseValue = processedFalseValue.substring(0, lastParen);
+                        }
+                    } else {
+                        // Single line case
+                        processedFalseValue = processedFalseValue.trim().slice(1, -1).trim();
+                    }
+                }
+
+                // Process any interpolations within the ternary values
+                for (const interpolation of parsed.interpolations) {
+                    const interpolationPlaceholder = interpolation.placeholder;
+                    const interpolationExpression = interpolation.expression;
+
+                    processedTrueValue = processedTrueValue.replace(
+                        new RegExp(interpolationPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+                        `\${${interpolationExpression}}`
+                    );
+
+                    processedFalseValue = processedFalseValue.replace(
+                        new RegExp(interpolationPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+                        `\${${interpolationExpression}}`
+                    );
+                }
+
+                // Create the ternary expression using string concatenation to avoid escaping issues
+                const escapedTrueValue = processedTrueValue.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
+                const escapedFalseValue = processedFalseValue.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
+                const ternaryExpression = `\${${ternary.condition} ? \`${escapedTrueValue}\` : \`${escapedFalseValue}\`}`;
+
+                // Replace the placeholder with the ternary expression
+                processedMarkdown = processedMarkdown.replace(
+                    new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+                    ternaryExpression
+                );
+            }
+
+            // Escape the template literal properly
+            // First escape backslashes
+            let escapedMarkdown = processedMarkdown.replace(/\\/g, '\\\\');
+
+            // Don't escape backticks since ternary expressions already have properly escaped backticks
+            // and we don't want to double-escape them
+
+            if (returnStmt.condition) {
+                // Conditional return statement
+                returnStatements.push(`if (${returnStmt.condition}) return \`${escapedMarkdown}\`;`);
+            } else {
+                // Default return statement
+                returnStatements.push(`return \`${escapedMarkdown}\`;`);
+            }
+        }
+    }
+
+    return returnStatements.join('\n  ');
 }
 
 export function generateTypedFunction(parsed: ParsedMDX): string {
@@ -166,7 +381,11 @@ export function generateTypedFunction(parsed: ParsedMDX): string {
 
     // Generate destructured parameter with types (don't include optional markers in destructuring)
     const destructuredParams = parsed.parameterTypes.map(param => {
-        return param.name; // Remove optional markers from parameter names in destructuring
+        // Include default value if present
+        if (param.defaultValue) {
+            return `${param.name} = ${param.defaultValue}`;
+        }
+        return param.name;
     }).join(', ');
 
     return `export function ${parsed.functionName}({ ${destructuredParams} }: ${interfaceName}): string {

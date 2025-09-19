@@ -42,6 +42,93 @@ export async function executeTypeScript(typescript: string, context: RenderConte
     }
 }
 
+export async function executeCompiledFunction(typescript: string, context: RenderContext): Promise<string> {
+    if (!typescript.trim()) {
+        return '';
+    }
+
+    try {
+        // Extract imports and resolve them
+        const imports = extractImports(typescript);
+        const resolvedImports = await resolveImports(imports, context.basePath, context.aliasMap);
+
+        // Create a safe execution environment with resolved imports
+        const safeContext = createSafeContext(context, typescript, resolvedImports);
+
+        // Extract the function name and parameters
+        const functionMatch = typescript.match(/export\s+function\s+(\w+)\s*\(([^)]*)\)\s*:\s*string\s*\{\s*([\s\S]*)\s*\}/);
+        if (!functionMatch) {
+            throw new Error('Could not parse compiled function');
+        }
+
+        const [, functionName, params, functionBody] = functionMatch;
+
+        // Extract parameter names - handle destructured parameters like { name }
+        const paramNames: string[] = [];
+        if (params.trim().startsWith('{') && params.trim().includes('}')) {
+            // Destructured parameters like { name }: MiniComponentProps
+            // Find the end of the destructuring part (before the type annotation)
+            const destructuringEnd = params.indexOf('}');
+            const destructuredParams = params.slice(1, destructuringEnd); // Remove { and }
+            const paramParts = destructuredParams.split(',');
+            for (const part of paramParts) {
+                const paramName = part.trim().split(':')[0].trim();
+                if (paramName) {
+                    paramNames.push(paramName);
+                }
+            }
+        } else {
+            // Regular parameters
+            paramNames.push(...params.split(',').map(p => p.trim().split(':')[0].trim()).filter(Boolean));
+        }
+
+        // Debug logging (can be removed in production)
+        // console.log('Function params:', params);
+        // console.log('Context keys:', Object.keys(context));
+        // console.log('Context name value:', context.name);
+        // console.log('Extracted param names:', paramNames);
+
+        // Create the function with proper parameter binding
+        const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
+
+        // For destructured parameters, create a function that takes a single parameter
+        let func: Function;
+        if (params.trim().startsWith('{') && params.trim().includes('}')) {
+            // Create a function that takes a single parameter and destructures it
+            // Extract just the destructuring part without the type annotation
+            const destructuringEnd = params.indexOf('}');
+            const destructuringPart = params.slice(0, destructuringEnd + 1); // Include the }
+            const destructuredFunctionBody = `const ${destructuringPart} = arguments[0]; ${functionBody}`;
+            func = new AsyncFunction(destructuredFunctionBody);
+        } else {
+            // For regular parameters, use the extracted parameter names
+            func = new AsyncFunction(...paramNames, functionBody);
+        }
+
+        // Get parameter values from context
+        // For destructured parameters, we need to pass an object with just the expected properties
+        let paramValues: any[];
+        if (params.trim().startsWith('{') && params.trim().includes('}')) {
+            // For destructured parameters, create an object with just the expected properties
+            const destructuredObject: any = {};
+            for (const paramName of paramNames) {
+                destructuredObject[paramName] = context[paramName];
+            }
+            paramValues = [destructuredObject];
+            // console.log('Destructured object:', destructuredObject);
+        } else {
+            // For regular parameters, pass individual values
+            paramValues = paramNames.map(name => context[name]);
+        }
+
+        // Execute the function and return the result
+        const result = await func(...paramValues);
+        return result || '';
+    } catch (error) {
+        throw new Error(`Compiled function execution failed: ${error}`);
+    }
+}
+
 export function extractExecutableCode(typescript: string): string {
     // Check if this is a complete function declaration
     const functionMatch = typescript.match(/export\s+function\s+\w+\s*\([^)]*\)\s*:\s*string\s*\{\s*([\s\S]*)\s*\}/);

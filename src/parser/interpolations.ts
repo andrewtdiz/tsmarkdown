@@ -171,7 +171,7 @@ export function parseInterpolations(content: string, context: ParseContext): str
             // Classify the expression type
             const expressionType = classifyExpression(expression);
 
-            let placeholder: string;
+            let placeholder: string = '';
 
             switch (expressionType) {
                 case 'conditional':
@@ -200,7 +200,15 @@ export function parseInterpolations(content: string, context: ParseContext): str
                             context.conditionalBlocks[currentIndex].content = processedBlockContent;
 
                             placeholder = `__CONDITIONAL_${currentIndex}__`;
+                        } else {
+                            // Invalid conditional syntax, treat as regular interpolation
+                            placeholder = `__INTERPOLATION_${context.interpolations.length}__`;
+                            context.interpolations.push({ placeholder, expression });
                         }
+                    } else {
+                        // Invalid conditional syntax, treat as regular interpolation
+                        placeholder = `__INTERPOLATION_${context.interpolations.length}__`;
+                        context.interpolations.push({ placeholder, expression });
                     }
                     break;
 
@@ -209,10 +217,14 @@ export function parseInterpolations(content: string, context: ParseContext): str
                     // Parse ternary logic with proper nesting support
                     const { condition, trueValue, falseValue } = parseNestedTernary(expression);
                     if (condition && trueValue && falseValue) {
+                        // Process interpolations within the ternary values
+                        const processedTrueValue = parseInterpolations(trueValue, context);
+                        const processedFalseValue = parseInterpolations(falseValue, context);
+
                         context.ternaryExpressions.push({
                             condition: condition,
-                            trueValue: trueValue,
-                            falseValue: falseValue,
+                            trueValue: processedTrueValue,
+                            falseValue: processedFalseValue,
                         });
                     }
                     break;
@@ -268,6 +280,41 @@ function findMatchingParen(content: string, startIndex: number): number {
     return -1; // No matching parenthesis found
 }
 
+// Helper function to clean parentheses and whitespace from ternary values
+function cleanParenthesesAndWhitespace(value: string): string {
+    // Remove leading and trailing whitespace
+    let cleaned = value.trim();
+
+    // If the value starts with ( and ends with ), and they match (not nested),
+    // remove the outer parentheses
+    if (cleaned.startsWith('(') && cleaned.endsWith(')')) {
+        // Check if the parentheses are properly matched at the top level
+        let parenCount = 0;
+        let hasUnmatchedParens = false;
+
+        for (let i = 0; i < cleaned.length; i++) {
+            const char = cleaned[i];
+            if (char === '(') {
+                parenCount++;
+            } else if (char === ')') {
+                parenCount--;
+                // If we hit 0 before the end, there are nested parentheses
+                if (parenCount === 0 && i < cleaned.length - 1) {
+                    hasUnmatchedParens = true;
+                    break;
+                }
+            }
+        }
+
+        // Only remove outer parentheses if they're properly matched
+        if (!hasUnmatchedParens && parenCount === 0) {
+            cleaned = cleaned.slice(1, -1).trim();
+        }
+    }
+
+    return cleaned;
+}
+
 // Helper function to parse nested ternary expressions
 function parseNestedTernary(expression: string): { condition: string; trueValue: string; falseValue: string } {
     let parenCount = 0;
@@ -305,8 +352,12 @@ function parseNestedTernary(expression: string): { condition: string; trueValue:
     }
 
     const condition = expression.substring(0, questionIndex).trim();
-    const trueValue = expression.substring(questionIndex + 1, colonIndex).trim();
-    const falseValue = expression.substring(colonIndex + 1).trim();
+    let trueValue = expression.substring(questionIndex + 1, colonIndex).trim();
+    let falseValue = expression.substring(colonIndex + 1).trim();
+
+    // Clean up parentheses and whitespace from trueValue and falseValue
+    trueValue = cleanParenthesesAndWhitespace(trueValue);
+    falseValue = cleanParenthesesAndWhitespace(falseValue);
 
     return { condition, trueValue, falseValue };
 }

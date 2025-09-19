@@ -16,7 +16,7 @@ export interface ParsedMDX {
   jsxExpressions: Array<{ placeholder: string; expression: string }>;
   returnStatements: Array<{ condition?: string; content: string; isTemplate: boolean }>;
   propsInterface?: string;
-  parameterTypes: Array<{ name: string; type: string; required: boolean }>;
+  parameterTypes: Array<{ name: string; type: string; required: boolean; defaultValue?: string }>;
 }
 
 export function parseMDX(content: string): ParsedMDX {
@@ -36,7 +36,7 @@ export function parseMDX(content: string): ParsedMDX {
   let inFunction = false;
   let inReturn = false;
   let braceLevel = 0;
-  let parameterTypes: Array<{ name: string; type: string; required: boolean }> = [];
+  let parameterTypes: Array<{ name: string; type: string; required: boolean; defaultValue?: string }> = [];
   let rawParams = "";
 
   // First, protect code blocks in the entire content to avoid brace level issues

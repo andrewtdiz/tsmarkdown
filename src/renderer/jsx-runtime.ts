@@ -4,6 +4,7 @@ import { parseMDX } from '../parser';
 import { componentRegistry, mergePropsWithDefaults, resolveComponentPath } from './render-context';
 import { processEscapeSequences, normalizeIndentation, valueToString } from './string-helpers';
 import { renderComponent } from '../renderer/render-component';
+import { parseInterpolations } from '../parser/interpolations';
 
 export function processInterpolations(
     content: string,
@@ -171,6 +172,20 @@ export async function processTernaryExpressions(
 
                     // Process interpolations using the main interpolations array
                     processedValue = processInterpolations(processedValue, interpolations, context, errors);
+
+                    // Recursively process any remaining interpolations in the ternary value
+                    // This handles cases where ternary values contain {{ variable }} syntax
+                    if (processedValue.includes('{{') && processedValue.includes('}}')) {
+                        // Create a temporary context for processing nested interpolations
+                        const tempInterpolations: Array<{ placeholder: string; expression: string }> = [];
+                        const tempContext = { interpolations: tempInterpolations, conditionalBlocks: [], ternaryExpressions: [], jsxExpressions: [] };
+
+                        // Parse any remaining interpolations in the ternary value
+                        const parsedValue = parseInterpolations(processedValue, tempContext);
+
+                        // Process the newly found interpolations
+                        processedValue = processInterpolations(parsedValue, tempInterpolations, context, errors);
+                    }
                 }
             }
 

@@ -1,84 +1,12 @@
-/**
- * End-to-end test demonstrating jscodeshift integration for AST transformations
- * 
- * This file shows how to use jscodeshift to make structural changes to TypeScript
- * code declaratively and testably, instead of using manual string parsing or regex.
- * 
- * Key benefits demonstrated:
- * - Declarative AST manipulation
- * - Testable transformations
- * - No manual string/regex parsing
- * - Reusable codemods
- */
-
 import { compile } from "./src/compiler";
 import type { ParsedMDX } from "./src/parser";
-import { parseWithTypeScript, extractParametersFromAST, extractExportedFunctions } from "./src/parser/parser-utils";
+import { parseWithTypeScript, extractParametersFromAST } from "./src/parser/parser-utils";
 import { generatePropsInterface, parseParameters } from "./src/parser/parameters";
 import { parseContent } from "./src/parser/pipeline";
 import { protectCodeBlocks, restoreCodeBlocks } from "./src/parser/code-protection";
 import { render } from "./src/renderer";
 import { normalizeIndentation } from "./src/renderer/string-helpers";
-import * as ts from 'typescript';
 import { validateComponentStructure } from "./src/parser/component-scanner";
-import jscodeshift, { Transform } from 'jscodeshift';
-
-/**
- * Apply a jscodeshift transformation to TypeScript code
- */
-async function applyJSCodeshiftTransform(typescriptCode: string, transform: Transform): Promise<string> {
-
-    try {
-        const result = await transform(
-            { source: typescriptCode, path: 'test.ts' },
-            { j: jscodeshift, jscodeshift, stats: () => { }, report: () => { } },
-            { parser: 'babel' }
-        );
-        return result || typescriptCode;
-    } catch (error) {
-        console.warn('JSCodeshift transformation failed:', error);
-        return typescriptCode;
-    }
-}
-
-/**
- * Simple jscodeshift transformation that demonstrates AST manipulation
- * This codemod adds a console.log statement at the beginning of function bodies
- * 
- * This is a proof-of-concept showing how to use jscodeshift for declarative
- * AST transformations instead of manual string parsing or regex manipulation.
- */
-const addConsoleLogTransform: Transform = (fileInfo, api) => {
-    const j = api.jscodeshift;
-    const source = j(fileInfo.source);
-
-    // Find all function declarations
-    source.find(j.FunctionDeclaration).forEach(path => {
-        const functionBody = path.value.body;
-
-        // Only process if the function has a block statement body
-        if (j.BlockStatement.check(functionBody)) {
-            // Create a console.log statement
-            const consoleLog = j.expressionStatement(
-                j.callExpression(
-                    j.memberExpression(
-                        j.identifier('console'),
-                        j.identifier('log')
-                    ),
-                    [j.literal(`Function ${path.value.id?.name || 'anonymous'} called`)]
-                )
-            );
-
-            // Add the console.log as the first statement in the function body
-            functionBody.body.unshift(consoleLog);
-        }
-    });
-
-    return source.toSource({
-        quote: 'single',
-        trailingComma: true,
-    });
-};
 
 function findMainFunctionInAST(ast: any): any {
     if (!ast) {
@@ -102,19 +30,19 @@ function findMainFunctionInAST(ast: any): any {
     return mainFunction;
 }
 
-async function buildParsedMDXWithTSParser(source: string): Promise<ParsedMDX> {
+function buildParsedMDXWithTSParser(source: string): ParsedMDX {
     const tsResult = parseWithTypeScript(source);
 
     if (!tsResult.success || !tsResult.componentSplit || !tsResult.tsPrelude) {
-        const message = tsResult.diagnostics.join(", ") || "Unknown TS parser failure";
-        throw new Error(`Failed to parse with TS parser: ${message}`);
+        const message = tsResult.diagnostics.join(", ") || "Unknown ESLint parser failure";
+        throw new Error(`Failed to parse with ESLint parser: ${message}`);
     }
 
     const { tsPrelude, markdownBody, returnStatements } = tsResult.componentSplit;
 
     // Extract function information from the AST
     if (!tsResult.ast) {
-        throw new Error("No AST available from TS parser");
+        throw new Error("No AST available from ESLint parser");
     }
 
     // Find the main function declaration in the AST
@@ -150,7 +78,8 @@ async function buildParsedMDXWithTSParser(source: string): Promise<ParsedMDX> {
     }
 
     const typescriptLines = nonImportLines.slice(functionLineIndex + 1);
-    let typescript = typescriptLines.join("\n").trim();
+    const typescript = typescriptLines.join("\n").trim();
+
     // Process multiple return statements
     const processedReturnStatements = returnStatements.map(returnStmt => {
         // Extract content from the source using the return statement indices
@@ -230,79 +159,25 @@ async function buildParsedMDXWithTSParser(source: string): Promise<ParsedMDX> {
 }
 
 const mdxSource = /* mdx */ `
-export function MiniComponent({ name, isLoggedIn = true }: { name: string, isLoggedIn: boolean }) {
+function MiniComponent({ name, isLoggedIn = true }: { name: string, isLoggedIn: boolean }) {
   const excited = name.split("").map(letter => letter.toUpperCase()).join("");
   return (
     # Inline Demo
     {{ isLoggedIn ? (
+     {{ name === "" ? (
+      Nothing to see here.
+     ) : (
       This is rendering **{{ excited }}**!
+     )}}
     ) : (
       Not logged in
     )}}
   );
 }
-
-function helperFunction() {
-  return "helper";
-}
-
-export default function DefaultComponent() {
-  return "default";
-}
 `;
 
-const parsed = await buildParsedMDXWithTSParser(mdxSource);
+const parsed = buildParsedMDXWithTSParser(mdxSource);
 console.log(parsed);
-
-// Extract exported functions from the AST
-const tsResult = parseWithTypeScript(mdxSource);
-if (tsResult.success && tsResult.ast) {
-    const exportedFunctions = extractExportedFunctions(tsResult.ast);
-    console.log("\n=== Exported Functions from AST ===");
-    console.log(JSON.stringify(exportedFunctions, null, 2));
-
-    // Also show the TypeScript source that was parsed
-    console.log("\n=== TypeScript Source Being Parsed ===");
-    console.log(tsResult.tsPrelude);
-} else {
-    console.log("Failed to parse TypeScript source for export analysis");
-    console.log("Diagnostics:", tsResult.diagnostics);
-}
-
-// Test export detection with a complete TypeScript source using direct TypeScript compiler API
-const completeTypeScriptSource = `
-export function MiniComponent({ name, isLoggedIn = true }: { name: string, isLoggedIn: boolean }) {
-  const excited = name.split("").map(letter => letter.toUpperCase()).join("");
-  return "Hello " + excited;
-}
-
-function helperFunction() {
-  return "helper";
-}
-
-export default function DefaultComponent() {
-  return "default";
-}
-
-export const arrowFunction = () => {
-  return "arrow";
-};
-
-export const exportedConst = "constant";
-`;
-
-console.log("\n=== Testing Export Detection with Complete TypeScript Source ===");
-// Use TypeScript compiler API directly for regular TypeScript code
-const sourceFile = ts.createSourceFile(
-    'test.ts',
-    completeTypeScriptSource,
-    ts.ScriptTarget.Latest,
-    true
-);
-const allExportedFunctions = extractExportedFunctions(sourceFile);
-console.log("All exported functions:");
-console.log(JSON.stringify(allExportedFunctions, null, 2));
-
 const compiled = compile(parsed);
 console.log(compiled);
 

@@ -23,8 +23,8 @@ export function parseParameters(params: string): string[] {
     return parameters;
 }
 
-export function parseParameterTypes(params: string): Array<{ name: string; type: string; required: boolean }> {
-    const parameterTypes: Array<{ name: string; type: string; required: boolean }> = [];
+export function parseParameterTypes(params: string): Array<{ name: string; type: string; required: boolean; defaultValue?: string }> {
+    const parameterTypes: Array<{ name: string; type: string; required: boolean; defaultValue?: string }> = [];
 
     // Handle destructured object parameters with type annotations like { month, amount }: { month: string; amount: number }
     const destructuredMatch = params.match(/\{\s*([^}]+)\s*\}(?:\s*:\s*\{\s*([^}]+)\s*\})?/);
@@ -57,6 +57,15 @@ export function parseParameterTypes(params: string): Array<{ name: string; type:
             const hasDefaultValue = prop.includes('=');
             const cleanName = prop.replace('?', '').split('=')[0].trim();
 
+            // Extract default value if present
+            let defaultValue: string | undefined;
+            if (hasDefaultValue) {
+                const equalIndex = prop.indexOf('=');
+                if (equalIndex !== -1) {
+                    defaultValue = prop.substring(equalIndex + 1).trim();
+                }
+            }
+
             const typeInfo = typeMap.get(cleanName);
             const inferredType = typeInfo?.type || inferTypeFromUsage(cleanName) || 'any';
             const isTypeOptional = typeInfo?.optional || false;
@@ -64,7 +73,8 @@ export function parseParameterTypes(params: string): Array<{ name: string; type:
             parameterTypes.push({
                 name: cleanName,
                 type: inferredType,
-                required: !isOptional && !isTypeOptional && !hasDefaultValue
+                required: !isOptional && !isTypeOptional && !hasDefaultValue,
+                defaultValue
             });
         }
     } else {
@@ -77,11 +87,21 @@ export function parseParameterTypes(params: string): Array<{ name: string; type:
             const hasDefaultValue = name?.includes('=') || false;
             const cleanName = name?.replace('?', '').split('=')[0].trim() || '';
 
+            // Extract default value if present
+            let defaultValue: string | undefined;
+            if (hasDefaultValue && name) {
+                const equalIndex = name.indexOf('=');
+                if (equalIndex !== -1) {
+                    defaultValue = name.substring(equalIndex + 1).trim();
+                }
+            }
+
             if (cleanName) {
                 parameterTypes.push({
                     name: cleanName,
                     type: paramType || inferTypeFromUsage(cleanName) || 'any',
-                    required: !isOptional && !hasDefaultValue
+                    required: !isOptional && !hasDefaultValue,
+                    defaultValue
                 });
             }
         }
@@ -107,7 +127,7 @@ export function inferTypeFromUsage(paramName: string): string {
     return 'any';
 }
 
-export function generatePropsInterface(functionName: string, parameterTypes: Array<{ name: string; type: string; required: boolean }>): string {
+export function generatePropsInterface(functionName: string, parameterTypes: Array<{ name: string; type: string; required: boolean; defaultValue?: string }>): string {
     if (parameterTypes.length === 0) {
         return '';
     }
@@ -118,7 +138,7 @@ export function generatePropsInterface(functionName: string, parameterTypes: Arr
         return `  ${param.name}${optional}: ${param.type};`;
     }).join('\n');
 
-    return `export interface ${interfaceName} {
+    return `interface ${interfaceName} {
 ${properties}
 }`;
 }
