@@ -1,6 +1,7 @@
 import { ParsedMDX } from './parser';
 import { extractDependencies, compileTypeScript, generateTypedFunction, compileTemplate } from './compiler/compiler-utils';
 export { compileAllExportedFunctions, compileAllFunctions, type MultiFunctionCompilationResult } from './compiler/multi-function-compiler';
+export { compileFullFile, type FullFileCompilationResult } from './compiler/full-file-compiler';
 
 export interface CompiledMDX {
   id: string;

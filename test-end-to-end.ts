@@ -11,7 +11,7 @@
  * - Reusable codemods
  */
 
-import { compile, compileAllExportedFunctions, compileAllFunctions } from "./src/compiler";
+import { compile, compileAllExportedFunctions, compileAllFunctions, compileFullFile } from "./src/compiler";
 import type { ParsedMDX } from "./src/parser";
 import { parseWithTypeScript, extractParametersFromAST, extractFunctions } from "./src/parser/parser-utils";
 import { generatePropsInterface, parseParameters } from "./src/parser/parameters";
@@ -229,32 +229,21 @@ async function buildParsedMDXWithTSParser(source: string): Promise<ParsedMDX> {
     };
 }
 
-// Test export detection with a complete TypeScript source using direct TypeScript compiler API
+
 const completeTypeScriptSource = `
+const someName = "Bob";
+const exportedConst = (*Hey there, {{ someName }}!*);
+
 export function MiniComponent({ name, isLoggedIn = true }: { name: string, isLoggedIn: boolean }) {
   const excited = name.split("").map(letter => {
     return letter.toUpperCase()
   }).join("");
 
-  if (name === "") return (Welcome!)
+  if (name === "") return (Welcome, {{ someName }}!)
   return (# Hello {{ excited }}!)
 }
 
-function helperFunction() {
-  return (
-    ### Helper Function
-  )
-}
-
-export default function DefaultComponent() {
-  return (
-    default
-  )
-}
-
 const arrowFunction = () => (# Arrow Function);
-
-export const exportedConst = "constant";
 `;
 
 console.log("\n=== Testing Export Detection with Complete TypeScript Source ===");
@@ -277,6 +266,7 @@ console.log(JSON.stringify(allExportedFunctions, null, 2));
 console.log("\n=== Testing Multi-Function Compilation (All Functions) ===");
 const allFunctionsResult = await compileAllFunctions(completeTypeScriptSource);
 console.log("Compilation errors:", allFunctionsResult.errors);
+
 
 // Test the exported-only compilation for comparison
 console.log("\n=== Testing Multi-Function Compilation (Exported Only) ===");
@@ -310,3 +300,23 @@ for (const { functionInfo, compiled } of allFunctionsResult.functions) {
 }
 console.log("\n=== Complete Transpiled File (All Functions) ===");
 console.log(completeTranspiledFile);
+
+// Test the new full-file compiler that processes template syntax outside of functions
+console.log("\n=== Testing Full-File Compilation ===");
+const fullFileResult = await compileFullFile(completeTypeScriptSource);
+console.log("Full-file compilation errors:", fullFileResult.errors);
+console.log("Global templates found:", fullFileResult.globalTemplates.length);
+
+if (fullFileResult.globalTemplates.length > 0) {
+    console.log("\n--- Global Templates ---");
+    fullFileResult.globalTemplates.forEach(template => {
+        console.log(`Variable: ${template.variableName} (${template.isExported ? 'exported' : 'internal'})`);
+        console.log(`Original: ${template.originalValue}`);
+        console.log(`Transpiled: ${template.transpiledValue}`);
+        console.log(`Interpolations: ${template.interpolations.length}`);
+        console.log("");
+    });
+}
+
+console.log("\n=== Complete Transpiled File (Full-File) ===");
+console.log(fullFileResult.transpiledFile);
