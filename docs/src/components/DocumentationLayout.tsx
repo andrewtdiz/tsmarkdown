@@ -15,7 +15,7 @@ export function DocumentationLayout() {
         if (currentPath === '/') {
             return (
                 <div className="text-center py-8 text-muted-foreground">
-                    Welcome to Better-MDX Documentation
+                    Welcome to TS Markdown Documentation
                 </div>
             );
         }
@@ -26,7 +26,7 @@ export function DocumentationLayout() {
 
             // Update document title
             if (frontmatter?.title) {
-                document.title = `${frontmatter.title} - Better-MDX Documentation`;
+                document.title = `${frontmatter.title} - TS Markdown Documentation`;
             }
 
             return (

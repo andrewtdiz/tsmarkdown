@@ -1,0 +1,37 @@
+import { analyzeReturnStatements } from './src/parser/parser-utils';
+
+const testMdx = `function BasicMultipleReturns() {
+    const user = { name: "John Doe", isActive: true };
+    const isLoading = false;
+    const name = user.name.split('').map((char) => {
+        return (char)
+    }).join('');
+
+    if (isLoading) {
+        return (
+            # Loading State
+            Please wait while we load your data...
+        )
+    }
+
+    if (!user.isActive) {
+        return (
+            # Inactive User
+            Your account has been deactivated.
+            Please contact support for assistance.
+        )
+    }
+
+    return (
+        # User Dashboard
+        Welcome back, {{ name }}!
+        
+        ## Your Account
+        Status: Active
+        Last login: Today
+    )
+}`;
+
+console.log('Testing basic multiple returns...');
+const result = analyzeReturnStatements(testMdx);
+console.log('Result:', JSON.stringify(result, null, 2));

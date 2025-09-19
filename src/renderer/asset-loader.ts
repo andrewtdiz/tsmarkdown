@@ -189,14 +189,15 @@ function parseSimpleYaml(content: string): any {
             const colonIndex = trimmed.indexOf(':');
             if (colonIndex > 0) {
                 const key = trimmed.substring(0, colonIndex).trim();
-                let value = trimmed.substring(colonIndex + 1).trim();
+                let parsedValue = trimmed.substring(colonIndex + 1).trim();
+                let value;
 
                 // Parse boolean values
-                if (value === 'true') {
+                if (parsedValue === 'true') {
                     value = true;
-                } else if (value === 'false') {
+                } else if (parsedValue === 'false') {
                     value = false;
-                } else if (!isNaN(Number(value))) {
+                } else if (!isNaN(Number(parsedValue))) {
                     value = Number(value);
                 }
 

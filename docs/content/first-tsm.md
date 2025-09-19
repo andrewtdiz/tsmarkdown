@@ -1,8 +1,8 @@
 ---
 title: Create Your First File
-description: Build a complete Better-MDX application from scratch
+description: Build a complete TS Markdown application from scratch
 date: 2024-01-15
-author: Better-MDX Team
+author: TS Markdown Team
 tags: [tutorial, first-file, complete-example]
 ---
 
@@ -18,7 +18,7 @@ my-dashboard/
 │   │   ├── UserCard.tsx
 │   │   └── TodoList.tsx
 │   ├── templates/
-│   │   └── dashboard.mdx
+│   │   └── dashboard.tsm
 │   ├── data/
 │   │   └── sample-data.ts
 │   └── index.tsx
@@ -35,7 +35,7 @@ Create your project:
 mkdir my-dashboard
 cd my-dashboard
 bun init -y
-bun add better-mdx react react-dom
+bun add tsm react react-dom
 bun add -D @types/react @types/react-dom typescript
 ```
 
@@ -98,7 +98,7 @@ export const sampleData: DashboardData = {
   todos: [
     {
       id: '1',
-      text: 'Learn Better-MDX',
+      text: 'Learn TS Markdown',
       completed: true,
       priority: 'high',
       dueDate: '2024-01-20'
@@ -260,12 +260,12 @@ export const TodoList: React.FC<TodoListProps> = ({ todos, onToggleTodo }) => {
 
 ## Step 4: Create the Dashboard Template
 
-Create `src/templates/dashboard.mdx`:
+Create `src/templates/dashboard.tsm`:
 
-```mdx
+```tsm
 ---
 title: Personal Dashboard
-description: A dynamic dashboard built with Better-MDX
+description: A dynamic dashboard built with TS Markdown
 ---
 
 # Welcome back, {user.name}! 👋
@@ -401,19 +401,19 @@ Create `src/index.tsx`:
 ```typescript
 import React, { useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { MDXParser, compileMDX, executeMDXTemplate } from 'better-mdx'
+import { TSMParser, compileTSM, executeTSMTemplate } from 'tsm'
 import { sampleData, DashboardData } from './data/sample-data'
 import { UserCard } from './components/UserCard'
 import { TodoList } from './components/TodoList'
-import dashboardTemplate from './templates/dashboard.mdx?raw'
+import dashboardTemplate from './templates/dashboard.tsm?raw'
 
 function App() {
   const [data, setData] = useState<DashboardData>(sampleData)
 
   // Parse and compile the template
-  const parser = new MDXParser()
+  const parser = new TSMParser()
   const parsed = parser.parse(dashboardTemplate)
-  const compiled = compileMDX(parsed)
+  const compiled = compileTSM(parsed)
 
   const handleToggleTodo = (id: string) => {
     setData(prevData => ({
@@ -430,7 +430,7 @@ function App() {
   }
 
   // Execute the template with data and components
-  const result = executeMDXTemplate(compiled, {
+  const result = executeTSMTemplate(compiled, {
     ...data,
     onToggleTodo: handleToggleTodo
   }, {
@@ -466,7 +466,7 @@ Create `index.html`:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Better-MDX Dashboard</title>
+    <title>TS Markdown Dashboard</title>
     <style>
         body {
             margin: 0;
@@ -488,7 +488,7 @@ Create `index.html`:
 bun run --bun src/index.tsx
 ```
 
-🎉 **Congratulations!** You've built a complete Better-MDX application!
+🎉 **Congratulations!** You've built a complete TS Markdown application!
 
 ## What You've Built
 
@@ -498,7 +498,7 @@ Your dashboard includes:
 ✅ **Interactive Components**: Clickable buttons and todo checkboxes  
 ✅ **Conditional Rendering**: Different content based on user status  
 ✅ **Real-time Updates**: Todo completion updates the stats  
-✅ **Component Integration**: Custom React components in MDX  
+✅ **Component Integration**: Custom React components in TS Markdown  
 ✅ **Responsive Design**: Clean, modern interface  
 
 ## Key Features Demonstrated
@@ -568,7 +568,7 @@ const MemoizedComponent = React.memo(MyComponent)
 ```
 
 {% callout type="check" %}
-**Complete Application Built!** You now have a fully functional Better-MDX dashboard with dynamic content, interactivity, and real-time updates.
+**Complete Application Built!** You now have a fully functional TS Markdown dashboard with dynamic content, interactivity, and real-time updates.
 {% /callout %}
 
-Ready to explore more features? Check out the [Syntax Guide](/syntax-guide) to learn about advanced Better-MDX capabilities!
+Ready to explore more features? Check out the [Syntax Guide](/syntax-guide) to learn about advanced TS Markdown capabilities!

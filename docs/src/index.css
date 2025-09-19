@@ -1,14 +1,10 @@
 @import "../styles/globals.css";
-@import "highlight.js/styles/github.css";
 
 @layer base {
   :root {
     @apply font-sans;
   }
 
-  body {
-    @apply grid place-items-center min-w-[320px] min-h-screen relative m-0 bg-background text-foreground;
-  }
 }
 
 @keyframes slide {

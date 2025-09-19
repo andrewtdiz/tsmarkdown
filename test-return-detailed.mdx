@@ -1,0 +1,104 @@
+function TestReturnDetailed() {
+  const analysisTitle = 'How Return Content is Handled';
+  const componentScannerInfo = 'Component Scanner splits the file into TypeScript prelude and Markdown body';
+  const tsPreludeLength = 330;
+  const markdownBodyLength = 223;
+
+  return (
+    # Detailed Return Content Analysis
+
+    ## {analysisTitle}
+
+    ### 1. Component Scanner Split
+    - **TypeScript Prelude**: Everything before the return statement
+    - **Markdown Body**: Everything inside the return statement parentheses  
+    - **Return statement**: NOT included in either part
+
+    ### 2. TypeScript Prelude (sent to ESLint parser)
+    **Length**: {tsPreludeLength} characters
+
+    **Contains**:
+    ✓ Interface declarations (interface User)
+    ✓ Type declarations (type UserRole)
+    ✓ Function declaration (const TypedComponent = () => {)
+    ✓ Variable declarations (const user: User = {...})
+    ✓ Logic before return (const isAdmin = role === 'admin')
+    ✗ Return statement (excluded)
+
+    ### 3. Markdown Body (sent to existing MDX pipeline)
+    **Length**: {markdownBodyLength} characters
+
+    **Contains**:
+    ✓ Markdown headers (# User Profile)
+    ✓ Better MDX interpolations ({{ user.name }})
+    ✓ Better MDX conditionals ({{ isAdmin && (...) }})
+    ✓ Better MDX ternary expressions ({{ user.isActive ? ... : ... }})
+    ✓ Opening parenthesis (included)
+    ✗ Closing parenthesis (excluded)
+
+    ### 4. Processing Flow
+    1. **Step 1**: {componentScannerInfo}
+    2. **Step 2**: TypeScript prelude → ESLint parser → AST for type checking
+    3. **Step 3**: Markdown body → Existing MDX pipeline → Processed markdown
+    4. **Step 4**: Both results can be used together
+
+    ### 5. Example Split
+
+    **TypeScript Prelude**:
+    interface User { ... }
+    type UserRole = ...
+    const TypedComponent = () => {
+      const user: User = { ... };
+      const isAdmin = role === 'admin';
+    ↓ (sent to ESLint parser)
+    ✓ Type checking, syntax validation, AST generation
+
+    **Markdown Body**:
+    (
+      # User Profile
+      Name: {{ user.name }}
+      {{ isAdmin && (Admin panel access) }}
+      {{ user.isActive ? "active" : "..." }}
+    ↓ (sent to existing MDX pipeline)
+    ✓ Interpolation processing, conditional rendering
+
+    ### 6. Key Insight
+    The return content is treated as **MARKDOWN**, not TypeScript!
+
+    This allows:
+    • ESLint to type-check the component logic
+    • Existing MDX pipeline to process the template
+    • Both systems to work together seamlessly
+
+    ### 7. Actual Content
+
+    **TypeScript Prelude**:
+    interface User {
+        name: string;
+        age: number;
+        isActive: boolean;
+    }
+
+    type UserRole = 'admin' | 'user' | 'guest';
+
+    const TypedComponent = () => {
+        const user: User = {
+            name: "John Doe",
+            age: 30,
+            isActive: true
+        };
+        
+        const role: UserRole = 'admin';
+        const isAdmin = role === 'admin';
+
+    **Markdown Body**:
+    (
+        # User Profile
+        Name: {{ user.name }}
+        Age: {{ user.age }}
+        {{ isAdmin && (
+            Admin panel access
+        )}}
+        {{ user.isActive ? "Account is active" : "Account is inactive" }}
+  )
+}

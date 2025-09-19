@@ -1,0 +1,42 @@
+function ErrorHandling() {
+    const data = fetchUserData();
+    const error = data.error;
+    const user = data.user;
+
+    if (error) {
+        return (
+            # Error State
+            Something went wrong while loading your data.
+            
+            Error: {{ error.message }}
+            
+            Please try refreshing the page or contact support.
+        )
+    }
+
+    if (!user) {
+        return (
+            # No Data
+            No user data available.
+            Please check your connection and try again.
+        )
+    }
+
+    if (user.isBlocked) {
+        return (
+            # Access Denied
+            Your account has been temporarily blocked.
+            Reason: {{ user.blockReason }}
+            
+            Contact support for assistance.
+        )
+    }
+
+    return (
+        # User Profile
+        ## {{ user.name }}
+        Email: {{ user.email }}
+        Role: {{ user.role }}
+        Last Active: {{ user.lastActive }}
+    )
+}

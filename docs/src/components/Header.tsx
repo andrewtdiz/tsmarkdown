@@ -1,15 +1,17 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
+import { useTheme } from './ThemeProvider';
+import { MoonIcon, SunIcon } from 'lucide-react';
 
 interface HeaderProps {
     showNavigation?: boolean;
 }
 
 export function Header({ showNavigation = true }: HeaderProps) {
-    const location = useLocation();
     const navigate = useNavigate();
-    const currentPath = location.pathname;
+
+    const themeToggle = useTheme();
 
     return (
         <header className="flex-shrink-0 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -21,21 +23,21 @@ export function Header({ showNavigation = true }: HeaderProps) {
                             className="text-2xl font-bold p-0 h-auto hover:bg-transparent"
                             onClick={() => navigate('/')}
                         >
-                            Better-MDX Documentation
+                            TS Markdown
                         </Button>
                     </div>
                     {showNavigation && (
                         <div className="flex items-center space-x-4">
                             <Button
                                 variant="ghost"
-                                className='text-lg text-foreground/80 font-normal'
+                                className='text-md text-foreground/80 font-normal'
                                 onClick={() => navigate('/welcome')}
                             >
-                                Welcome
+                                 Docs
                             </Button>
                             <Button
                                 variant="ghost"
-                                className='text-lg text-foreground/80 font-normal'
+                                className='text-md text-foreground/80 font-normal'
                                 onClick={() => navigate('/about')}
                             >
                                 About
@@ -43,9 +45,9 @@ export function Header({ showNavigation = true }: HeaderProps) {
                             <Button
                                 variant="ghost"
                                 className='text-lg text-foreground/80 font-normal'
-                                onClick={() => navigate('/frontmatter-examples')}
+                                onClick={() => themeToggle.setTheme(themeToggle.theme === 'dark' ? 'light' : 'dark')}
                             >
-                                Frontmatter
+                                {themeToggle.theme === 'dark' ? <SunIcon className='w-4 h-4' /> : <MoonIcon className='w-4 h-4' />}
                             </Button>
                         </div>
                     )}

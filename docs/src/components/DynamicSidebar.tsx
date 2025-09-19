@@ -69,7 +69,7 @@ export function DynamicSidebar({ sections }: DynamicSidebarProps) {
             <nav className="space-y-6">
                 {sections.map((section) => (
                     <div key={section.title}>
-                        <h3 className="px-2 text-xs uppercase font-normal text-muted-foreground/85 mb-1 leading-tight">
+                        <h3 className="px-2 text-xs mb-3 uppercase font-normal text-muted-foreground/85 mb-1 leading-tight">
                             {section.title}
                         </h3>
                         <ul className="space-y-1">
@@ -83,8 +83,9 @@ export function DynamicSidebar({ sections }: DynamicSidebarProps) {
                                         <Button
                                             variant={'ghost'}
                                             className={cn(
-                                                "w-full justify-start font-normal text-foreground/90 hover:text-foreground rounded-xs text-left h-auto py-1 px-3 font-normal",
-                                                isActive && "text-foreground bg-muted"
+                                                "w-full justify-start duration-0 font-normal text-foreground/80 hover:text-foreground rounded-md text-left h-auto py-1 px-3 font-normal",
+                                                isActive && "text-foreground bg-muted  hover:bg-muted/80!",
+                                                !isActive && "hover:bg-transparent"
                                             )}
                                             onClick={() => navigate(link.href)}
                                             title={contentMetadata[link.href]?.description}

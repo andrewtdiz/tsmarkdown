@@ -39,7 +39,7 @@ export function initializeContentManifest() {
         { file: 'overview.md', route: '/overview' },
         { file: 'installation.md', route: '/installation' },
         { file: 'quick-start.md', route: '/quick-start' },
-        { file: 'first-mdx.md', route: '/first-mdx' }
+        { file: 'first-tsm.md', route: '/first-tsm' }
     ];
 
     try {

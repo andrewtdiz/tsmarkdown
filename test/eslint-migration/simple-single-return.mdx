@@ -1,0 +1,12 @@
+function SimpleSingleReturn({ name }: { name: string}) {
+    const isValid = name !== "";
+    
+    return (
+        # User Dashboard
+        Welcome back, {{ name }}!
+        
+        ## Your Account
+        Status: {{ isValid ? "Active" : "Inactive" }}
+        Last login: Today
+    )
+}

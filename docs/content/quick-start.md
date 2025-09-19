@@ -1,8 +1,8 @@
 ---
 title: Quick Start Guide
-description: Get up and running with Better-MDX in just a few minutes
+description: Get up and running with TS Markdown in just a few minutes
 date: 2024-01-15
-author: Better-MDX Team
+author: TS Markdown Team
 tags: [quick-start, tutorial, getting-started]
 ---
 
@@ -11,15 +11,15 @@ tags: [quick-start, tutorial, getting-started]
 ### Step 1: Create a New Project
 
 ```bash
-mkdir my-better-mdx-app
-cd my-better-mdx-app
+mkdir my-ts-markdown-app
+cd my-ts-markdown-app
 bun init -y
 ```
 
-### Step 2: Install Better-MDX
+### Step 2: Install TS Markdown
 
 ```bash
-bun add tsmarkdown
+bun add tsm
 ```
 
 ### Step 3: Create Your First File
@@ -27,13 +27,13 @@ bun add tsmarkdown
 Create `index.tsd`:
 
 ```typescript
-import { MDXParser, compileMDX, executeMDXTemplate } from 'better-mdx'
+import { TSMParser, compileTSM, executeTSMTemplate } from 'tsm'
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 
 // Your dynamic content template
 const template = `
-# Welcome to Better-MDX!
+# Welcome to TS Markdown!
 
 Hello {name}! Today is {currentDate}.
 

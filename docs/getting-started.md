@@ -1,6 +1,6 @@
-# Getting Started with Better-MDX
+# Getting Started with TS Markdown
 
-This guide will walk you through creating your first Better-MDX project from scratch.
+This guide will walk you through creating your first TS Markdown project from scratch.
 
 ## Prerequisites
 
@@ -12,10 +12,10 @@ This guide will walk you through creating your first Better-MDX project from scr
 
 ### Option 1: Create New Project
 
-The fastest way to get started is with the Better-MDX CLI:
+The fastest way to get started is with the TS Markdown CLI:
 
 ```bash
-npx better-mdx init my-first-project
+npx tsm init my-first-project
 cd my-first-project
 npm install
 npm run dev
@@ -25,26 +25,26 @@ This creates a complete project structure with examples and documentation.
 
 ### Option 2: Add to Existing Project
 
-Install Better-MDX in an existing project:
+Install TS Markdown in an existing project:
 
 ```bash
-npm install better-mdx
+npm install tsm
 # or
-bun add better-mdx
+bun add tsm
 ```
 
 ## Project Structure
 
-A typical Better-MDX project looks like this:
+A typical TS Markdown project looks like this:
 
 ```
 my-project/
-├── mdx/                    # Your MDX files
-│   ├── Welcome.mdx
-│   ├── About.mdx
+├── tsm/                    # Your TS Markdown files
+│   ├── Welcome.tsm
+│   ├── About.tsm
 │   └── Blog/
-│       ├── Post1.mdx
-│       └── Post2.mdx
+│       ├── Post1.tsm
+│       └── Post2.tsm
 ├── src/
 │   ├── components/         # React components
 │   │   ├── Button.tsx
@@ -57,13 +57,13 @@ my-project/
 └── tsconfig.json
 ```
 
-## Your First MDX File
+## Your First TS Markdown File
 
-Create `mdx/Hello.mdx`:
+Create `tsm/Hello.tsm`:
 
-```mdx
+```tsm
 function HelloWorld() {
-  const message = 'Welcome to Better-MDX!';
+  const message = 'Welcome to TS Markdown!';
   const currentTime = new Date().toLocaleTimeString();
 
   return (
@@ -71,7 +71,7 @@ function HelloWorld() {
 
     It's currently {{ currentTime }}.
 
-    ## What can you do with Better-MDX?
+    ## What can you do with TS Markdown?
 
     - 🔥 **Dynamic content** with template interpolation
     - 🎯 **Conditional rendering** based on data
@@ -86,9 +86,9 @@ function HelloWorld() {
 
 ### Function Structure
 
-Every MDX file contains a TypeScript function that returns content:
+Every TS Markdown file contains a TypeScript function that returns content:
 
-```mdx
+```tsm
 function MyComponent() {
   // TypeScript code goes here
   const data = fetchSomeData();
@@ -106,7 +106,7 @@ function MyComponent() {
 
 Use `{{ expression }}` to embed dynamic values:
 
-```mdx
+```tsm
 function Examples() {
   const user = { name: 'Alice', age: 30 };
   const items = ['Apple', 'Banana', 'Cherry'];
@@ -129,7 +129,7 @@ function Examples() {
 
 Show or hide content based on conditions:
 
-```mdx
+```tsm
 function ConditionalExample() {
   const user = getCurrentUser();
   const isPremium = user?.subscription === 'premium';
@@ -162,7 +162,7 @@ function ConditionalExample() {
 
 Import and use React components directly:
 
-```mdx
+```tsm
 import { Button, Card, Icon } from '../src/components';
 
 function ComponentExample() {
@@ -173,7 +173,7 @@ function ComponentExample() {
 
     <Card variant="primary">
       <Icon name="star" />
-      This is a React component inside MDX!
+      This is a React component inside TS Markdown!
 
       <Button onClick={handleClick} variant="primary">
         Click me
@@ -187,9 +187,9 @@ function ComponentExample() {
 
 ### Static Data
 
-Define data directly in your MDX file:
+Define data directly in your TS Markdown file:
 
-```mdx
+```tsm
 function StaticDataExample() {
   const products = [
     { id: 1, name: 'Laptop', price: 999 },
@@ -213,7 +213,7 @@ function StaticDataExample() {
 
 Use React hooks to fetch external data:
 
-```mdx
+```tsm
 import { useAPI } from '../src/hooks';
 
 function DynamicDataExample() {
@@ -248,7 +248,7 @@ function DynamicDataExample() {
 
 Use context for shared data:
 
-```mdx
+```tsm
 import { useContext } from '../src/hooks';
 
 function ContextExample() {
@@ -278,11 +278,11 @@ function ContextExample() {
 ### Starting Development Server
 
 ```bash
-better-mdx dev
+tsm dev
 ```
 
 This starts a development server with:
-- Hot reload for MDX files
+- Hot reload for TS Markdown files
 - Error overlay for compilation issues
 - TypeScript type checking
 - React component updates
@@ -292,23 +292,23 @@ This starts a development server with:
 Watch specific files or directories:
 
 ```bash
-better-mdx watch ./mdx
+tsm watch ./tsm
 ```
 
 ### Compilation
 
-Compile MDX files to JSON format:
+Compile TS Markdown files to JSON format:
 
 ```bash
-better-mdx compile MyFile.mdx --output compiled.json
+tsm compile MyFile.tsm --output compiled.json
 ```
 
 ### Execution
 
-Test MDX execution with mock context:
+Test TS Markdown execution with mock context:
 
 ```bash
-better-mdx execute MyFile.mdx
+tsm execute MyFile.tsm
 ```
 
 ## Building for Production
@@ -316,7 +316,7 @@ better-mdx execute MyFile.mdx
 ### Build Command
 
 ```bash
-better-mdx build
+tsm build
 ```
 
 This creates optimized builds in the `dist/` directory.
@@ -328,13 +328,13 @@ Customize build settings in `package.json`:
 ```json
 {
   "scripts": {
-    "build": "better-mdx build --output ./dist --verbose",
-    "build:watch": "better-mdx build --watch"
+    "build": "tsm build --output ./dist --verbose",
+    "build:watch": "tsm build --watch"
   }
 }
 ```
 
-## Testing Your MDX
+## Testing Your TS Markdown
 
 ### Test Setup
 
@@ -343,12 +343,12 @@ Create test files using the testing utilities:
 ```typescript
 // test/content.test.ts
 import { test, expect } from 'bun:test';
-import { MDXTestRunner, createMDXTest } from 'better-mdx/testing';
+import { TSMTestRunner, createTSMTest } from 'tsm/testing';
 
-const runner = new MDXTestRunner();
+const runner = new TSMTestRunner();
 
 test('Welcome page renders correctly', async () => {
-  const testCase = createMDXTest(
+  const testCase = createTSMTest(
     'Welcome page',
     `
 function Welcome() {
@@ -370,15 +370,15 @@ function Welcome() {
 ### Running Tests
 
 ```bash
-better-mdx-test run
+tsm-test run
 ```
 
 ### Snapshot Testing
 
 ```typescript
-import { MDXSnapshotTester } from 'better-mdx/testing';
+import { TSMSnapshotTester } from 'tsm/testing';
 
-const snapshots = new MDXSnapshotTester();
+const snapshots = new TSMSnapshotTester();
 
 test('Homepage snapshot', () => {
   const matches = snapshots.matchSnapshot('homepage', homepageContent);
@@ -392,12 +392,12 @@ test('Homepage snapshot', () => {
 
 1. Open VS Code
 2. Go to Extensions (Ctrl+Shift+X)
-3. Search for "Better-MDX"
+3. Search for "TS Markdown"
 4. Click Install
 
 ### Features
 
-- **Syntax highlighting** for MDX files
+- **Syntax highlighting** for TS Markdown files
 - **IntelliSense** for template expressions
 - **Error diagnostics** for compilation issues
 - **Code snippets** for common patterns
@@ -405,18 +405,18 @@ test('Homepage snapshot', () => {
 
 ### Snippets
 
-Type these shortcuts in `.mdx` files:
+Type these shortcuts in `.tsm` files:
 
-- `mdx-function` - Basic MDX function template
-- `mdx-conditional` - Conditional rendering block
-- `mdx-interpolation` - Template interpolation
-- `mdx-component` - React component usage
+- `tsm-function` - Basic TS Markdown function template
+- `tsm-conditional` - Conditional rendering block
+- `tsm-interpolation` - Template interpolation
+- `tsm-component` - React component usage
 
 ## Common Patterns
 
 ### Navigation Menu
 
-```mdx
+```tsm
 function Navigation() {
   const currentPath = window.location.pathname;
   const menuItems = [
@@ -437,7 +437,7 @@ function Navigation() {
 
 ### Feature List
 
-```mdx
+```tsm
 function FeatureList() {
   const features = [
     { icon: '🚀', title: 'Fast', description: 'Optimized for performance' },
@@ -458,7 +458,7 @@ function FeatureList() {
 
 ### User Profile
 
-```mdx
+```tsm
 import { Avatar, Badge } from '../components';
 
 function UserProfile() {
@@ -499,8 +499,8 @@ Now that you understand the basics, explore these advanced topics:
 ## Getting Help
 
 - 📚 [Full Documentation](./README.md)
-- 💬 [Discord Community](https://discord.gg/better-mdx)
-- 🐛 [Issue Tracker](https://github.com/better-mdx/better-mdx/issues)
-- 📧 [Email Support](mailto:support@better-mdx.dev)
+- 💬 [Discord Community](https://discord.gg/ts-markdown)
+- 🐛 [Issue Tracker](https://github.com/ts-markdown/tsm/issues)
+- 📧 [Email Support](mailto:support@ts-markdown.dev)
 
-Happy coding with Better-MDX! 🎉
+Happy coding with TS Markdown! 🎉

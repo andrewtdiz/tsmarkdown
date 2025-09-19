@@ -15,8 +15,8 @@ export async function executeTypeScript(typescript: string, context: RenderConte
         // Create a safe execution environment with resolved imports
         const safeContext = createSafeContext(context, typescript, resolvedImports);
 
-        // Remove import statements as they can't be executed in this context
-        const executableCode = removeImports(typescript);
+        // Extract executable code - either standalone code or function body
+        const executableCode = extractExecutableCode(typescript);
 
         if (!executableCode.trim()) {
             return {};
@@ -40,6 +40,35 @@ export async function executeTypeScript(typescript: string, context: RenderConte
     } catch (error) {
         throw new Error(`TypeScript execution failed: ${error}`);
     }
+}
+
+export function extractExecutableCode(typescript: string): string {
+    // Check if this is a complete function declaration
+    const functionMatch = typescript.match(/export\s+function\s+\w+\s*\([^)]*\)\s*:\s*string\s*\{\s*([\s\S]*)\s*\}/);
+
+    if (functionMatch) {
+        // This is a complete function, extract the body
+        const functionBody = functionMatch[1].trim();
+
+        // Remove the final return statement (it contains the template literal)
+        // We only want the TypeScript code before the return statement
+        const lines = functionBody.split('\n');
+        const codeLines = [];
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('return `') || trimmed.startsWith('return`')) {
+                // Stop at the return statement - we don't want to execute the template literal
+                break;
+            }
+            codeLines.push(line);
+        }
+
+        return codeLines.join('\n').trim();
+    }
+
+    // Fallback to the original behavior for standalone code
+    return removeImports(typescript);
 }
 
 export function createSafeContext(context: RenderContext, typescript?: string, resolvedImports?: any): any {

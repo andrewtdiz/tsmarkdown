@@ -21,6 +21,8 @@
   },
   "dependencies": {
     "@types/react": "^19.1.13",
+    "@typescript-eslint/parser": "^8.44.0",
+    "@typescript-eslint/typescript-estree": "^8.44.0",
     "commander": "^11.0.0",
     "js-yaml": "^4.1.0",
     "marked": "^12.0.0",

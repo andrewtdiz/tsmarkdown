@@ -1,0 +1,28 @@
+interface User {
+    name: string;
+    age: number;
+    isActive: boolean;
+}
+
+type UserRole = 'admin' | 'user' | 'guest';
+
+const TypedComponent = () => {
+    const user: User = {
+        name: "John Doe",
+        age: 30,
+        isActive: true
+    };
+    
+    const role: UserRole = 'admin';
+    const isAdmin = role === 'admin';
+    
+    return (
+        # User Profile
+        Name: {{ user.name }}
+        Age: {{ user.age }}
+        {{ isAdmin && (
+            Admin panel access
+        )}}
+        {{ user.isActive ? "Account is active" : "Account is inactive" }}
+    )
+}

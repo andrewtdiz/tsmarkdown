@@ -34,7 +34,11 @@ export async function renderComponent(compiled: CompiledMDX, context: RenderCont
             processedContent = await processMultipleReturnStatements(
                 compiled.returnStatements,
                 fullContext,
-                errors
+                errors,
+                compiled.interpolations,
+                compiled.conditionalBlocks,
+                compiled.ternaryExpressions,
+                compiled.jsxExpressions
             );
         } else {
             // Fall back to single template processing for backward compatibility

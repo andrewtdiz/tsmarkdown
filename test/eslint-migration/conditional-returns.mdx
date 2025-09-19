@@ -1,0 +1,44 @@
+function ConditionalReturns() {
+    const theme = "dark";
+    const userRole = "admin";
+    const isLoggedIn = true;
+
+    if (!isLoggedIn) {
+        return (
+            # Login Required
+            Please log in to access this content.
+        )
+    }
+
+    if (userRole === "admin") {
+        return (
+            # Admin Panel
+            Welcome to the admin dashboard!
+            
+            ## Admin Tools
+            - User Management
+            - System Settings
+            - Analytics Dashboard
+        )
+    } else if (userRole === "moderator") {
+        return (
+            # Moderator Panel
+            Welcome to the moderator dashboard!
+            
+            ## Moderator Tools
+            - Content Review
+            - User Reports
+            - Community Guidelines
+        )
+    } else {
+        return (
+            # User Dashboard
+            Welcome to your personal dashboard!
+            
+            ## Your Content
+            - Profile Settings
+            - Activity History
+            - Preferences
+        )
+    }
+}

@@ -1,14 +1,14 @@
 ---
-title: Install Better-MDX
-description: Complete installation guide for Better-MDX in your project
+title: Install TS Markdown
+description: Complete installation guide for TS Markdown in your project
 date: 2024-01-15
-author: Better-MDX Team
+author: TS Markdown Team
 tags: [installation, setup, getting-started]
 ---
 
 ## Prerequisites
 
-Before installing Better-MDX, make sure you have:
+Before installing TS Markdown, make sure you have:
 
 - **Node.js** 18+ or **Bun** 1.0+
 - **TypeScript** (recommended for type safety)
@@ -20,25 +20,25 @@ Before installing Better-MDX, make sure you have:
 ### Option 1: Bun (Recommended)
 
 ```bash
-bun add better-mdx
+bun add tsm
 ```
 
 ### Option 2: npm
 
 ```bash
-npm install better-mdx
+npm install tsm
 ```
 
 ### Option 3: yarn
 
 ```bash
-yarn add better-mdx
+yarn add tsm
 ```
 
 ### Option 4: pnpm
 
 ```bash
-pnpm add better-mdx
+pnpm add tsm
 ```
 
 ## TypeScript Setup

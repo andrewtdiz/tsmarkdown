@@ -1,0 +1,16 @@
+function SimpleMultipleReturns({ name }: { name: string}) {
+    if (name === "") {
+        return (
+            Invalid name.
+        )
+    }
+
+    return (
+        # User Dashboard
+        Welcome back, {{ name }}!
+        
+        ## Your Account
+        Status: Active
+        Last login: Today
+    )
+}

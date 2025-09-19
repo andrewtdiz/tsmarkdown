@@ -3,6 +3,10 @@ import type { ParseContext } from './types';
 import { parseContent } from './pipeline';
 import { processJSXElements } from './jsx';
 
+// ESLint integration (opt-in)
+import { parseForESLint, validateForESLint, extractTypeInfo, analyzeReturnStatements } from './eslint-parser';
+import { locateComponent, splitComponent, validateComponentStructure } from './component-scanner';
+
 // Core pipeline and types
 export type { ParseContext } from './types';
 export { parseContent } from './pipeline';
@@ -49,3 +53,11 @@ export function processTemplateContent(
 
     return processed;
 }
+
+// ESLint integration exports (opt-in functionality)
+export { parseForESLint, validateForESLint, extractTypeInfo, analyzeReturnStatements } from './eslint-parser';
+export { locateComponent, splitComponent, validateComponentStructure } from './component-scanner';
+
+// ESLint integration types
+export type { ESLintParseResult, ESLintParseOptions } from './eslint-parser';
+export type { ComponentSplit, ComponentLocation } from './component-scanner';

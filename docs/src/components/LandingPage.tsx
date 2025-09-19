@@ -14,13 +14,13 @@ export function LandingPage() {
         },
         {
             icon: FileText,
-            title: "MDX Made Better",
-            description: "Enhanced MDX with better syntax, improved performance, and seamless React integration."
+            title: "TS Markdown Made Better",
+            description: "Enhanced TS Markdown with better syntax, improved performance, and seamless React integration."
         },
         {
             icon: Component,
             title: "React Components",
-            description: "Use any React component directly in your MDX files with full TypeScript support."
+            description: "Use any React component directly in your TS Markdown files with full TypeScript support."
         },
         {
             icon: Rocket,
@@ -30,25 +30,25 @@ export function LandingPage() {
     ];
 
     const quickLinks = [
-        { href: '/overview', title: 'What is Better-MDX?', description: 'Learn about the enhanced MDX experience' },
+        { href: '/overview', title: 'What is TS Markdown?', description: 'Learn about the enhanced TS Markdown experience' },
         { href: '/quick-start', title: 'Quick Start', description: 'Get up and running in minutes' },
-        { href: '/first-mdx', title: 'Create Your First File', description: 'Build your first Better-MDX document' },
-        { href: '/installation', title: 'Installation', description: 'Install and configure Better-MDX' }
+        { href: '/first-tsm', title: 'Create Your First File', description: 'Build your first TS Markdown document' },
+        { href: '/installation', title: 'Installation', description: 'Install and configure TS Markdown' }
     ];
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
+        <div className="min-h-screen">
             {/* Header */}
-            <Header showNavigation={false} />
+            <Header />
 
             {/* Hero Section */}
-            <div className="container mx-auto px-4 py-16">
+            <div className="w-screen px-4 py-16">
                 <div className="text-center max-w-4xl mx-auto">
-                    <h1 className="text-5xl font-bold tracking-tight mb-6 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                        Better-MDX Documentation
+                    <h1 className="text-5xl font-bold tracking-tight mb-6">
+                        TS Markdown Documentation
                     </h1>
                     <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-                        The enhanced MDX experience with dynamic content, conditional rendering, and seamless React integration.
+                        The enhanced TS Markdown experience with dynamic content, conditional rendering, and seamless React integration.
                         Build faster, more interactive documentation and content.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -70,9 +70,9 @@ export function LandingPage() {
             {/* Features Section */}
             <div className="container mx-auto px-4 py-16">
                 <div className="text-center mb-12">
-                    <h2 className="text-3xl font-bold mb-4">Why Better-MDX?</h2>
+                    <h2 className="text-3xl font-bold mb-4">Why TS Markdown?</h2>
                     <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                        Enhanced MDX with powerful features for modern documentation and content creation.
+                        Enhanced TS Markdown with powerful features for modern documentation and content creation.
                     </p>
                 </div>
 
@@ -103,7 +103,7 @@ export function LandingPage() {
                 <div className="text-center mb-12">
                     <h2 className="text-3xl font-bold mb-4">Get Started</h2>
                     <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                        Jump into Better-MDX with these essential guides and tutorials.
+                        Jump into TS Markdown with these essential guides and tutorials.
                     </p>
                 </div>
 
@@ -134,7 +134,7 @@ export function LandingPage() {
             {/* Footer */}
             <div className="container mx-auto px-4 py-8 border-t">
                 <div className="text-center text-muted-foreground">
-                    <p>Built with Better-MDX • Powered by Bun • Enhanced with React</p>
+                    <p>Built with TS Markdown • Powered by Bun • Enhanced with React</p>
                 </div>
             </div>
         </div>

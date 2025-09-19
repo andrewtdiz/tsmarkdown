@@ -1,0 +1,10 @@
+function BasicMultipleReturns({ name }: { name?: string }) {
+    if (!name) {
+        return (
+            Name not provided.
+        );
+    }
+    return (
+        Welcome back, {{ name }}!
+    )
+}

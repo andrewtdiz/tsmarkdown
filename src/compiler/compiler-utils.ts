@@ -79,13 +79,76 @@ export function extractDependencies(imports: string[]): string[] {
 }
 
 export function compileTypeScript(parsed: ParsedMDX): string {
-    // Combine imports, props interface, and typescript code (without generating stub functions)
+    // Combine imports, props interface, and generate complete function
     const imports = parsed.imports.join('\n');
     const propsInterface = parsed.propsInterface || '';
-    const typescript = parsed.typescript;
 
-    const parts = [imports, propsInterface, typescript].filter(Boolean);
+    // Generate the complete function with the TypeScript body and return statement
+    const completeFunction = generateCompleteFunction(parsed);
+
+    const parts = [imports, propsInterface, completeFunction].filter(Boolean);
     return parts.join('\n\n').trim();
+}
+
+export function generateCompleteFunction(parsed: ParsedMDX): string {
+    if (!parsed.functionName) {
+        return parsed.typescript; // Fallback to just the typescript code
+    }
+
+    const interfaceName = `${parsed.functionName}Props`;
+    const hasProps = parsed.parameterTypes.length > 0;
+
+    // Generate function parameters
+    let functionParams = '';
+    if (hasProps) {
+        const destructuredParams = parsed.parameterTypes.map(param => {
+            return param.name; // Remove optional markers from parameter names in destructuring
+        }).join(', ');
+        functionParams = `{ ${destructuredParams} }: ${interfaceName}`;
+    }
+
+    // Generate the return statement with the template
+    const returnStatement = generateReturnStatement(parsed);
+
+    // Combine everything into a complete function
+    const functionBody = `${parsed.typescript}
+  ${returnStatement}`;
+
+    return `export function ${parsed.functionName}(${functionParams}): string {
+  ${functionBody}
+}`;
+}
+
+export function generateReturnStatement(parsed: ParsedMDX): string {
+    // Process interpolations in the markdown template
+    let processedMarkdown = parsed.markdown;
+
+    // Clean up the markdown - remove leading/trailing whitespace and fix common issues
+    processedMarkdown = processedMarkdown.trim();
+
+    // Remove the opening parenthesis and newline if it starts with "(\n"
+    if (processedMarkdown.startsWith('(\n')) {
+        processedMarkdown = processedMarkdown.substring(2);
+    }
+
+    // Replace interpolation placeholders with actual expressions
+    for (const interpolation of parsed.interpolations) {
+        const placeholder = interpolation.placeholder;
+        const expression = interpolation.expression;
+
+        // Replace the placeholder with the expression wrapped in ${}
+        processedMarkdown = processedMarkdown.replace(
+            new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+            `\${${expression}}`
+        );
+    }
+
+    // Escape the template literal properly
+    const escapedMarkdown = processedMarkdown
+        .replace(/\\/g, '\\\\')
+        .replace(/`/g, '\\`');
+
+    return `return \`${escapedMarkdown}\`;`;
 }
 
 export function generateTypedFunction(parsed: ParsedMDX): string {

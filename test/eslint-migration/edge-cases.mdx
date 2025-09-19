@@ -1,0 +1,47 @@
+function EdgeCases() {
+    const value = null;
+    const items = [];
+    const config = { debug: true };
+
+    // Empty return content
+    if (value === null) {
+        return (
+        )
+    }
+
+    // Return with only whitespace
+    if (items.length === 0) {
+        return (
+            
+        )
+    }
+
+    // Return with minimal content
+    if (config.debug) {
+        return (
+            Debug mode
+        )
+    }
+
+    // Complex conditional with nested logic
+    if (value !== null && items.length > 0) {
+        if (config.debug) {
+            return (
+                # Debug Information
+                Items count: {{ items.length }}
+                Value: {{ value }}
+            )
+        } else {
+            return (
+                # Production View
+                {{ items.length }} items available
+            )
+        }
+    }
+
+    // Fallback return
+    return (
+        # Default State
+        No data available
+    )
+}

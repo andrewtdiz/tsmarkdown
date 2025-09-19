@@ -59,6 +59,6 @@ Get started with one of the quick links below, or read on to learn more about TS
 **Quick Start:**
 - [Install TypeScript Markdown](installation)
 - [Create your first component](quick-start)
-- [Use a project template](first-mdx)
+- [Use a project template](first-tsm)
 - [Build dynamic content](component-examples)
 - [Structure complex documents](frontmatter-examples)
