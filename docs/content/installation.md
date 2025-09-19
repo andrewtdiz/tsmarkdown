@@ -11,12 +11,9 @@ tags: [installation, setup, getting-started]
 Before installing Better-MDX, make sure you have:
 
 - **Node.js** 18+ or **Bun** 1.0+
-- **React** 18+ (if using React)
 - **TypeScript** (recommended for type safety)
 
-{% callout type="note" %}
 **Package Manager**: We recommend using Bun for the best performance, but npm, yarn, and pnpm are also supported.
-{% /callout %}
 
 ## Installation Options
 
@@ -221,9 +218,7 @@ Parsed result: [parsed AST structure]
 
 If you encounter import errors:
 
-{% callout type="warning" %}
 **Module Resolution**: Make sure your `tsconfig.json` or `package.json` has the correct module resolution settings.
-{% /callout %}
 
 ```json
 {
@@ -247,9 +242,7 @@ bun add -D @types/node @types/react @types/react-dom
 
 Different build tools may require additional configuration:
 
-{% callout type="note" %}
 **Build Tools**: Check the specific integration guide for your build tool (Webpack, Vite, Next.js, etc.) for detailed setup instructions.
-{% /callout %}
 
 ## Next Steps
 

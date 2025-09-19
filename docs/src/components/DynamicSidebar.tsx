@@ -65,7 +65,7 @@ export function DynamicSidebar({ sections }: DynamicSidebarProps) {
     }
 
     return (
-        <aside className="w-64 flex-shrink-0 overflow-y-auto">
+        <aside className="w-64 flex-shrink-0 py-8 overflow-y-auto">
             <nav className="space-y-6">
                 {sections.map((section) => (
                     <div key={section.title}>

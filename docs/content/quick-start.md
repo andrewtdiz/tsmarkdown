@@ -19,13 +19,12 @@ bun init -y
 ### Step 2: Install Better-MDX
 
 ```bash
-bun add better-mdx react react-dom
-bun add -D @types/react @types/react-dom typescript
+bun add tsmarkdown
 ```
 
 ### Step 3: Create Your First File
 
-Create `index.tsx`:
+Create `index.tsd`:
 
 ```typescript
 import { MDXParser, compileMDX, executeMDXTemplate } from 'better-mdx'

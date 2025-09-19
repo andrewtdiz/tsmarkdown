@@ -33,7 +33,7 @@ export function DocumentationLayout() {
                 <div>
                     {/* Page Header with Title and Description */}
                     {frontmatter && (
-                        <div className="mb-2 pb-6 border-b border-border">
+                        <div className="mb-6 pb-6 border-b border-border">
                             {/* Page Actions */}
                             {frontmatter && rawContent && (
                                 <PageActions
@@ -78,13 +78,13 @@ export function DocumentationLayout() {
 
             {/* Content Area */}
             <div className="flex-1 flex overflow-hidden">
-                <div className="flex gap-12 w-full max-w-7xl mx-auto py-8">
+                <div className="flex gap-12 w-full max-w-7xl mx-auto">
                     {/* Dynamic Sidebar Navigation */}
                     <DynamicSidebar sections={sidebar} />
 
                     {/* Main Content */}
                     <main className="flex-1 overflow-y-auto">
-                        <div className="">
+                        <div className="w-[90%]">
                             {renderContent()}
                         </div>
                     </main>

@@ -67,7 +67,7 @@ export const Heading6 = ({ children, className, ...props }: React.HTMLAttributes
 // Text Components
 export const Paragraph = ({ children, className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) => (
     <p
-        className={cn("leading-7 text-foreground/90 mt-2 mb-2 first:mt-0", className)}
+        className={cn("leading-7 text-foreground/90 mt-4 mb-4 first:mt-0", className)}
         {...props}
     >
         {children}
