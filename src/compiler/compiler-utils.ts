@@ -115,13 +115,9 @@ export function generateCompleteFunction(parsed: ParsedMDX): string {
     const returnStatement = generateReturnStatement(parsed);
 
     // Combine everything into a complete function
-    // Remove any existing return statements and if statements from the TypeScript body to avoid duplication
-    const cleanTypeScript = parsed.typescript
-        .replace(/\s*return\s+[^;]+;?\s*$/gm, '')
-        .replace(/\s*if\s*\([^)]+\)\s*$/gm, '')
-        .trim();
-    const functionBody = `${cleanTypeScript}
-  ${returnStatement}`;
+    // The typescript body is already cleaned by the multi-function compiler
+    const functionBody = `${parsed.typescript}
+    ${returnStatement}`;
 
     return `export function ${parsed.functionName}(${functionParams}): string {
   ${functionBody}
@@ -246,9 +242,12 @@ function generateSingleReturnStatement(parsed: ParsedMDX): string {
 }
 
 function generateMultipleReturnStatements(parsed: ParsedMDX): string {
-    const returnStatements: string[] = [];
+    const conditionalReturns: string[] = [];
+    let defaultReturn: string | null = null;
 
-    for (const returnStmt of parsed.returnStatements) {
+    // Process return statements in order
+    for (let i = 0; i < parsed.returnStatements.length; i++) {
+        const returnStmt = parsed.returnStatements[i];
         if (returnStmt.isTemplate) {
             // Process interpolations in the markdown template
             let processedMarkdown = returnStmt.content;
@@ -353,17 +352,27 @@ function generateMultipleReturnStatements(parsed: ParsedMDX): string {
             // Don't escape backticks since ternary expressions already have properly escaped backticks
             // and we don't want to double-escape them
 
-            if (returnStmt.condition) {
-                // Conditional return statement
-                returnStatements.push(`if (${returnStmt.condition}) return \`${escapedMarkdown}\`;`);
+            // Determine if this should be a conditional or default return
+            const isLastReturn = i === parsed.returnStatements.length - 1;
+            const hasCondition = returnStmt.condition && returnStmt.condition !== 'undefined';
+
+            if (hasCondition && !isLastReturn) {
+                // Conditional return statement (not the last one)
+                conditionalReturns.push(`if (${returnStmt.condition}) return \`${escapedMarkdown}\`;`);
             } else {
-                // Default return statement
-                returnStatements.push(`return \`${escapedMarkdown}\`;`);
+                // Default return statement (last one or no condition)
+                defaultReturn = `return \`${escapedMarkdown}\`;`;
             }
         }
     }
 
-    return returnStatements.join('\n  ');
+    // Combine conditional returns and default return
+    const allReturns = [...conditionalReturns];
+    if (defaultReturn) {
+        allReturns.push(defaultReturn);
+    }
+
+    return allReturns.join('\n  ');
 }
 
 export function generateTypedFunction(parsed: ParsedMDX): string {
@@ -467,3 +476,4 @@ function isTypeScriptOrAssetImport(modulePath: string): boolean {
         modulePath.endsWith('.md') ||
         modulePath.endsWith('.txt');
 }
+

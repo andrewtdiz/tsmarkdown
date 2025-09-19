@@ -281,7 +281,7 @@ function createTypeScriptSourceWithMultipleReturns(
     }).join('\n');
     
     return `${tsPrelude}
-${returnStubs}
+    ${returnStubs}
 }`;
   }
   
@@ -292,7 +292,7 @@ ${returnStubs}
   }).join('\n');
   
   return `${tsPrelude}
-${returnStubs}
+    ${returnStubs}
 }`;
 }
 

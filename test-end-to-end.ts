@@ -11,9 +11,9 @@
  * - Reusable codemods
  */
 
-import { compile } from "./src/compiler";
+import { compile, compileAllExportedFunctions, compileAllFunctions } from "./src/compiler";
 import type { ParsedMDX } from "./src/parser";
-import { parseWithTypeScript, extractParametersFromAST, extractExportedFunctions } from "./src/parser/parser-utils";
+import { parseWithTypeScript, extractParametersFromAST, extractFunctions } from "./src/parser/parser-utils";
 import { generatePropsInterface, parseParameters } from "./src/parser/parameters";
 import { parseContent } from "./src/parser/pipeline";
 import { protectCodeBlocks, restoreCodeBlocks } from "./src/parser/code-protection";
@@ -117,23 +117,23 @@ async function buildParsedMDXWithTSParser(source: string): Promise<ParsedMDX> {
         throw new Error("No AST available from TS parser");
     }
 
+    // Get all exported functions from the AST
+    const exportedFunctions = extractFunctions(tsResult.ast);
+    if (exportedFunctions.length === 0) {
+        throw new Error("No exported functions found in AST");
+    }
+
+    // For now, use the first exported function as the main component
+    // TODO: In the future, we might want to handle multiple components
+    const mainFunctionInfo = exportedFunctions[0];
+    const functionName = mainFunctionInfo.name;
+    const functionParams = mainFunctionInfo.parameters.map(param => param.name);
+
     // Find the main function declaration in the AST
     const mainFunction = findMainFunctionInAST(tsResult.ast);
     if (!mainFunction) {
         throw new Error("Component function not found in AST");
     }
-
-    const functionName = mainFunction.name?.text || "Component";
-    const functionParams = mainFunction.parameters?.map((param: any) => {
-        if (param.name && param.name.elements) {
-            // Object destructuring pattern
-            return param.name.elements.map((element: any) => element.name?.text).filter(Boolean);
-        } else if (param.name && param.name.text) {
-            // Simple identifier
-            return param.name.text;
-        }
-        return null;
-    }).flat().filter(Boolean) || [];
 
     // Extract parameter information from AST
     const parameterTypes = extractParametersFromAST(mainFunction);
@@ -229,64 +229,30 @@ async function buildParsedMDXWithTSParser(source: string): Promise<ParsedMDX> {
     };
 }
 
-const mdxSource = /* mdx */ `
-export function MiniComponent({ name, isLoggedIn = true }: { name: string, isLoggedIn: boolean }) {
-  const excited = name.split("").map(letter => letter.toUpperCase()).join("");
-  return (
-    # Inline Demo
-    {{ isLoggedIn ? (
-      This is rendering **{{ excited }}**!
-    ) : (
-      Not logged in
-    )}}
-  );
-}
-
-function helperFunction() {
-  return "helper";
-}
-
-export default function DefaultComponent() {
-  return "default";
-}
-`;
-
-const parsed = await buildParsedMDXWithTSParser(mdxSource);
-console.log(parsed);
-
-// Extract exported functions from the AST
-const tsResult = parseWithTypeScript(mdxSource);
-if (tsResult.success && tsResult.ast) {
-    const exportedFunctions = extractExportedFunctions(tsResult.ast);
-    console.log("\n=== Exported Functions from AST ===");
-    console.log(JSON.stringify(exportedFunctions, null, 2));
-
-    // Also show the TypeScript source that was parsed
-    console.log("\n=== TypeScript Source Being Parsed ===");
-    console.log(tsResult.tsPrelude);
-} else {
-    console.log("Failed to parse TypeScript source for export analysis");
-    console.log("Diagnostics:", tsResult.diagnostics);
-}
-
 // Test export detection with a complete TypeScript source using direct TypeScript compiler API
 const completeTypeScriptSource = `
 export function MiniComponent({ name, isLoggedIn = true }: { name: string, isLoggedIn: boolean }) {
-  const excited = name.split("").map(letter => letter.toUpperCase()).join("");
-  return "Hello " + excited;
+  const excited = name.split("").map(letter => {
+    return letter.toUpperCase()
+  }).join("");
+
+  if (name === "") return (Welcome!)
+  return (# Hello {{ excited }}!)
 }
 
 function helperFunction() {
-  return "helper";
+  return (
+    ### Helper Function
+  )
 }
 
 export default function DefaultComponent() {
-  return "default";
+  return (
+    default
+  )
 }
 
-export const arrowFunction = () => {
-  return "arrow";
-};
+const arrowFunction = () => (# Arrow Function);
 
 export const exportedConst = "constant";
 `;
@@ -299,42 +265,48 @@ const sourceFile = ts.createSourceFile(
     ts.ScriptTarget.Latest,
     true
 );
-const allExportedFunctions = extractExportedFunctions(sourceFile);
+const allExportedFunctions = extractFunctions(sourceFile);
 console.log("All exported functions:");
 console.log(JSON.stringify(allExportedFunctions, null, 2));
+// Note: buildParsedMDXWithTSParser is designed for single functions, not multi-function sources
+// For multi-function sources, use compileAllExportedFunctions instead
 
-const compiled = compile(parsed);
-console.log(compiled);
+// The compileAllExportedFunctions function is now imported from the main compiler
 
-console.log("\n=== TypeScript emitted by compile() ===\n");
-console.log(compiled.typescript);
+// Test the new multi-function compilation (all functions, including non-exported)
+console.log("\n=== Testing Multi-Function Compilation (All Functions) ===");
+const allFunctionsResult = await compileAllFunctions(completeTypeScriptSource);
+console.log("Compilation errors:", allFunctionsResult.errors);
 
-const result = await render(compiled, {}, { name: "MDX" }).catch((error) => {
-    console.error("Render step failed", error);
+// Test the exported-only compilation for comparison
+console.log("\n=== Testing Multi-Function Compilation (Exported Only) ===");
+const exportedOnlyResult = await compileAllExportedFunctions(completeTypeScriptSource);
+console.log("Compilation errors:", exportedOnlyResult.errors);
+
+// Print the complete transpiled file as one unit (all functions)
+console.log("\n=== Complete Transpiled File (All Functions) ===");
+let completeTranspiledFile = "";
+allFunctionsResult.functions.forEach(({ functionInfo, compiled }) => {
+    completeTranspiledFile += compiled.typescript + "\n\n";
 });
 
-if (result) {
-    console.log("\n=== Render Result ===");
-    console.log(result);
-}
-
-// Test with a different name to verify it's working
-const result2 = await render(compiled, {}, { name: "Better MDX" }).catch((error) => {
-    console.error("Render step failed", error);
+// Print the exported-only transpiled file
+console.log("\n=== Complete Transpiled File (Exported Only) ===");
+let exportedTranspiledFile = "";
+exportedOnlyResult.functions.forEach(({ functionInfo, compiled }) => {
+    exportedTranspiledFile += compiled.typescript + "\n\n";
 });
+console.log(exportedTranspiledFile);
 
-if (result2) {
-    console.log("\n=== Render Result 2 (with 'Better MDX') ===");
-    console.log(result2.content);
+console.log("\n=== Testing Individual Function Rendering (All Functions) ===");
+for (const { functionInfo, compiled } of allFunctionsResult.functions) {
+    console.log(`\n--- Rendering ${functionInfo.name} (${functionInfo.isExported ? 'exported' : 'internal'}) ---`);
+    try {
+        const result = await render(compiled, {}, { name: "Test" });
+        console.log(result.content);
+    } catch (error) {
+        console.log("Render Error:", error.message);
+    }
 }
-
-// Test with empty name to verify conditional logic
-const result3 = await render(compiled, {}, { name: "" }).catch((error) => {
-    console.error("Render step failed", error);
-});
-
-if (result3) {
-    console.log("\n=== Render Result 3 (with empty name) ===");
-    console.log(result3.content);
-}
-
+console.log("\n=== Complete Transpiled File (All Functions) ===");
+console.log(completeTranspiledFile);

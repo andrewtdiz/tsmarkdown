@@ -721,7 +721,7 @@ function extractTypesFromAST(node: ts.Node, types: string[], interfaces: string[
 /**
  * Extracts exported functions from the TypeScript AST
  */
-export function extractExportedFunctions(ast: ts.SourceFile): Array<{
+export function extractFunctions(ast: ts.SourceFile): Array<{
     name: string;
     isExported: boolean;
     isDefaultExport: boolean;
@@ -768,27 +768,26 @@ export function extractExportedFunctions(ast: ts.SourceFile): Array<{
             const isExported = hasExportModifier(node);
             const isDefaultExport = hasDefaultExportModifier(node);
 
-            if (isExported || isDefaultExport) {
-                for (const declaration of node.declarationList.declarations) {
-                    if (ts.isIdentifier(declaration.name) && declaration.initializer) {
-                        if (ts.isFunctionExpression(declaration.initializer) || ts.isArrowFunction(declaration.initializer)) {
-                            const name = declaration.name.text;
-                            const parameters = extractParametersFromFunctionExpression(declaration.initializer);
-                            const returnType = extractReturnTypeFromFunctionExpression(declaration.initializer);
+            // Process all variable declarations, not just exported ones
+            for (const declaration of node.declarationList.declarations) {
+                if (ts.isIdentifier(declaration.name) && declaration.initializer) {
+                    if (ts.isFunctionExpression(declaration.initializer) || ts.isArrowFunction(declaration.initializer)) {
+                        const name = declaration.name.text;
+                        const parameters = extractParametersFromFunctionExpression(declaration.initializer);
+                        const returnType = extractReturnTypeFromFunctionExpression(declaration.initializer);
 
-                            const sourceFile = node.getSourceFile();
-                            const lineAndChar = ts.getLineAndCharacterOfPosition(sourceFile, node.getStart());
+                        const sourceFile = node.getSourceFile();
+                        const lineAndChar = ts.getLineAndCharacterOfPosition(sourceFile, node.getStart());
 
-                            exportedFunctions.push({
-                                name,
-                                isExported,
-                                isDefaultExport,
-                                parameters,
-                                returnType,
-                                line: lineAndChar.line + 1,
-                                column: lineAndChar.character
-                            });
-                        }
+                        exportedFunctions.push({
+                            name,
+                            isExported,
+                            isDefaultExport,
+                            parameters,
+                            returnType,
+                            line: lineAndChar.line + 1,
+                            column: lineAndChar.character
+                        });
                     }
                 }
             }

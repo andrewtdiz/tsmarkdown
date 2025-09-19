@@ -4,7 +4,7 @@ import { parseContent } from './pipeline';
 import { processJSXElements } from './jsx';
 
 // TypeScript parser integration (replaces ESLint parser)
-import { parseWithTypeScript, validateWithTypeScript, extractTypeInfo, analyzeReturnStatements, extractParametersFromAST, extractExportedFunctions } from './typescript-parser';
+import { parseWithTypeScript, validateWithTypeScript, extractTypeInfo, analyzeReturnStatements, extractParametersFromAST, extractFunctions } from './typescript-parser';
 import { locateComponent, splitComponent, validateComponentStructure } from './component-scanner';
 
 // Core pipeline and types
@@ -55,7 +55,7 @@ export function processTemplateContent(
 }
 
 // TypeScript parser integration exports (replaces ESLint parser)
-export { parseWithTypeScript, validateWithTypeScript, extractTypeInfo, analyzeReturnStatements, extractParametersFromAST, extractExportedFunctions } from './typescript-parser';
+export { parseWithTypeScript, validateWithTypeScript, extractTypeInfo, analyzeReturnStatements, extractParametersFromAST, extractFunctions } from './typescript-parser';
 export { locateComponent, splitComponent, validateComponentStructure } from './component-scanner';
 
 // TypeScript parser types
