@@ -1,7 +1,8 @@
 import { test, expect, describe } from 'bun:test';
-import { createExactMDXTest } from '../../src/exact-testing-utilities';
+import { createExactMDXTest, ExactMDXTestRunner } from '../../src/exact-testing-utilities';
 
 describe('Expanded Features', () => {
+    const runner = new ExactMDXTestRunner();
     describe('Template Interpolation', () => {
         test('should parse simple interpolations', async () => {
             const mdx = await Bun.file(import.meta.dir + '/simple-interpolation.mdx').text();
@@ -57,8 +58,6 @@ describe('Expanded Features', () => {
                 .build();
 
             // Run the exact test
-            const { ExactMDXTestRunner } = await import('../../src/exact-testing-utilities');
-            const runner = new ExactMDXTestRunner();
             const result = await runner.runTestCase(testCase);
             expect(result.passed).toBe(true);
         });
@@ -118,9 +117,6 @@ describe('Expanded Features', () => {
                 )
                 .build();
 
-            // Run the exact test
-            const { ExactMDXTestRunner } = await import('../../src/exact-testing-utilities');
-            const runner = new ExactMDXTestRunner();
             const result = await runner.runTestCase(testCase);
             expect(result.passed).toBe(true);
         });
@@ -137,9 +133,6 @@ describe('Expanded Features', () => {
                 )
                 .build();
 
-            // Run the exact test
-            const { ExactMDXTestRunner } = await import('../../src/exact-testing-utilities');
-            const runner = new ExactMDXTestRunner();
             const result = await runner.runTestCase(testCase);
             expect(result.passed).toBe(true);
         });
@@ -158,9 +151,6 @@ describe('Expanded Features', () => {
                 )
                 .build();
 
-            // Run the exact test
-            const { ExactMDXTestRunner } = await import('../../src/exact-testing-utilities');
-            const runner = new ExactMDXTestRunner();
             const result = await runner.runTestCase(testCase);
             expect(result.passed).toBe(true);
         });
@@ -181,9 +171,158 @@ describe('Expanded Features', () => {
                 )
                 .build();
 
+            const result = await runner.runTestCase(testCase);
+            expect(result.passed).toBe(true);
+        });
+    });
+
+    describe('List Rendering', () => {
+        test('should render unordered lists correctly', async () => {
+            const mdx = await Bun.file(import.meta.dir + '/list-rendering.mdx').text();
+
+            const testCase = createExactMDXTest(
+                'Unordered list rendering',
+                mdx
+            )
+                .withContext({
+                    basePath: import.meta.dir,
+                    items: ["Apple", "Banana", "Cherry"]
+                })
+                .expectExactLines(
+                    '## Technologies Used',
+                    '- Apple',
+                    '- Banana',
+                    '- Cherry'
+                )
+                .build();
+
+            const result = await runner.runTestCase(testCase);
+            expect(result.passed).toBe(true);
+        });
+
+        test('should render empty lists correctly', async () => {
+            const mdx = await Bun.file(import.meta.dir + '/list-rendering.mdx').text();
+
+            const testCase = createExactMDXTest(
+                'Empty list rendering',
+                mdx
+            )
+                .withContext({
+                    basePath: import.meta.dir,
+                    items: []
+                })
+                .expectExactLines(
+                    '## Technologies Used',
+                    'Empty'
+                )
+                .build();
+
+            const result = await runner.runTestCase(testCase);
+            expect(result.passed).toBe(true);
+        });
+
+        test('should render comma lists correctly', async () => {
+            const mdx = await Bun.file(import.meta.dir + '/comma-list-rendering.mdx').text();
+
+            const testCase = createExactMDXTest(
+                'Comma list rendering',
+                mdx
+            )
+                .withContext({
+                    basePath: import.meta.dir,
+                    items: ["First", "Second", "Third"]
+                })
+                .expectExactLines(
+                    '## Technologies Used',
+                    'First, Second, Third'
+                )
+                .build();
+
             // Run the exact test
-            const { ExactMDXTestRunner } = await import('../../src/exact-testing-utilities');
             const runner = new ExactMDXTestRunner();
+            const result = await runner.runTestCase(testCase);
+            expect(result.passed).toBe(true);
+        });
+
+        test('should render empty comma lists correctly', async () => {
+            const mdx = await Bun.file(import.meta.dir + '/comma-list-rendering.mdx').text();
+
+            const testCase = createExactMDXTest(
+                'Empty comma list rendering',
+                mdx
+            )
+                .withContext({
+                    basePath: import.meta.dir,
+                    items: []
+                })
+                .expectExactLines(
+                    '## Technologies Used',
+                    'Empty'
+                )
+                .build();
+
+            const result = await runner.runTestCase(testCase);
+            expect(result.passed).toBe(true);
+        });
+
+        test('should render single item comma lists correctly', async () => {
+            const mdx = await Bun.file(import.meta.dir + '/comma-list-rendering.mdx').text();
+
+            const testCase = createExactMDXTest(
+                'Single item comma list rendering',
+                mdx
+            )
+                .withContext({
+                    basePath: import.meta.dir,
+                    items: ["Only Item"]
+                })
+                .expectExactLines(
+                    '## Technologies Used',
+                    'Only Item'
+                )
+                .build();
+
+            const result = await runner.runTestCase(testCase);
+            expect(result.passed).toBe(true);
+        });
+
+        test('should render internal comma list with and', async () => {
+            const mdx = await Bun.file(import.meta.dir + '/InternalCommaList.mdx').text();
+
+            const testCase = createExactMDXTest(
+                'Internal comma list rendering',
+                mdx
+            )
+                .withContext({
+                    basePath: import.meta.dir,
+                    withAnd: true,
+                    items: ["First", "Second", "Third"]
+                })
+                .expectExactLines(
+                    'First, Second and Third'
+                )
+                .build();
+
+            const result = await runner.runTestCase(testCase);
+            expect(result.passed).toBe(true);
+        });
+
+        test('should handle undefined props gracefully', async () => {
+            const mdx = await Bun.file(import.meta.dir + '/InternalCommaList.mdx').text();
+
+            const testCase = createExactMDXTest(
+                'Internal comma list rendering',
+                mdx
+            )
+                .withContext({
+                    basePath: import.meta.dir,
+                    items: ["First", "Second", "Third"]
+                })
+                .expectExactLines(
+                    'First, Second, Third'
+                )
+                .build();
+
             const result = await runner.runTestCase(testCase);
             expect(result.passed).toBe(true);
         });
@@ -205,7 +344,6 @@ describe('Expanded Features', () => {
                 .build();
 
             // Run the exact test
-            const { ExactMDXTestRunner } = await import('../../src/exact-testing-utilities');
             const runner = new ExactMDXTestRunner();
             const result = await runner.runTestCase(testCase);
             expect(result.passed).toBe(true);
@@ -225,7 +363,6 @@ describe('Expanded Features', () => {
                 .build();
 
             // Run the exact test
-            const { ExactMDXTestRunner } = await import('../../src/exact-testing-utilities');
             const runner = new ExactMDXTestRunner();
             const result = await runner.runTestCase(testCase);
             expect(result.passed).toBe(true);

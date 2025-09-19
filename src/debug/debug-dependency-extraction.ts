@@ -46,3 +46,4 @@ console.log('Compiled 1 dependencies:', compiled1.dependencies);
 
 const compiled2 = compile(parsed2);
 console.log('Compiled 2 dependencies:', compiled2.dependencies);
+

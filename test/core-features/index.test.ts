@@ -131,6 +131,25 @@ describe('Better-MDX Complex Nested Conditionals - Exact Tests', () => {
         expect(result.passed).toBe(true);
     });
 
+    test('Simple props', async () => {
+        const mdxContent = await Bun.file(import.meta.dir + '/simple-props.mdx').text();
+        const testCase = createExactMDXTest(
+            'Simple props',
+            mdxContent
+        )
+            .withContext({
+                withAnd: true,
+                items: ["First", "Second", "Third"]
+            })
+            .expectExactLines(
+                'First, Second and Third'
+            )
+            .build();
+
+        const result = await runner.runTestCase(testCase);
+        expect(result.passed).toBe(true);
+    });
+
     test('Simple conditional - exact match', async () => {
         const mdxContent = await Bun.file(import.meta.dir + '/simple-conditional.mdx').text();
         const testCase = createExactMDXTest(

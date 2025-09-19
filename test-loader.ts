@@ -1,0 +1,1 @@
+import { TestTernary } from "./test-ternary.mdx";

@@ -127,16 +127,12 @@ function classifyExpression(expression: string): 'conditional' | 'ternary' | 'js
     }
 
     // Check for ternary pattern: condition ? trueValue : falseValue
-    // Must have exactly one ? and one : in the right order
+    // Must have at least one ? and one : in the right order
     if (trimmed.includes('?') && trimmed.includes(':')) {
-        const questionCount = (trimmed.match(/\?/g) || []).length;
-        const colonCount = (trimmed.match(/:/g) || []).length;
-        if (questionCount === 1 && colonCount === 1) {
-            const questionIndex = trimmed.indexOf('?');
-            const colonIndex = trimmed.lastIndexOf(':');
-            if (colonIndex > questionIndex) {
-                return 'ternary';
-            }
+        const questionIndex = trimmed.indexOf('?');
+        const colonIndex = trimmed.lastIndexOf(':');
+        if (colonIndex > questionIndex) {
+            return 'ternary';
         }
     }
 
@@ -210,13 +206,9 @@ export function parseInterpolations(content: string, context: ParseContext): str
 
                 case 'ternary':
                     placeholder = `__TERNARY_${context.ternaryExpressions.length}__`;
-                    // Parse ternary logic
-                    const questionIndex = expression.indexOf('?');
-                    const colonIndex = expression.lastIndexOf(':');
-                    if (questionIndex !== -1 && colonIndex !== -1 && colonIndex > questionIndex) {
-                        const condition = expression.substring(0, questionIndex).trim();
-                        const trueValue = expression.substring(questionIndex + 1, colonIndex).trim();
-                        const falseValue = expression.substring(colonIndex + 1).trim();
+                    // Parse ternary logic with proper nesting support
+                    const { condition, trueValue, falseValue } = parseNestedTernary(expression);
+                    if (condition && trueValue && falseValue) {
                         context.ternaryExpressions.push({
                             condition: condition,
                             trueValue: trueValue,
@@ -274,6 +266,49 @@ function findMatchingParen(content: string, startIndex: number): number {
     }
 
     return -1; // No matching parenthesis found
+}
+
+// Helper function to parse nested ternary expressions
+function parseNestedTernary(expression: string): { condition: string; trueValue: string; falseValue: string } {
+    let parenCount = 0;
+    let questionIndex = -1;
+    let colonIndex = -1;
+
+    // Find the outermost ? operator
+    for (let i = 0; i < expression.length; i++) {
+        const char = expression[i];
+        if (char === '(') parenCount++;
+        else if (char === ')') parenCount--;
+        else if (char === '?' && parenCount === 0) {
+            questionIndex = i;
+            break;
+        }
+    }
+
+    if (questionIndex === -1) {
+        return { condition: '', trueValue: '', falseValue: '' };
+    }
+
+    // Find the matching : operator for this ?
+    for (let i = questionIndex + 1; i < expression.length; i++) {
+        const char = expression[i];
+        if (char === '(') parenCount++;
+        else if (char === ')') parenCount--;
+        else if (char === ':' && parenCount === 0) {
+            colonIndex = i;
+            break;
+        }
+    }
+
+    if (colonIndex === -1) {
+        return { condition: '', trueValue: '', falseValue: '' };
+    }
+
+    const condition = expression.substring(0, questionIndex).trim();
+    const trueValue = expression.substring(questionIndex + 1, colonIndex).trim();
+    const falseValue = expression.substring(colonIndex + 1).trim();
+
+    return { condition, trueValue, falseValue };
 }
 
 export function processNestedInterpolations(

@@ -16,7 +16,7 @@ console.log("\n=== Testing component loading ===");
 // Test loading dependencies manually
 const { loadDependencies } = await import("../../renderer/render-utils");
 const errors: string[] = [];
-loadDependencies(listCompiled.dependencies, "./mdx", errors);
+await loadDependencies(listCompiled.dependencies, "./mdx", errors);
 
 console.log("Loading errors:", errors);
 

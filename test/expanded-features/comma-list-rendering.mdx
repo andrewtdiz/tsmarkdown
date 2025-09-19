@@ -1,0 +1,9 @@
+import { InternalCommaList } from "./InternalCommaList";
+
+function ListRendering({ items }: { items: string[] }) {
+  const isAuthedToViewTechnologies = true
+  return (
+    ## Technologies Used
+    {{ isAuthedToViewTechnologies && <@InternalCommaList items={items} withAnd={false} /> }}
+  )
+}

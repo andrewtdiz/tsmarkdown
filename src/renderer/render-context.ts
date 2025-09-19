@@ -84,6 +84,16 @@ export function createPropsContext(functionParams: string[], props: any, paramet
                     } else {
                         context[param] = undefined;
                     }
+                } else if (paramType && paramType.required) {
+                    // For required parameters that are missing, provide a default value based on type
+                    // This prevents JavaScript evaluation errors when the parameter is accessed
+                    if (paramType.type === 'boolean') {
+                        context[param] = false;
+                    } else if (paramType.type.includes('[]')) {
+                        context[param] = [];
+                    } else {
+                        context[param] = undefined;
+                    }
                 }
             }
         }

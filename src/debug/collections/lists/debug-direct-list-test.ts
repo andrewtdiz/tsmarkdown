@@ -16,7 +16,7 @@ const result1 = await render(listCompiled, {}, {
     items: ["Apple", "Banana", "Cherry"],
     ordered: false
 }, "./mdx");
-console.log("Result:", result1.content);
+console.log(result1.content);
 console.log("Errors:", result1.errors);
 
 // Test with ordered list
@@ -25,7 +25,7 @@ const result2 = await render(listCompiled, {}, {
     items: ["First", "Second", "Third"],
     ordered: true
 }, "./mdx");
-console.log("Result:", result2.content);
+console.log(result2.content);
 console.log("Errors:", result2.errors);
 
 // Test with empty list
@@ -34,5 +34,5 @@ const result3 = await render(listCompiled, {}, {
     items: [],
     ordered: false
 }, "./mdx");
-console.log("Result:", result3.content);
+console.log(result3.content);
 console.log("Errors:", result3.errors);

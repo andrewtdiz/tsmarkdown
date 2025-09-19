@@ -1,19 +1,5 @@
 import { Greeting } from "./Greeting"
 
-/*
-Context-aware import specification (proposal)
-1. Module resolution: Prefer explicit relative paths; `.ts`/`.tsx` readers resolve through the MDX file's `basePath` or configured aliases. Re-exported MDX is blocked to avoid recursive hydration issues.
-2. TypeScript modules: Accept `.ts`, `.tsx`, `.mts`, and `.cts` sources. Transpile via the shared TypeScript runtime, drop type-only imports, and surface compile errors with the MDX filename + line context. Async exports must resolve before render completes.
-3. Non-MDX assets: Support JSON/YAML (default export parsed data), text/markdown via a `?raw` suffix (string export), and CSS modules that emit `Record<string, string>`. Unsupported extensions fail with a diagnostic that points to the import site.
-4. Runtime contract: Imported bindings execute inside the MDX sandbox; values must be serialisable or functional components. Side-effects should be idempotent—cache module evaluation per render context.
-5. Developer ergonomics: Provide hover/tooling metadata for specifiers, warn on extensionless imports, and document fallback strategies in project docs.
-
-Example:
-import type { AuthContext } from '../context/auth.types.ts';
-import getCopy from '../copy/welcome-message.ts';
-import copyBlock from '../copy/welcome.md?raw';
-*/
-
 function BasicTest() {
   return (
     # Hello, Bob!

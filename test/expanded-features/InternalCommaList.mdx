@@ -1,0 +1,7 @@
+function InternalCommaList({ items, withAnd }: { items: string[]; withAnd: boolean }) {
+  return (
+    {{ items.length === 0 ? (
+      Empty
+    ) : items.length === 1 ? items[0] : items.slice(0, -1).join(', ') + (withAnd ? ' and ' : ', ') + items[items.length - 1] }}
+  )
+}

@@ -3,6 +3,8 @@ function CommaList({ items, withAnd = true }: { items: string[]; withAnd?: boole
   const lastItem = items[items.length - 1];
   
   return (
-    {{ items.length === 0 ? 'Empty' : beginningItems.join(', ') + (withAnd ? ' and ' : ', ') + lastItem }}
+    {{ items.length === 0 ? (
+      Empty
+    ) : beginningItems.join(', ') + (withAnd ? ' and ' : ', ') + lastItem }}
   )
 }

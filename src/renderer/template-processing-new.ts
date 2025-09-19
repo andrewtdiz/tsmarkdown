@@ -73,7 +73,7 @@ export async function processTemplate(
     );
 
     // Process ternary expressions
-    processedContent = processTernaryExpressions(
+    processedContent = await processTernaryExpressions(
         processedContent,
         ternaryExpressions,
         context,

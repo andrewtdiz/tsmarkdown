@@ -1,0 +1,16 @@
+import { InternalOlItem } from './InternalOlItem'
+import { InternalUlItem } from './InternalUlItem'
+
+function InternalList({ items, ordered = false }: { items: string[]; emptyText?: string; ordered?: boolean }) {
+  return (
+    {{items.length === 0 ? (
+      Empty
+    ) : (
+      {{items.map((item, index) => ordered ? (
+        <@InternalOlItem item={item} index={index} />
+      ) : (
+        <@InternalUlItem item={item} />
+      ))}}
+    )}}
+  )
+}

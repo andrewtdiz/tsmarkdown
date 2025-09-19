@@ -1,4 +1,5 @@
 import { RenderContext } from './render-context';
+import { loadAsset } from './asset-loader';
 import path, { resolve } from 'path';
 
 export async function executeTypeScript(typescript: string, context: RenderContext): Promise<any> {

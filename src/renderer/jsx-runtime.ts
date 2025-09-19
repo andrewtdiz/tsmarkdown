@@ -65,7 +65,7 @@ export async function processConditionalBlocks(
                 blockContent = processInterpolations(blockContent, interpolations, context, errors);
 
                 // Process ternary expressions
-                blockContent = processTernaryExpressions(
+                blockContent = await processTernaryExpressions(
                     blockContent,
                     [],
                     context,
@@ -101,13 +101,13 @@ export async function processConditionalBlocks(
     return processedContent;
 }
 
-export function processTernaryExpressions(
+export async function processTernaryExpressions(
     content: string,
     ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>,
     context: any,
     errors: string[],
     interpolations: Array<{ placeholder: string; expression: string }> = []
-): string {
+): Promise<string> {
     let processedContent = content;
 
     for (let i = 0; i < ternaryExpressions.length; i++) {
@@ -130,14 +130,48 @@ export function processTernaryExpressions(
                     processedValue = processedValue.slice(1, -1).trim();
                 }
 
-                // Process escape sequences first (convert \n to actual newlines)
-                processedValue = processEscapeSequences(processedValue);
+                // Check if this is a nested ternary expression
+                // But first check if it's a map expression or other complex expression that contains ternary
+                if (processedValue.includes('?') && processedValue.includes(':')) {
+                    // Check if this is a map expression or other complex expression
+                    if (processedValue.includes('.map(') || processedValue.includes('{{') || processedValue.includes('<')) {
+                        // This is a complex expression containing ternary, not a standalone ternary
+                        // Process it as a regular expression
+                        try {
+                            // For expressions wrapped in double braces, extract and evaluate
+                            if (processedValue.startsWith('{{') && processedValue.endsWith('}}')) {
+                                const innerExpression = processedValue.slice(2, -2).trim();
+                                const evaluatedResult = await evaluateJSXExpression(innerExpression, context);
+                                processedValue = String(evaluatedResult);
+                            } else {
+                                // For other complex expressions, evaluate directly
+                                const func = new Function(...Object.keys(context), `return (${processedValue})`);
+                                const evaluatedResult = func(...Object.values(context));
+                                processedValue = String(evaluatedResult);
+                            }
+                        } catch (error) {
+                            errors.push(`Complex expression error: ${error}`);
+                        }
+                    } else {
+                        // This is a standalone ternary expression
+                        try {
+                            // Evaluate the nested ternary expression
+                            const evaluatedResult = await evaluateTernaryExpression(processedValue, context);
+                            processedValue = String(evaluatedResult);
+                        } catch (error) {
+                            errors.push(`Nested ternary expression error: ${error}`);
+                        }
+                    }
+                } else {
+                    // Process escape sequences first (convert \n to actual newlines)
+                    processedValue = processEscapeSequences(processedValue);
 
-                // Normalize indentation within the ternary value
-                processedValue = normalizeIndentation(processedValue);
+                    // Normalize indentation within the ternary value
+                    processedValue = normalizeIndentation(processedValue);
 
-                // Process interpolations using the main interpolations array
-                processedValue = processInterpolations(processedValue, interpolations, context, errors);
+                    // Process interpolations using the main interpolations array
+                    processedValue = processInterpolations(processedValue, interpolations, context, errors);
+                }
             }
 
             // Replace placeholder and normalize line spacing
@@ -440,8 +474,8 @@ export async function processJSXExpressions(
                     // This is a JSX expression with component calls
                     // First, check if it's a ternary expression that contains JSX
                     if (resolvedExpression.includes('?')) {
-                        // This is a ternary expression with JSX components, evaluate it as a JSX expression
-                        const result = await evaluateJSXExpression(resolvedExpression, context, jsxExpressions);
+                        // This is a ternary expression with JSX components, evaluate it as a ternary expression
+                        const result = await evaluateTernaryExpression(resolvedExpression, context);
                         const stringValue = await jsxResultToString(result);
 
                         processedContent = processedContent.replace(
@@ -490,33 +524,39 @@ export async function processJSXExpressions(
 
 export async function evaluateJSXExpression(expression: string, context: any, jsxExpressions?: Array<{ placeholder: string; expression: string }>): Promise<any> {
     try {
+        // Strip double braces if present ({{expression}} -> expression)
+        let cleanExpression = expression;
+        if (expression.startsWith('{{') && expression.endsWith('}}')) {
+            cleanExpression = expression.slice(2, -2).trim();
+        }
+
         // Check if this is a .map() expression for arrays first
         // This takes priority over ternary expressions because map expressions can contain ternary operators
-        if (expression.includes('.map(')) {
-            return await evaluateMapExpression(expression, context, jsxExpressions);
+        if (cleanExpression.includes('.map(')) {
+            return await evaluateMapExpression(cleanExpression, context, jsxExpressions);
         }
 
         // Check if this is a ternary expression
-        if (expression.includes('?')) {
-            return await evaluateTernaryExpression(expression, context);
+        if (cleanExpression.includes('?')) {
+            return await evaluateTernaryExpression(cleanExpression, context);
         }
 
         // Check if this is a placeholder reference
-        if (expression.startsWith('__JSX_EXPRESSION_') && expression.endsWith('__')) {
+        if (cleanExpression.startsWith('__JSX_EXPRESSION_') && cleanExpression.endsWith('__')) {
             // This is a placeholder reference, return it as-is for now
             // It will be resolved in the processing pipeline
-            return expression;
+            return cleanExpression;
         }
 
         // For other JSX expressions, evaluate normally
         try {
-            const func = new Function(...Object.keys(context), `return (${expression})`);
+            const func = new Function(...Object.keys(context), `return (${cleanExpression})`);
             return func(...Object.values(context));
         } catch (evalError) {
             // If evaluation fails, it might be because the expression contains JSX syntax
             // that wasn't caught by the previous checks
-            console.warn(`Failed to evaluate JSX expression: ${expression}`, evalError);
-            return expression; // Return the expression as-is
+            console.warn(`Failed to evaluate JSX expression: ${cleanExpression}`, evalError);
+            return cleanExpression; // Return the expression as-is
         }
     } catch (error) {
         throw new Error(`JSX expression evaluation failed: ${error}`);
@@ -575,7 +615,23 @@ export async function evaluateTernaryExpression(expression: string, context: any
         selectedExpression = selectedExpression.slice(1, -1).trim();
     }
 
-    // Check if this is a JSX expression wrapped in braces {expression}
+    // Check if this is a JSX expression wrapped in double braces {{expression}}
+    if (selectedExpression.startsWith('{{') && selectedExpression.endsWith('}}')) {
+        // Extract the inner expression
+        const innerExpression = selectedExpression.slice(2, -2).trim();
+
+        // Process the inner expression
+        if (innerExpression.includes('.map(')) {
+            return await evaluateMapExpression(innerExpression, context);
+        } else if (innerExpression.includes('<') && innerExpression.includes('>')) {
+            return await evaluateTernaryJSXExpression(innerExpression, context);
+        } else {
+            // Regular JSX expression
+            return await evaluateJSXExpression(innerExpression, context);
+        }
+    }
+
+    // Check if this is a JSX expression wrapped in single braces {expression}
     if (selectedExpression.startsWith('{') && selectedExpression.endsWith('}')) {
         // Extract the inner expression
         const innerExpression = selectedExpression.slice(1, -1).trim();
@@ -596,9 +652,53 @@ export async function evaluateTernaryExpression(expression: string, context: any
         return await evaluateMapExpression(selectedExpression, context);
     } else if (selectedExpression.includes('<') && selectedExpression.includes('>')) {
         return await evaluateTernaryJSXExpression(selectedExpression, context);
+    } else if (selectedExpression.includes('?') && selectedExpression.includes(':')) {
+        // Check if this is a standalone ternary expression or a complex expression containing ternary
+        // A standalone ternary should have the pattern: condition ? trueValue : falseValue
+        // We can detect this by checking if the first ? is at the top level (not inside parentheses)
+        let parenCount = 0;
+        let firstQuestionIndex = -1;
+
+        for (let i = 0; i < selectedExpression.length; i++) {
+            const char = selectedExpression[i];
+            if (char === '(') parenCount++;
+            else if (char === ')') parenCount--;
+            else if (char === '?' && parenCount === 0) {
+                firstQuestionIndex = i;
+                break;
+            }
+        }
+
+        if (firstQuestionIndex > 0) {
+            // This looks like a standalone ternary expression (starts with a condition)
+            return await evaluateTernaryExpression(selectedExpression, context);
+        } else {
+            // This is a complex expression containing ternary operators within parentheses
+            // Evaluate it as a regular JavaScript expression
+            try {
+                const func = new Function(...Object.keys(context), `return (${selectedExpression})`);
+                return func(...Object.values(context));
+            } catch (error) {
+                // If evaluation fails, return as-is
+                return selectedExpression;
+            }
+        }
     } else {
-        // Simple value (like "Empty") - remove quotes if present
-        return selectedExpression.replace(/^["']|["']$/g, '');
+        // Check if this is a quoted string literal
+        if ((selectedExpression.startsWith('"') && selectedExpression.endsWith('"')) ||
+            (selectedExpression.startsWith("'") && selectedExpression.endsWith("'"))) {
+            // Simple string literal - remove quotes
+            return selectedExpression.slice(1, -1);
+        } else {
+            // This might be a variable reference or expression that needs evaluation
+            try {
+                const func = new Function(...Object.keys(context), `return (${selectedExpression})`);
+                return func(...Object.values(context));
+            } catch (error) {
+                // If evaluation fails, return as-is (might be a literal value)
+                return selectedExpression;
+            }
+        }
     }
 }
 
@@ -902,6 +1002,77 @@ export async function renderJSXElement(
         if (!isAlreadyHandled) {
             propValues[booleanProp] = true;
         }
+    }
+
+    // Handle @ syntax for imported MDX components
+    if (atSymbol === '@') {
+        // Check if we have the component in our registry (imported MDX components)
+        if (componentRegistry[componentName]) {
+            try {
+                // Merge JSX props with default values from component metadata
+                const mergedProps = mergePropsWithDefaults(propValues, componentRegistry[componentName]);
+                const componentResult = await renderComponent(componentRegistry[componentName], context, mergedProps);
+
+                // Apply parent indentation to the component output if it exists
+                if (parentIndentation && componentResult.content) {
+                    const lines = componentResult.content.split('\n');
+                    const indentedLines = lines.map((line, index) => {
+                        // Don't indent empty lines
+                        if (line.trim() === '') return line;
+
+                        // Apply parent indentation to non-empty lines
+                        return parentIndentation + line;
+                    });
+                    return indentedLines.join('\n');
+                }
+
+                return componentResult.content;
+            } catch (error) {
+                return `<@${componentName}:ERROR>`;
+            }
+        }
+
+        // If not found in registry, try to load it as a dependency
+        try {
+            const basePath = context.basePath || process.cwd();
+            const componentPath = await resolveComponentPath(componentName, basePath);
+            if (componentPath) {
+                const componentContent = await Bun.file(componentPath).text();
+                const parsed = parseMDX(componentContent);
+                const compiled = compile(parsed);
+
+                // Register the component for future use
+                componentRegistry[componentName] = compiled;
+
+                // Render the component
+                const mergedProps = mergePropsWithDefaults(propValues, compiled);
+                const componentResult = await renderComponent(compiled, context, mergedProps);
+
+                // Apply parent indentation to the component output if it exists
+                if (parentIndentation && componentResult.content) {
+                    const lines = componentResult.content.split('\n');
+                    const indentedLines = lines.map((line, index) => {
+                        // Don't indent empty lines
+                        if (line.trim() === '') return line;
+
+                        // Apply parent indentation to non-empty lines
+                        return parentIndentation + line;
+                    });
+                    return indentedLines.join('\n');
+                }
+
+                return componentResult.content;
+            }
+        } catch (error) {
+            // Component not found or failed to load
+        }
+
+        // Fallback representation for @ components
+        const fallbackContent = `<@${componentName} ${Object.entries(propValues).map(([k, v]) => `${k}="${v}"`).join(' ')} />`;
+        if (parentIndentation) {
+            return parentIndentation + fallbackContent;
+        }
+        return fallbackContent;
     }
 
     // Check if we have the component in our registry

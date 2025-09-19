@@ -10,7 +10,19 @@ export async function renderComponent(compiled: CompiledMDX, context: RenderCont
 
     try {
         // Merge props into context for function parameters
-        const propsContext = createPropsContext(compiled.functionParams || [], props, compiled.metadata?.parameterTypes);
+        // First, extract props from the context (for test framework compatibility)
+        const contextProps = {};
+        if (compiled.functionParams && compiled.functionParams.length > 0) {
+            for (const param of compiled.functionParams) {
+                if (context.hasOwnProperty(param)) {
+                    contextProps[param] = context[param];
+                }
+            }
+        }
+
+        // Merge props from both the props parameter and the context
+        const allProps = { ...contextProps, ...props };
+        const propsContext = createPropsContext(compiled.functionParams || [], allProps, compiled.metadata?.parameterTypes);
         const mergedContext = { ...context, ...propsContext };
 
         // Execute TypeScript to get runtime values (now supports async)
@@ -45,7 +57,7 @@ export async function renderComponent(compiled: CompiledMDX, context: RenderCont
             );
 
             // Process ternary expressions
-            processedContent = processTernaryExpressions(
+            processedContent = await processTernaryExpressions(
                 processedContent,
                 compiled.ternaryExpressions || [],
                 fullContext,
