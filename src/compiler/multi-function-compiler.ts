@@ -14,6 +14,43 @@ import { protectCodeBlocks, restoreCodeBlocks } from '../parser/code-protection'
 import { normalizeIndentation } from '../renderer/string-helpers';
 
 /**
+ * Preprocesses MDX syntax within functions to make them parseable by TypeScript
+ */
+function preprocessMDXInFunctions(source: string): string {
+    // Find all return statements with MDX syntax and convert them to template literals
+    // This handles patterns like: return (content with {{ interpolation }})
+
+    let processedSource = source;
+
+    // Find return statements with parentheses that contain MDX syntax
+    const returnWithParensRegex = /return\s*\(\s*([^)]*\{\{[^}]+\}\}[^)]*)\s*\)/g;
+
+    processedSource = processedSource.replace(returnWithParensRegex, (match, content) => {
+        // Convert MDX interpolations to template literal syntax
+        let templateContent = content
+            .replace(/\{\{([^}]+)\}\}/g, '${$1}')  // Convert {{ var }} to ${var}
+            .replace(/#\s+/g, '# ')  // Ensure proper spacing for headers
+            .trim();
+
+        return `return \`${templateContent}\``;
+    });
+
+    // Also handle return statements with hash syntax (like # Hello)
+    const returnWithHashRegex = /return\s*\(\s*(#[^)]*)\s*\)/g;
+
+    processedSource = processedSource.replace(returnWithHashRegex, (match, content) => {
+        // Convert MDX interpolations to template literal syntax
+        let templateContent = content
+            .replace(/\{\{([^}]+)\}\}/g, '${$1}')  // Convert {{ var }} to ${var}
+            .trim();
+
+        return `return \`${templateContent}\``;
+    });
+
+    return processedSource;
+}
+
+/**
  * Extracts return statements from function source using regex
  */
 function extractReturnStatementsFromSource(functionSource: string, originalSource: string, functionStart: number): Array<{ condition?: string; content: string; startIndex: number }> {
@@ -140,11 +177,13 @@ export async function compileAllFunctions(source: string): Promise<MultiFunction
     const functions: Array<{ functionInfo: any; compiled: any }> = [];
 
     try {
-        // Use TypeScript compiler API directly for regular TypeScript code
-        // We'll handle MDX syntax in the content extraction phase
+        // Preprocess the source to handle MDX syntax within functions
+        const processedSource = preprocessMDXInFunctions(source);
+
+        // Use TypeScript compiler API with the processed source
         const sourceFile = ts.createSourceFile(
             'input.ts',
-            source,
+            processedSource,
             ts.ScriptTarget.Latest,
             true
         );
@@ -158,8 +197,8 @@ export async function compileAllFunctions(source: string): Promise<MultiFunction
 
         for (const functionInfo of allFunctions) {
             try {
-                // Extract the actual function content from the AST using the original source
-                const { typescript, returnStatements, interpolations, conditionalBlocks, ternaryExpressions, jsxExpressions } = extractFunctionContentWithOriginalSource(sourceFile, functionInfo.name, source);
+                // Extract the actual function content from the AST using the processed source
+                const { typescript, returnStatements, interpolations, conditionalBlocks, ternaryExpressions, jsxExpressions } = extractFunctionContentWithOriginalSource(sourceFile, functionInfo.name, processedSource);
 
                 // Create ParsedMDX for each function
                 const markdownContent = returnStatements.length > 0 ? returnStatements[0].content : `# ${functionInfo.name} Content`;

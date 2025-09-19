@@ -13,6 +13,41 @@ import { parseContent } from '../parser/pipeline';
 import { protectCodeBlocks, restoreCodeBlocks } from '../parser/code-protection';
 import { normalizeIndentation } from '../renderer/string-helpers';
 
+/**
+ * Preprocesses MDX syntax within functions to make them parseable by TypeScript
+ */
+function preprocessMDXInFunctions(source: string): string {
+    // Find all return statements with MDX syntax and convert them to template literals
+    // This handles patterns like: return (content with {{ interpolation }})
+
+    let processedSource = source;
+
+    // Find return statements with parentheses that contain MDX syntax (but don't start with #)
+    const returnWithParensRegex = /return\s*\(\s*([^#][^)]*\{\{[^}]+\}\}[^)]*)\s*\)/g;
+
+    processedSource = processedSource.replace(returnWithParensRegex, (match, content) => {
+        // Convert MDX syntax to valid TypeScript string literal (preserve interpolation syntax)
+        let templateContent = content
+            .replace(/#\s+/g, '# ')
+            .trim();
+
+        return `return "${templateContent}"`;
+    });
+
+    // Also handle return statements with hash syntax (like # Hello)
+    const returnWithHashRegex = /return\s*\(\s*(#[^)]*)\s*\)/g;
+
+    processedSource = processedSource.replace(returnWithHashRegex, (match, content) => {
+        // Convert MDX syntax to valid TypeScript string literal (preserve interpolation syntax)
+        let templateContent = content
+            .trim();
+
+        return `return "${templateContent}"`;
+    });
+
+    return processedSource;
+}
+
 export interface FullFileCompilationResult {
     functions: Array<{
         functionInfo: {
@@ -49,10 +84,13 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
     const globalTemplates: Array<any> = [];
 
     try {
-        // Use TypeScript compiler API directly for regular TypeScript code
+        // Preprocess MDX syntax within functions first
+        const preprocessedSource = preprocessMDXInFunctions(source);
+
+        // Use TypeScript compiler API with the preprocessed source
         const sourceFile = ts.createSourceFile(
             'input.ts',
-            source,
+            preprocessedSource,
             ts.ScriptTarget.Latest,
             true
         );
@@ -308,6 +346,76 @@ function convertToTemplateLiteral(
 }
 
 /**
+ * Extracts regular TypeScript variables (non-template, non-function)
+ */
+function extractRegularVariables(
+    sourceFile: ts.SourceFile,
+    globalTemplates: any[],
+    functions: Array<{ functionInfo: any; compiled: any }>
+): Array<{ text: string; isExported: boolean }> {
+    const regularVariables: Array<{ text: string; isExported: boolean }> = [];
+    const processedStatements = new Set<string>();
+
+    // Get names of variables that are already processed as templates or functions
+    const processedNames = new Set([
+        ...globalTemplates.map(t => t.variableName),
+        ...functions.map(f => f.functionInfo.name)
+    ]);
+
+    function visit(node: ts.Node, depth: number = 0): void {
+        if (ts.isVariableStatement(node)) {
+            // Only process top-level variable statements (depth 0)
+            if (depth === 0) {
+                const statementText = node.getText(sourceFile);
+
+                // Skip if we've already processed this statement
+                if (processedStatements.has(statementText)) {
+                    return;
+                }
+
+                // Check if any variable in this statement is already processed
+                let hasProcessedVariable = false;
+                for (const declaration of node.declarationList.declarations) {
+                    if (ts.isIdentifier(declaration.name)) {
+                        if (processedNames.has(declaration.name.text)) {
+                            hasProcessedVariable = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (hasProcessedVariable) {
+                    return;
+                }
+
+                // Check if this statement contains template syntax
+                if (statementText.includes('(*') || statementText.includes('{{')) {
+                    return;
+                }
+
+                // This is a regular top-level variable statement
+                const isExported = node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.ExportKeyword) || false;
+
+                regularVariables.push({
+                    text: statementText,
+                    isExported
+                });
+
+                processedStatements.add(statementText);
+            }
+        }
+
+        // Increase depth when entering function bodies
+        const newDepth = (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node)) ? depth + 1 : depth;
+
+        ts.forEachChild(node, (child) => visit(child, newDepth));
+    }
+
+    visit(sourceFile);
+    return regularVariables;
+}
+
+/**
  * Generates the complete transpiled file
  */
 function generateTranspiledFile(
@@ -317,7 +425,16 @@ function generateTranspiledFile(
 ): string {
     let transpiledFile = '';
 
-    // Add global templates first
+    // Extract regular TypeScript variables (non-template, non-function)
+    const regularVariables = extractRegularVariables(sourceFile, globalTemplates, functions);
+
+    // Add regular variables first
+    for (const variable of regularVariables) {
+        const exportKeyword = variable.isExported ? 'export ' : '';
+        transpiledFile += `${exportKeyword}${variable.text}\n\n`;
+    }
+
+    // Add global templates
     for (const template of globalTemplates) {
         const exportKeyword = template.isExported ? 'export ' : '';
         transpiledFile += `${exportKeyword}const ${template.variableName} = ${template.transpiledValue};\n\n`;
@@ -407,6 +524,107 @@ function extractConditionFromAST(returnNode: ts.ReturnStatement, sourceFile: ts.
     }
 
     return undefined;
+}
+
+/**
+ * Extracts markdown content from a return statement using original source text
+ */
+function extractMarkdownFromReturnStatementWithOriginalSource(returnNode: ts.ReturnStatement, originalSource: string): { content: string; interpolations: any[]; conditionalBlocks: any[]; ternaryExpressions: any[]; jsxExpressions: any[] } {
+    if (!returnNode.expression) {
+        return { content: '', interpolations: [], conditionalBlocks: [], ternaryExpressions: [], jsxExpressions: [] };
+    }
+
+    let rawContent = '';
+
+    // Handle different types of return expressions using original source
+    if (ts.isParenthesizedExpression(returnNode.expression)) {
+        const start = returnNode.expression.getStart();
+
+        // Find the matching closing parenthesis manually since TypeScript parser fails on MDX syntax
+        let parenCount = 0;
+        let endPos = start;
+        let foundStart = false;
+
+        for (let i = start; i < originalSource.length; i++) {
+            if (originalSource[i] === '(') {
+                parenCount++;
+                foundStart = true;
+            } else if (originalSource[i] === ')') {
+                parenCount--;
+                if (parenCount === 0 && foundStart) {
+                    endPos = i;
+                    break;
+                }
+            }
+        }
+
+        const fullText = originalSource.slice(start, endPos + 1);
+
+        // Extract content between the parentheses
+        if (fullText.startsWith('(') && fullText.endsWith(')')) {
+            rawContent = fullText.slice(1, -1).trim();
+        } else {
+            rawContent = fullText.trim();
+        }
+    } else if (ts.isStringLiteral(returnNode.expression)) {
+        // Handle return "content" format
+        rawContent = returnNode.expression.text;
+    } else if (ts.isTemplateExpression(returnNode.expression)) {
+        // Handle return `content` format
+        rawContent = originalSource.slice(returnNode.expression.getStart(), returnNode.expression.getEnd());
+    } else {
+        // Fallback: get the raw text from original source
+        rawContent = originalSource.slice(returnNode.expression.getStart(), returnNode.expression.getEnd());
+    }
+
+    // Clean up the content
+    rawContent = rawContent.trim();
+
+    // Remove leading whitespace from each line (dedent)
+    const lines = rawContent.split('\n');
+    if (lines.length > 1) {
+        // Find the minimum indentation (excluding empty lines)
+        let minIndent = Infinity;
+        for (const line of lines) {
+            if (line.trim()) { // Skip empty lines
+                const indent = line.match(/^(\s*)/)?.[1]?.length || 0;
+                minIndent = Math.min(minIndent, indent);
+            }
+        }
+
+        // Remove the minimum indentation from all lines
+        if (minIndent > 0 && minIndent < Infinity) {
+            rawContent = lines.map(line =>
+                line.trim() ? line.slice(minIndent) : line
+            ).join('\n');
+        }
+    }
+
+    // Now parse the markdown content using the MDX parsing pipeline
+    const { protectedContent, codeBlocks } = protectCodeBlocks(rawContent);
+    const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
+
+    const interpolations: Array<{ placeholder: string; expression: string }> = [];
+    const conditionalBlocks: Array<{ condition: string; content: string }> = [];
+    const ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
+    const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
+
+    let processedContent = parseContent(normalizedMarkdown, {
+        interpolations,
+        conditionalBlocks,
+        ternaryExpressions,
+        jsxExpressions,
+    });
+
+    processedContent = restoreCodeBlocks(processedContent, codeBlocks);
+
+    return {
+        content: processedContent,
+        interpolations,
+        conditionalBlocks,
+        ternaryExpressions,
+        jsxExpressions
+    };
 }
 
 function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sourceFile: ts.SourceFile): { content: string; interpolations: any[]; conditionalBlocks: any[]; ternaryExpressions: any[]; jsxExpressions: any[] } {
@@ -547,7 +765,7 @@ function extractFunctionContent(ast: ts.SourceFile, functionName: string): { typ
                                 if (ts.isParenthesizedExpression(declaration.initializer.body)) {
                                     const { content, interpolations, conditionalBlocks, ternaryExpressions, jsxExpressions } = extractMarkdownFromReturnStatement({
                                         expression: declaration.initializer.body
-                                    } as ts.ReturnStatement, sourceFile);
+                                    } as unknown as ts.ReturnStatement, sourceFile);
 
                                     returnStatements.push({
                                         condition: undefined,

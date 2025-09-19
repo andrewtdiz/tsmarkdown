@@ -246,61 +246,6 @@ export function MiniComponent({ name, isLoggedIn = true }: { name: string, isLog
 const arrowFunction = () => (# Arrow Function);
 `;
 
-console.log("\n=== Testing Export Detection with Complete TypeScript Source ===");
-// Use TypeScript compiler API directly for regular TypeScript code
-const sourceFile = ts.createSourceFile(
-    'test.ts',
-    completeTypeScriptSource,
-    ts.ScriptTarget.Latest,
-    true
-);
-const allExportedFunctions = extractFunctions(sourceFile);
-console.log("All exported functions:");
-console.log(JSON.stringify(allExportedFunctions, null, 2));
-// Note: buildParsedMDXWithTSParser is designed for single functions, not multi-function sources
-// For multi-function sources, use compileAllExportedFunctions instead
-
-// The compileAllExportedFunctions function is now imported from the main compiler
-
-// Test the new multi-function compilation (all functions, including non-exported)
-console.log("\n=== Testing Multi-Function Compilation (All Functions) ===");
-const allFunctionsResult = await compileAllFunctions(completeTypeScriptSource);
-console.log("Compilation errors:", allFunctionsResult.errors);
-
-
-// Test the exported-only compilation for comparison
-console.log("\n=== Testing Multi-Function Compilation (Exported Only) ===");
-const exportedOnlyResult = await compileAllExportedFunctions(completeTypeScriptSource);
-console.log("Compilation errors:", exportedOnlyResult.errors);
-
-// Print the complete transpiled file as one unit (all functions)
-console.log("\n=== Complete Transpiled File (All Functions) ===");
-let completeTranspiledFile = "";
-allFunctionsResult.functions.forEach(({ functionInfo, compiled }) => {
-    completeTranspiledFile += compiled.typescript + "\n\n";
-});
-
-// Print the exported-only transpiled file
-console.log("\n=== Complete Transpiled File (Exported Only) ===");
-let exportedTranspiledFile = "";
-exportedOnlyResult.functions.forEach(({ functionInfo, compiled }) => {
-    exportedTranspiledFile += compiled.typescript + "\n\n";
-});
-console.log(exportedTranspiledFile);
-
-console.log("\n=== Testing Individual Function Rendering (All Functions) ===");
-for (const { functionInfo, compiled } of allFunctionsResult.functions) {
-    console.log(`\n--- Rendering ${functionInfo.name} (${functionInfo.isExported ? 'exported' : 'internal'}) ---`);
-    try {
-        const result = await render(compiled, {}, { name: "Test" });
-        console.log(result.content);
-    } catch (error) {
-        console.log("Render Error:", error.message);
-    }
-}
-console.log("\n=== Complete Transpiled File (All Functions) ===");
-console.log(completeTranspiledFile);
-
 // Test the new full-file compiler that processes template syntax outside of functions
 console.log("\n=== Testing Full-File Compilation ===");
 const fullFileResult = await compileFullFile(completeTypeScriptSource);
