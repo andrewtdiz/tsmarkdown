@@ -79,11 +79,11 @@ function ProductCard({ product }) {
 
     {isOnSale && (
       🔥 **SALE:** {{ discountPercent }}% OFF!
-      ~~${{ product.originalPrice }}~~ **${{ product.salePrice }}**
+      ~~{{ product.originalPrice }}~~ **{{ product.salePrice }}**
     )}
 
     {!isOnSale && (
-      **Price:** ${{ product.originalPrice }}
+      **Price:** {{ product.originalPrice }}
     )}
 
     ## Description

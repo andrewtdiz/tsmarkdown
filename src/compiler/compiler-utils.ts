@@ -158,6 +158,37 @@ function generateSingleReturnStatement(parsed: ParsedMDX): string {
         );
     }
 
+    // Replace conditional block placeholders with actual conditional logic
+    // Process in reverse order to handle nested conditionals correctly
+    for (let i = parsed.conditionalBlocks.length - 1; i >= 0; i--) {
+        const conditional = parsed.conditionalBlocks[i];
+        const placeholder = `__CONDITIONAL_${i}__`;
+
+        // Process the content to handle any interpolations within it
+        let processedContent = conditional.content;
+
+        // Process any interpolations within the conditional content
+        for (const interpolation of parsed.interpolations) {
+            const interpolationPlaceholder = interpolation.placeholder;
+            const interpolationExpression = interpolation.expression;
+
+            processedContent = processedContent.replace(
+                new RegExp(interpolationPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+                `\${${interpolationExpression}}`
+            );
+        }
+
+        // Create the conditional expression
+        const escapedContent = processedContent.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
+        const conditionalExpression = `\${${conditional.condition} ? \`${escapedContent}\` : ''}`;
+
+        // Replace the placeholder with the conditional expression
+        processedMarkdown = processedMarkdown.replace(
+            new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+            conditionalExpression
+        );
+    }
+
     // Replace ternary expression placeholders with actual ternary logic
     // Process in reverse order to handle nested ternaries correctly
     for (let i = parsed.ternaryExpressions.length - 1; i >= 0; i--) {
@@ -347,6 +378,37 @@ function generateMultipleReturnStatements(parsed: ParsedMDX): string {
                 processedMarkdown = processedMarkdown.replace(
                     new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
                     ternaryExpression
+                );
+            }
+
+            // Replace conditional block placeholders with actual conditional logic
+            // Process in reverse order to handle nested conditionals correctly
+            for (let j = parsed.conditionalBlocks.length - 1; j >= 0; j--) {
+                const conditional = parsed.conditionalBlocks[j];
+                const placeholder = `__CONDITIONAL_${j}__`;
+
+                // Process the content to handle any interpolations within it
+                let processedContent = conditional.content;
+
+                // Process any interpolations within the conditional content
+                for (const interpolation of parsed.interpolations) {
+                    const interpolationPlaceholder = interpolation.placeholder;
+                    const interpolationExpression = interpolation.expression;
+
+                    processedContent = processedContent.replace(
+                        new RegExp(interpolationPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+                        `\${${interpolationExpression}}`
+                    );
+                }
+
+                // Create the conditional expression using &&
+                const escapedContent = processedContent.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
+                const conditionalExpression = `\${${conditional.condition} && \`${escapedContent}\`}`;
+
+                // Replace the placeholder with the conditional expression
+                processedMarkdown = processedMarkdown.replace(
+                    new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+                    conditionalExpression
                 );
             }
 

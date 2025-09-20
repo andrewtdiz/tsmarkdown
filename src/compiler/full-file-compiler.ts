@@ -37,19 +37,42 @@ function preprocessMDXInFunctions(source: string): string {
         const openParenIndex = returnStart + match[0].length - 1; // Position of the opening (
 
         // Find the matching closing parenthesis by counting braces
+        // We need to be more careful about nested parentheses in ternary expressions
         let braceLevel = 0;
         let closeParenIndex = -1;
+        let inString: string | false = false;
+        let escapeNext = false;
 
         for (let i = openParenIndex; i < processedSource.length; i++) {
             const char = processedSource[i];
+            const prevChar = i > 0 ? processedSource[i - 1] : '';
 
-            if (char === '(') {
-                braceLevel++;
-            } else if (char === ')') {
-                braceLevel--;
-                if (braceLevel === 0) {
-                    closeParenIndex = i;
-                    break;
+            // Handle string literals
+            if (!escapeNext && (char === '"' || char === "'" || char === '`')) {
+                if (!inString) {
+                    inString = char;
+                } else if (inString === char) {
+                    inString = false;
+                }
+            }
+
+            // Handle escape characters
+            if (char === '\\' && !escapeNext) {
+                escapeNext = true;
+                continue;
+            }
+            escapeNext = false;
+
+            // Only count braces when not inside strings
+            if (!inString) {
+                if (char === '(') {
+                    braceLevel++;
+                } else if (char === ')') {
+                    braceLevel--;
+                    if (braceLevel === 0) {
+                        closeParenIndex = i;
+                        break;
+                    }
                 }
             }
         }
@@ -63,24 +86,29 @@ function preprocessMDXInFunctions(source: string): string {
             const sourceBeforeReturn = processedSource.slice(returnStart, openParenIndex);
             const alreadyConvertedToTemplate = sourceBeforeReturn.includes('return `');
 
-            console.log('DEBUG: Source before return:', JSON.stringify(sourceBeforeReturn));
-            console.log('DEBUG: Already converted to template:', alreadyConvertedToTemplate);
 
             if (hasMDXSyntax && !alreadyConvertedToTemplate) {
                 // Convert MDX syntax to valid TypeScript template literal
                 let templateContent = content
                     .trim()
-                    // Escape backticks and dollar signs for template literals
+                    // Escape backticks for template literals
                     .replace(/`/g, '\\`')
-                    .replace(/\$/g, '\\$')
                     // Convert {{ }} to ${ } for template literals
                     .replace(/\{\{([^}]+)\}\}/g, '${$1}');
+
+                // Handle ternary expressions by converting them to use template literals
+                templateContent = templateContent.replace(/(\w+\s*\?\s*\([^)]+\)\s*:\s*\([^)]+\))/g, (match) => {
+                    // Convert ternary like "data.isAuthorized ? (Authorized) : (Not Authorized)" to use template literals
+                    return match.replace(/\(\s*([^)]+?)\s*\)/g, '`$1`');
+                });
 
                 // Replace the return statement with template literal
                 const beforeReturn = processedSource.slice(0, returnStart);
                 const afterReturn = processedSource.slice(closeParenIndex + 1);
 
-                processedSource = beforeReturn + 'return `' + templateContent + '`' + afterReturn;
+                const newReturnStatement = 'return `' + templateContent + '`';
+                processedSource = beforeReturn + newReturnStatement + afterReturn;
+
                 break; // Process one at a time to avoid conflicts
             }
         }
@@ -366,7 +394,7 @@ function convertToTemplateLiteral(
         const placeholder = `__CONDITIONAL_${index}__`;
         // For conditional blocks, we need to handle them specially
         // This is a simplified approach - in practice, you might want more sophisticated handling
-        const conditionalExpression = `${condition} ? \`${blockContent}\` : ''`;
+        const conditionalExpression = `${condition} && \`${blockContent}\``;
         result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), conditionalExpression);
     });
 
@@ -706,7 +734,22 @@ function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sour
     } else if (ts.isStringLiteral(returnNode.expression)) {
         rawContent = returnNode.expression.text;
     } else if (ts.isTemplateExpression(returnNode.expression)) {
-        rawContent = sourceText.slice(returnNode.expression.getStart(), returnNode.expression.getEnd());
+        // Handle template expressions by extracting the content between backticks
+        const templateText = sourceText.slice(returnNode.expression.getStart(), returnNode.expression.getEnd());
+        // Extract content between backticks, removing ${...} syntax and converting back to {{...}}
+        const backtickMatch = templateText.match(/^`([\s\S]*?)`$/);
+        if (backtickMatch) {
+            let content = backtickMatch[1];
+            // Convert ${...} back to {{...}} for downstream processing
+            content = content.replace(/\$\{([^}]+)\}/g, '{{$1}}');
+            // Handle nested template literals within ternary expressions
+            // In the context of ternary expressions, the content inside backticks should be kept as-is
+            // since it represents the actual content to be rendered
+            content = content.replace(/`([^`]+)`/g, '$1');
+            rawContent = content;
+        } else {
+            rawContent = templateText;
+        }
     } else {
         rawContent = sourceText.slice(returnNode.expression.getStart(), returnNode.expression.getEnd());
     }

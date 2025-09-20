@@ -6,17 +6,15 @@ function TestComponent() {
 
   return (
     # Admin panel
-    {{ data.isAuthorized ? (
+    {{ data.isAuthorized && (
       Authorized
-    ) : (
-      Not Authorized
     )}}
   )
 }
 `;
 
 async function test() {
-  console.log("=== Simple Ternary Test ===");
+  console.log("=== Simple Conditional Test ===");
   console.log("Input:");
   console.log(simpleTest);
   console.log("\nOutput:");
