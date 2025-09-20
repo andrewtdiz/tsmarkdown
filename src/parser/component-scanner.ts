@@ -1,6 +1,7 @@
 // Component Scanner - identifies TypeScript prelude and markdown body in Better MDX components
 
 import { findMatchingBrace, findMatchingParen } from './string-helpers';
+import * as ts from 'typescript';
 
 export interface ReturnStatement {
     returnIndex: number;
@@ -196,6 +197,151 @@ export function splitComponent(source: string): ComponentSplit {
 }
 
 /**
+ * Checks if content contains MDX tokens
+ */
+function containsMDXTokens(content: string): boolean {
+    // Check for common MDX patterns: {{ interpolation }}, <@ component />, ** markdown **
+    return /\{\{.*?\}\}/s.test(content) ||
+        /<\@.*?>.*?<\/@>/s.test(content) ||
+        /\*\*.*?\*\*/s.test(content) ||
+        /^#+\s/s.test(content) ||  // Headers
+        /^[-*+]\s/s.test(content) || // Lists
+        /^\d+\.\s/s.test(content);   // Ordered lists
+}
+
+/**
+ * Checks if content contains parentheses that might indicate markdown regions
+ * This is particularly important for ternary expressions like: data.isAuthorized ? (Authorized) : (Not Authorized)
+ */
+function containsParenthesesWithContent(content: string): boolean {
+    // Look for patterns like: ? (content) : (content)
+    const ternaryPattern = /\?\s*\([^)]+\)\s*:\s*\([^)]+\)/s;
+    if (ternaryPattern.test(content)) {
+        return true;
+    }
+
+    // Look for content that starts with ( followed by newline - clear markdown indicator
+    if (content.startsWith('(\n') || content.startsWith('(\r\n')) {
+        return true;
+    }
+
+    // Look for standalone parentheses that might contain markdown
+    const standaloneParenPattern = /\(\s*[^)]+\s*\)/s;
+    if (standaloneParenPattern.test(content)) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Determines if a return statement contains markdown/MDX content
+ * Uses TypeScript AST parsing to make a more accurate determination
+ */
+function isMarkdownReturn(content: string): boolean {
+    const trimmed = content.trim();
+
+    // Empty content is not markdown
+    if (trimmed.length === 0) {
+        return false;
+    }
+
+    // First, check for obvious non-markdown patterns (pure expressions, literals)
+    const nonMarkdownPatterns = [
+        /^true$/s,      // boolean literal
+        /^false$/s,     // boolean literal
+        /^null$/s,      // null literal
+        /^undefined$/s, // undefined literal
+        /^["'].*["']$/s, // string literal
+        /^[\d.]+$/s,    // number literal
+        /^\w+$/s,       // single identifier
+        /^\w+\([^)]*\)$/s, // function call
+        /^\w+\s*[\+\-\*\/]\s*\w+$/s, // simple arithmetic
+        /^\w+\s*===?\s*\w+$/s, // comparison
+        /^\w+\s*&&\s*\w+$/s, // logical and
+        /^\w+\s*\|\|\s*\w+$/s, // logical or
+        /^!\w+$/s       // negation
+    ];
+
+    // If it matches any non-markdown pattern, it's likely a TypeScript expression
+    for (const pattern of nonMarkdownPatterns) {
+        if (pattern.test(trimmed)) {
+            return false;
+        }
+    }
+
+    // Check for MDX tokens that indicate markdown content
+    if (containsMDXTokens(trimmed)) {
+        return true;
+    }
+
+    // Check for parentheses that might contain markdown (especially in ternary expressions)
+    if (containsParenthesesWithContent(trimmed)) {
+        return true;
+    }
+
+    // Use TypeScript AST parsing to determine if content is valid TypeScript
+    // If it fails to parse as TypeScript, it's likely markdown
+    if (!isValidTypeScriptExpression(trimmed)) {
+        return true;
+    }
+
+    // Check for common markdown patterns
+    const markdownPatterns = [
+        /^#+\s+/s,      // Headers
+        /^[-*+]\s+/s,   // Unordered lists
+        /^\d+\.\s+/s,   // Ordered lists
+        /^>\s+/s,       // Blockquotes
+        /^```/s,        // Code blocks
+        /^\|/s,         // Tables
+        /^\[.*\]\(.*\)/s, // Links
+        /^!\[.*\]\(.*\)/s // Images
+    ];
+
+    for (const pattern of markdownPatterns) {
+        if (pattern.test(trimmed)) {
+            return true;
+        }
+    }
+
+    // If content has newlines and some structure, likely markdown
+    if (trimmed.includes('\n') && trimmed.length > 10) {
+        return true;
+    }
+
+    // Default to TypeScript expression for short, simple content
+    return false;
+}
+
+/**
+ * Uses TypeScript AST parsing to determine if content is valid TypeScript
+ * If parsing fails, it's likely markdown content
+ */
+function isValidTypeScriptExpression(content: string): boolean {
+    try {
+        // Create a minimal TypeScript source file to test the content
+        const testSource = `const test: any = ${content};`;
+
+        // Use TypeScript compiler to parse the expression
+        const sourceFile = ts.createSourceFile(
+            'test.ts',
+            testSource,
+            ts.ScriptTarget.Latest,
+            true // setParentNodes
+        );
+
+        // Check for syntax errors
+        const diagnostics = ts.getSyntacticDiagnostics(sourceFile);
+
+        // If there are no syntax errors, it's likely valid TypeScript
+        return diagnostics.length === 0;
+    } catch (error) {
+        // If parsing throws an error, it's likely not valid TypeScript
+        return false;
+    }
+}
+
+/**
  * Finds all return statements that are not nested in child functions
  */
 function findAllReturns(componentBody: string): ReturnStatement[] {
@@ -225,6 +371,7 @@ function findAllReturns(componentBody: string): ReturnStatement[] {
             // Check if this is a return statement (followed by whitespace or parenthesis)
             const afterReturn = componentBody.slice(i + 6);
             const trimmedAfterReturn = afterReturn.trim();
+
             if (trimmedAfterReturn.startsWith('(')) {
                 // Find the opening parenthesis - account for the original whitespace
                 const openParenIndex = i + 6 + afterReturn.indexOf('(');
@@ -255,22 +402,43 @@ function findAllReturns(componentBody: string): ReturnStatement[] {
                 const trailingWhitespace = rawContent.trimStart().length - trimmedContent.length;
                 contentEndIndex = contentStartIndex + trimmedContent.length;
 
-                const returnStmt = {
-                    returnIndex: i,
-                    contentStartIndex,
-                    contentEndIndex,
-                    condition,
-                    isConditional
-                };
+                // Only include this return statement if it contains markdown content
+                const finalContent = componentBody.slice(contentStartIndex, contentEndIndex);
+                if (isMarkdownReturn(finalContent)) {
+                    const returnStmt = {
+                        returnIndex: i,
+                        contentStartIndex,
+                        contentEndIndex,
+                        condition,
+                        isConditional
+                    };
 
-                // Debug: Check what content is being extracted (can be removed in production)
-                // const extractedContent = componentBody.slice(returnStmt.contentStartIndex, returnStmt.contentEndIndex);
-                // console.log('Raw content between parens:', JSON.stringify(componentBody.slice(openParenIndex + 1, closeParenIndex)));
-                // console.log('Trimmed content:', JSON.stringify(trimmedContent));
-                // console.log('Final extracted content:', JSON.stringify(extractedContent));
-                // console.log('Content start index:', contentStartIndex, 'Content end index:', contentEndIndex);
+                    returnStatements.push(returnStmt);
+                }
+            } else {
+                // Handle one-line returns like return (**API Error**)
+                const nextNonWhitespaceIndex = i + 6 + afterReturn.indexOf('(');
+                if (componentBody[nextNonWhitespaceIndex] === '(') {
+                    const closeParenIndex = findMatchingParen(componentBody, nextNonWhitespaceIndex);
+                    if (closeParenIndex !== -1) {
+                        // Extract content between parentheses
+                        const contentStartIndex = nextNonWhitespaceIndex + 1;
+                        const contentEndIndex = closeParenIndex;
+                        const finalContent = componentBody.slice(contentStartIndex, contentEndIndex);
 
-                returnStatements.push(returnStmt);
+                        if (isMarkdownReturn(finalContent)) {
+                            const returnStmt = {
+                                returnIndex: i,
+                                contentStartIndex,
+                                contentEndIndex,
+                                condition: undefined,
+                                isConditional: false
+                            };
+
+                            returnStatements.push(returnStmt);
+                        }
+                    }
+                }
             }
         }
     }

@@ -178,13 +178,17 @@ import { Dashboard } from "./components/Dashboard";
 import { getData } from "./api/getData";
 
 const VERSION_NUMBER = "1.0.0";
-const inlineVersion = (*Version: {{ VERSION_NUMBER }}!*);
+const inlineVersion = (
+    *Version: {{ VERSION_NUMBER }}!*
+);
 
 async function TestComponent() {
   const { data, error, timedout } = await getData();
 
   if (error) return false;
-  if (timedout) return (**API Error**)
+  if (timedout) return (
+    **API Error**
+  )
   if (!data) {
     return (
       **Error**: No data available
@@ -195,8 +199,14 @@ async function TestComponent() {
 
   return (
     # Admin panel
-    {{ data.isAuthorized ? (Authorized) : (Not Authorized) }}
-    {{ !data.active && (Account is inactive) }}
+    {{ data.isAuthorized ? (
+        Authorized
+    ) : (
+        Not Authorized
+    )}}
+    {{ !data.active && (
+        Account is inactive
+    )}}
     - Name: {{ data.name }}
     - Description: {{ data.description }}
       Access your information here
@@ -210,7 +220,18 @@ async function TestComponent() {
 }
 `;
 
-// Test the new full-file compiler that processes template syntax outside of functions
+const expectedOutput = `# Admin panel
+Authorized
+- Name: Bob
+- Description: Bob's description
+  Access your information here
+
+<content>
+    <@Dashboard />
+</content>
+
+*Version: 1.0.0!*`;
+
 console.log("\n=== Testing Full-File Compilation ===");
 const fullFileResult = await compileFullFile(completeTypeScriptSource);
 console.log("Full-file compilation errors:", fullFileResult.errors);

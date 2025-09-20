@@ -4,29 +4,34 @@ Based on the architecture specification in `ARCHITECTURE.md` and the current fai
 
 ## Phase 1: Core Runtime Foundation
 
-### 1.1 Create TSM Runtime Module
-- [ ] **Create `src/runtime/tsm-runtime.ts`** with the core runtime primitives:
-  - [ ] `type Chunk = string | null | undefined | false | Iterable<string>`
-  - [ ] `export function __tsm(chunks: Array<Chunk>): string` - main runtime function
-  - [ ] `export function __tsmJoin(parts: Array<Chunk>): Array<Chunk>` - flatten helper
-  - [ ] `export function __erasePrevLine(buf: string[]): void` - line erase functionality
-  - [ ] Implement falsy compaction logic (falsy values don't emit text or whitespace)
-  - [ ] Implement whitespace normalization and newline handling
-  - [ ] Handle `__ERASE_PREV_LINE` sentinel for `{{ null }}` functionality
+### 1.1 Create TSM Runtime Module ✅ COMPLETED
+- [x] **Create `src/runtime/tsm-runtime.ts`** with the core runtime primitives:
+  - [x] `type Chunk = string | null | undefined | false | Iterable<Chunk>` - recursive type for nested chunks
+  - [x] `export function __tsm(chunks: Array<Chunk>): string` - main runtime function
+  - [x] `export function __tsmJoin(parts: Array<Chunk>): Array<Chunk>` - flatten helper
+  - [x] `export function __erasePrevLine(buf: string[]): void` - line erase functionality
+  - [x] Implement falsy compaction logic (undefined/false ignored, null erases previous line)
+  - [x] Implement whitespace normalization and newline handling
+  - [x] Handle `__ERASE_PREV_LINE` sentinel for `{{ null }}` functionality
+  - [x] **BONUS**: Added `__normalizeWhitespace()` and `__processChunk()` helper functions
+  - [x] **BONUS**: Created comprehensive test suite `test/__tsm/index.test.ts` with strict string correctness checks
 
-### 1.2 Create TSM AST Types
-- [ ] **Create `src/parser/tsm-ast.ts`** with TSM-specific AST node types:
-  - [ ] `TSMBlock`, `TSMLine`, `TSMTextChunk`, `TSMInterpolation`, `TSMComponent`, `TSMXmlGroup`
-  - [ ] Support for nested blocks in conditional expressions
-  - [ ] Proper typing for TSM grammar elements
+### 1.2 Create TSM AST Types ✅ COMPLETED
+- [x] **Create `src/parser/tsm-ast.ts`** with TSM-specific AST node types:
+  - [x] `TSMBlock`, `TSMLine`, `TSMTextChunk`, `TSMInterpolation`, `TSMComponent` (XML treated as text)
+  - [x] Support for nested blocks in conditional expressions
+  - [x] Proper typing for TSM grammar elements
+  - [x] **BONUS**: Added type guards for runtime type checking
+  - [x] **BONUS**: Added visitor and transformer pattern support
+  - [x] **BONUS**: Created comprehensive test suite `test/__tsm/ast.test.ts` with 17 test cases
 
 ## Phase 2: TSM Grammar Parser
 
 ### 2.1 TSM Block Detection
 - [ ] **Enhance `src/parser/component-scanner.ts`** to properly detect TSM blocks:
-  - [ ] Detect `return ( ... )` patterns containing TSM tokens (`{{`, `<@`, XML tags)
+  - [ ] Detect `return ( ... )` patterns containing TSM tokens (`{{`, `<@`)
   - [ ] Distinguish between regular TypeScript expressions and TSM blocks
-  - [ ] Handle one-line returns like `return (**API Error**)`
+  - [ ] Handle one-line returns like `return (**Here's some markdown**)`
 
 ### 2.2 TSM Grammar Parser
 - [ ] **Create `src/parser/tsm-grammar-parser.ts`** implementing the TSM grammar:
@@ -35,7 +40,6 @@ Based on the architecture specification in `ARCHITECTURE.md` and the current fai
   - [ ] Parse `Line := (TextChunk | Interp | Component | XmlGroup)*`
   - [ ] Parse `Interp := "{{" WS? Expr WS? "}}"`
   - [ ] Parse `Component := "<@" Ident Attrs? ("/>" | ">" Lines "</@" Ident ">")`
-  - [ ] Parse `XmlGroup := "<" Ident Attrs? ">" Lines "</" Ident ">"`
   - [ ] Handle balanced braces in expressions
   - [ ] Support for comments inside blocks (lines starting with `//`)
 

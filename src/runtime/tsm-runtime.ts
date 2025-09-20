@@ -26,20 +26,22 @@ export function __tsm(chunks: Array<Chunk>): string {
     const flattenedChunks = __tsmJoin(chunks);
 
     for (const chunk of flattenedChunks) {
-        if (chunk === __ERASE_PREV_LINE) {
+        if (chunk === __ERASE_PREV_LINE || chunk === null) {
+            // Both __ERASE_PREV_LINE and null should erase the previous line
             __erasePrevLine(buffer);
-        } else if (chunk === null || chunk === undefined || chunk === false) {
-            // Falsy values don't emit text or whitespace
+        } else if (chunk === undefined || chunk === false) {
+            // undefined and false don't emit text or whitespace
             continue;
         } else if (typeof chunk === 'string') {
             buffer.push(chunk);
         } else if (chunk && typeof chunk[Symbol.iterator] === 'function') {
             // Handle iterable chunks (arrays, etc.)
             for (const item of chunk) {
-                if (item === __ERASE_PREV_LINE) {
+                if (item === __ERASE_PREV_LINE || item === null) {
+                    // Both __ERASE_PREV_LINE and null should erase the previous line
                     __erasePrevLine(buffer);
-                } else if (item === null || item === undefined || item === false) {
-                    // Falsy values don't emit text or whitespace
+                } else if (item === undefined || item === false) {
+                    // undefined and false don't emit text or whitespace
                     continue;
                 } else if (typeof item === 'string') {
                     buffer.push(item);
@@ -61,8 +63,11 @@ export function __tsmJoin(parts: Array<Chunk>): Array<Chunk> {
     const result: Array<Chunk> = [];
 
     for (const part of parts) {
-        if (part === null || part === undefined || part === false) {
-            // Falsy values don't emit text or whitespace
+        if (part === null) {
+            // null should erase the previous line
+            result.push(__ERASE_PREV_LINE);
+        } else if (part === undefined || part === false) {
+            // undefined and false don't emit text or whitespace
             continue;
         } else if (typeof part === 'string') {
             result.push(part);

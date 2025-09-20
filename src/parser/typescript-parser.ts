@@ -4,6 +4,67 @@ import * as ts from 'typescript';
 import { locateComponent, splitComponent, type ComponentSplit, type ReturnStatement, extractMultipleReturnContent } from './component-scanner';
 import type { ParseContext } from './types';
 
+// Shared compiler infrastructure for better performance
+const sharedCompilerHost = ts.createCompilerHost({});
+
+// Separate compiler options for different use cases
+const parserCompilerOptions = {
+    jsx: ts.JsxEmit.React,
+    target: ts.ScriptTarget.Latest,
+    moduleResolution: ts.ModuleResolutionKind.NodeJs,
+    allowSyntheticDefaultImports: true,
+    esModuleInterop: true,
+    skipLibCheck: true,
+    strict: false
+};
+
+const analysisCompilerOptions = {
+    jsx: ts.JsxEmit.React,
+    target: ts.ScriptTarget.Latest,
+    moduleResolution: ts.ModuleResolutionKind.NodeJs,
+    allowSyntheticDefaultImports: true,
+    esModuleInterop: true,
+    skipLibCheck: true,
+    strict: false
+};
+
+// Cache for compiled source files to avoid recompilation
+const sourceFileCache = new Map<string, ts.SourceFile>();
+
+function getOrCreateSourceFile(fileName: string, source: string, useCache = true): ts.SourceFile {
+    if (!useCache) {
+        return ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+    }
+
+    const cacheKey = `${fileName}:${source.length}`;
+    if (!sourceFileCache.has(cacheKey)) {
+        const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+        sourceFileCache.set(cacheKey, sourceFile);
+        // Limit cache size to prevent memory issues
+        if (sourceFileCache.size > 50) {
+            const firstKey = sourceFileCache.keys().next().value;
+            sourceFileCache.delete(firstKey);
+        }
+    }
+    return sourceFileCache.get(cacheKey)!;
+}
+
+// Pre-compiled regex patterns for better performance
+const INTERPOLATION_REGEX = /\{\{([^}]+)\}\}/g;
+const HEADER_REGEX = /^(#{1,6})\s+(.*)$/gm;
+const RETURN_REGEX = /return\s*\(\s*([\s\S]*?)\s*\)/g;
+const HEADER_MATCH_REGEX = /^(#{1,6})\s+(.*)$/;
+
+function convertHeaderToJSX(line: string): string {
+    const match = line.match(HEADER_MATCH_REGEX);
+    if (match) {
+        const level = match[1].length;
+        const text = match[2];
+        return `<h${level}>${text}</h${level}>`;
+    }
+    return `<div>${line.trim()}</div>`;
+}
+
 export interface TypeScriptParseResult {
     success: boolean;
     ast?: ts.SourceFile; // TypeScript AST
@@ -63,16 +124,11 @@ export function parseWithTypeScript(
         });
 
         // Parse the TypeScript portion using TypeScript compiler API
-        const sourceFile = ts.createSourceFile(
-            fileName,
-            tsSource,
-            ts.ScriptTarget.Latest,
-            true // setParentNodes
-        );
+        const sourceFile = getOrCreateSourceFile(fileName, tsSource, false); // Don't cache to avoid interfering with MDX compilation
         const host = ts.createCompilerHost({});
         const program = ts.createProgram({
-            rootNames: ['file.ts'],
-            options: {},
+            rootNames: [fileName],
+            options: parserCompilerOptions,
             host,
         });
 
@@ -348,19 +404,12 @@ export function analyzeReturnStatements(source: string): {
         const tsSource = convertMDXToTypeScriptForAnalysis(source);
 
         // Parse the TypeScript source with JSX support
-        const sourceFile = ts.createSourceFile(
-            'return-analysis.tsx',
-            tsSource,
-            ts.ScriptTarget.Latest,
-            true // setParentNodes
-        );
+        const fileName = 'return-analysis.tsx';
+        const sourceFile = getOrCreateSourceFile(fileName, tsSource, false); // Don't cache to avoid interfering with MDX compilation
         const host = ts.createCompilerHost({});
         const program = ts.createProgram({
-            rootNames: ['return-analysis.tsx'],
-            options: {
-                jsx: ts.JsxEmit.React,
-                target: ts.ScriptTarget.Latest
-            },
+            rootNames: [fileName],
+            options: analysisCompilerOptions,
             host,
         });
 
@@ -412,17 +461,16 @@ function convertMDXToTypeScriptForAnalysis(source: string): string {
     let converted = source;
 
     // Convert MDX interpolation syntax {{ }} to valid JSX expressions
-    converted = converted.replace(/\{\{([^}]+)\}\}/g, '{$1}');
+    converted = converted.replace(INTERPOLATION_REGEX, '{$1}');
 
     // Convert markdown headers to JSX elements
-    converted = converted.replace(/^(#{1,6})\s+(.*)$/gm, '<h$1>$2</h$1>');
+    converted = converted.replace(HEADER_REGEX, '<h$1>$2</h$1>');
 
     // Handle multiple return statements by converting each one individually
     // This preserves the conditional structure while making the content valid JSX
-    const returnRegex = /return\s*\(\s*([\s\S]*?)\s*\)/g;
-    converted = converted.replace(returnRegex, (match, content) => {
+    converted = converted.replace(RETURN_REGEX, (match, content) => {
         // Convert the content inside return statements to valid JSX
-        let jsxElements = content
+        const jsxElements = content
             .split('\n')
             .map((line: string) => {
                 const trimmed = line.trim();
@@ -430,12 +478,7 @@ function convertMDXToTypeScriptForAnalysis(source: string): string {
 
                 // If it's a markdown header, convert to JSX
                 if (trimmed.match(/^#{1,6}\s+/)) {
-                    const headerMatch = trimmed.match(/^(#{1,6})\s+(.*)$/);
-                    if (headerMatch) {
-                        const level = headerMatch[1].length;
-                        const text = headerMatch[2];
-                        return `<h${level}>${text}</h${level}>`;
-                    }
+                    return convertHeaderToJSX(trimmed);
                 }
 
                 // If it's plain text, wrap in a div

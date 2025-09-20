@@ -3,6 +3,7 @@
 import { parseMDX } from './src/parser';
 import { compile } from './src/compiler';
 import { render } from './src/renderer';
+import { parseWithTypeScript } from './src/parser/typescript-parser';
 
 async function testMultipleReturns() {
   console.log('🧪 Testing Multiple Return Statements Implementation\n');
@@ -21,11 +22,15 @@ async function testMultipleReturns() {
 }`;
 
   try {
-    const parsed = parseMDX(emptyArrayComponent);
+    const tsResult = parseWithTypeScript(emptyArrayComponent);
+    if (!tsResult.success || !tsResult.componentSplit) {
+      throw new Error(`Parsing failed: ${tsResult.diagnostics.join(', ')}`);
+    }
+    const parsed = parseMDX(emptyArrayComponent); // Keep old parser for backward compatibility
     console.log('✅ Parsed successfully');
-    console.log('Return statements:', parsed.returnStatements.length);
+    console.log('Return statements from component scanner:', tsResult.componentSplit.returnStatements.length);
     console.log('TypeScript:', parsed.typescript);
-    console.log('Return statements:', JSON.stringify(parsed.returnStatements, null, 2));
+    console.log('Component split return statements:', JSON.stringify(tsResult.componentSplit.returnStatements, null, 2));
 
     const compiled = compile(parsed);
     console.log('✅ Compiled successfully');
