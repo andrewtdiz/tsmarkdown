@@ -22,30 +22,69 @@ function preprocessMDXInFunctions(source: string): string {
 
     let processedSource = source;
 
-    // Find return statements with parentheses that contain multi-line content
-    // This regex matches return ( followed by any content until the matching closing paren
-    const returnWithParensRegex = /return\s*\(\s*([\s\S]*?)\s*\)/g;
+    // Use a proper approach that handles nested parentheses
+    // We'll find return statements and then find the matching closing paren by counting braces
+    const returnWithParensRegex = /return\s*\(/g;
 
-    processedSource = processedSource.replace(returnWithParensRegex, (match, content) => {
-        // Check if the content contains MDX syntax (headers, interpolations, etc.)
-        const hasMDXSyntax = /(^#{1,6}\s|\{\{[^}]+\}\})/m.test(content);
+    let match;
+    let offset = 0;
 
-        if (hasMDXSyntax) {
-            // Convert MDX syntax to valid TypeScript template literal
-            let templateContent = content
-                .trim()
-                // Escape backticks and dollar signs for template literals
-                .replace(/`/g, '\\`')
-                .replace(/\$/g, '\\$')
-                // Convert {{ }} to ${ } for template literals
-                .replace(/\{\{([^}]+)\}\}/g, '${$1}');
+    // Process return statements one by one to avoid conflicts
+    const returnMatches = [...processedSource.matchAll(returnWithParensRegex)];
 
-            return 'return `' + templateContent + '`';
+    for (const match of returnMatches) {
+        const returnStart = match.index;
+        const openParenIndex = returnStart + match[0].length - 1; // Position of the opening (
+
+        // Find the matching closing parenthesis by counting braces
+        let braceLevel = 0;
+        let closeParenIndex = -1;
+
+        for (let i = openParenIndex; i < processedSource.length; i++) {
+            const char = processedSource[i];
+
+            if (char === '(') {
+                braceLevel++;
+            } else if (char === ')') {
+                braceLevel--;
+                if (braceLevel === 0) {
+                    closeParenIndex = i;
+                    break;
+                }
+            }
         }
 
-        // If no MDX syntax, return as-is
-        return match;
-    });
+        if (closeParenIndex !== -1) {
+            // Extract the content between the parentheses
+            const content = processedSource.slice(openParenIndex + 1, closeParenIndex);
+
+            // Check if the content contains MDX syntax AND hasn't already been converted to template literal
+            const hasMDXSyntax = /(^#{1,6}\s|\{\{[^}]+\}\})/m.test(content);
+            const sourceBeforeReturn = processedSource.slice(returnStart, openParenIndex);
+            const alreadyConvertedToTemplate = sourceBeforeReturn.includes('return `');
+
+            console.log('DEBUG: Source before return:', JSON.stringify(sourceBeforeReturn));
+            console.log('DEBUG: Already converted to template:', alreadyConvertedToTemplate);
+
+            if (hasMDXSyntax && !alreadyConvertedToTemplate) {
+                // Convert MDX syntax to valid TypeScript template literal
+                let templateContent = content
+                    .trim()
+                    // Escape backticks and dollar signs for template literals
+                    .replace(/`/g, '\\`')
+                    .replace(/\$/g, '\\$')
+                    // Convert {{ }} to ${ } for template literals
+                    .replace(/\{\{([^}]+)\}\}/g, '${$1}');
+
+                // Replace the return statement with template literal
+                const beforeReturn = processedSource.slice(0, returnStart);
+                const afterReturn = processedSource.slice(closeParenIndex + 1);
+
+                processedSource = beforeReturn + 'return `' + templateContent + '`' + afterReturn;
+                break; // Process one at a time to avoid conflicts
+            }
+        }
+    }
 
     return processedSource;
 }

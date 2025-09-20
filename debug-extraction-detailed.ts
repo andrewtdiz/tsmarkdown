@@ -52,15 +52,15 @@ const split = splitComponent(completeTypeScriptSource);
 console.log("Return statements found:", split.returnStatements.length);
 
 split.returnStatements.forEach((stmt, index) => {
-  console.log(`\nReturn ${index + 1}:`);
-  console.log(`  Start: ${stmt.contentStartIndex}, End: ${stmt.contentEndIndex}`);
-  const extracted = completeTypeScriptSource.slice(stmt.contentStartIndex, stmt.contentEndIndex);
-  console.log(`  Extracted content:`, JSON.stringify(extracted));
+    console.log(`\nReturn ${index + 1}:`);
+    console.log(`  Start: ${stmt.contentStartIndex}, End: ${stmt.contentEndIndex}`);
+    const extracted = completeTypeScriptSource.slice(stmt.contentStartIndex, stmt.contentEndIndex);
+    console.log(`  Extracted content:`, JSON.stringify(extracted));
 
-  // Show the actual source around this area
-  const start = Math.max(0, stmt.contentStartIndex - 50);
-  const end = Math.min(completeTypeScriptSource.length, stmt.contentEndIndex + 50);
-  console.log(`  Source context:`);
-  console.log(completeTypeScriptSource.slice(start, end));
-  console.log('');
+    // Show the actual source around this area
+    const start = Math.max(0, stmt.contentStartIndex - 50);
+    const end = Math.min(completeTypeScriptSource.length, stmt.contentEndIndex + 50);
+    console.log(`  Source context:`);
+    console.log(completeTypeScriptSource.slice(start, end));
+    console.log('');
 });
