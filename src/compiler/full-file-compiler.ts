@@ -12,6 +12,7 @@ import { extractFunctions } from '../parser/typescript-parser';
 import { parseContent } from '../parser/pipeline';
 import { protectCodeBlocks, restoreCodeBlocks } from '../parser/code-protection';
 import { normalizeIndentation } from '../renderer/string-helpers';
+import { Chunk } from '../runtime/tsm-runtime';
 
 /**
  * Preprocesses MDX syntax within functions to make them parseable by TypeScript
@@ -82,7 +83,8 @@ function preprocessMDXInFunctions(source: string): string {
             const content = processedSource.slice(openParenIndex + 1, closeParenIndex);
 
             // Check if the content contains MDX syntax AND hasn't already been converted to template literal
-            const hasMDXSyntax = /(^#{1,6}\s|\{\{[^}]+\}\})/m.test(content);
+            // Exclude {{...}} syntax which should be handled by the new parsing system
+            const hasMDXSyntax = /(^#{1,6}\s)/m.test(content);
             const sourceBeforeReturn = processedSource.slice(returnStart, openParenIndex);
             const alreadyConvertedToTemplate = sourceBeforeReturn.includes('return `');
 
@@ -136,8 +138,8 @@ export interface FullFileCompilationResult {
         originalValue: string;
         transpiledValue: string;
         interpolations: Array<{ placeholder: string; expression: string }>;
-        conditionalBlocks: Array<{ condition: string; content: string }>;
-        ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>;
+        conditionalBlocks: Array<{ condition: string; content: any }>;
+        ternaryExpressions: Array<{ condition: string; trueValue: any; falseValue: any }>;
         jsxExpressions: Array<{ placeholder: string; expression: string }>;
     }>;
     transpiledFile: string;
@@ -328,8 +330,8 @@ function containsTemplateSyntax(expression: string): boolean {
 function processTemplateInExpression(expression: string, sourceFile: ts.SourceFile): {
     transpiled: string;
     interpolations: Array<{ placeholder: string; expression: string }>;
-    conditionalBlocks: Array<{ condition: string; content: string }>;
-    ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>;
+    conditionalBlocks: Array<{ condition: string; content: any }>;
+    ternaryExpressions: Array<{ condition: string; trueValue: any; falseValue: any }>;
     jsxExpressions: Array<{ placeholder: string; expression: string }>;
 } | null {
 
@@ -347,8 +349,8 @@ function processTemplateInExpression(expression: string, sourceFile: ts.SourceFi
     const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
 
     const interpolations: Array<{ placeholder: string; expression: string }> = [];
-    const conditionalBlocks: Array<{ condition: string; content: string }> = [];
-    const ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
+    const conditionalBlocks: Array<{ condition: string; content: any }> = [];
+    const ternaryExpressions: Array<{ condition: string; trueValue: any; falseValue: any }> = [];
     const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
 
     let processedContent = parseContent(normalizedMarkdown, {
@@ -375,11 +377,29 @@ function processTemplateInExpression(expression: string, sourceFile: ts.SourceFi
 /**
  * Converts processed content to a template literal with proper substitutions
  */
+// Helper function to convert chunks to template literal content
+function chunksToTemplateLiteral(chunks: any[]): string {
+    if (!Array.isArray(chunks)) {
+        return String(chunks);
+    }
+
+    return chunks.map(chunk => {
+        if (typeof chunk === 'string') {
+            return chunk;
+        } else if (Array.isArray(chunk)) {
+            // Handle nested chunks
+            return chunksToTemplateLiteral(chunk);
+        } else {
+            return String(chunk);
+        }
+    }).join('');
+}
+
 function convertToTemplateLiteral(
     content: string,
     interpolations: Array<{ placeholder: string; expression: string }>,
-    conditionalBlocks: Array<{ condition: string; content: string }>,
-    ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>,
+    conditionalBlocks: Array<{ condition: string; content: any }>,
+    ternaryExpressions: Array<{ condition: string; trueValue: any; falseValue: any }>,
     jsxExpressions: Array<{ placeholder: string; expression: string }>
 ): string {
     let result = content;
@@ -392,16 +412,18 @@ function convertToTemplateLiteral(
     // Replace conditional blocks - these need special handling since they're not simple substitutions
     conditionalBlocks.forEach(({ condition, content: blockContent }, index) => {
         const placeholder = `__CONDITIONAL_${index}__`;
-        // For conditional blocks, we need to handle them specially
-        // This is a simplified approach - in practice, you might want more sophisticated handling
-        const conditionalExpression = `${condition} && \`${blockContent}\``;
+        // Convert chunks to template literal content
+        const templateContent = chunksToTemplateLiteral(blockContent);
+        const conditionalExpression = `${condition} && \`${templateContent}\``;
         result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), conditionalExpression);
     });
 
     // Replace ternary expressions
     ternaryExpressions.forEach(({ condition, trueValue, falseValue }, index) => {
         const placeholder = `__TERNARY_${index}__`;
-        const ternaryExpression = `${condition} ? \`${trueValue}\` : \`${falseValue}\``;
+        const trueContent = chunksToTemplateLiteral(trueValue);
+        const falseContent = chunksToTemplateLiteral(falseValue);
+        const ternaryExpression = `${condition} ? \`${trueContent}\` : \`${falseContent}\``;
         result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), ternaryExpression);
     });
 
@@ -598,9 +620,9 @@ function extractConditionFromAST(returnNode: ts.ReturnStatement, sourceFile: ts.
 /**
  * Extracts markdown content from a return statement using original source text
  */
-function extractMarkdownFromReturnStatementWithOriginalSource(returnNode: ts.ReturnStatement, originalSource: string): { content: string; interpolations: any[]; conditionalBlocks: any[]; ternaryExpressions: any[]; jsxExpressions: any[] } {
+function extractMarkdownFromReturnStatementWithOriginalSource(returnNode: ts.ReturnStatement, originalSource: string): { content: Chunk[]; interpolations: any[]; conditionalBlocks: any[]; ternaryExpressions: any[]; jsxExpressions: any[] } {
     if (!returnNode.expression) {
-        return { content: '', interpolations: [], conditionalBlocks: [], ternaryExpressions: [], jsxExpressions: [] };
+        return { content: [], interpolations: [], conditionalBlocks: [], ternaryExpressions: [], jsxExpressions: [] };
     }
 
     let rawContent = '';
@@ -674,8 +696,8 @@ function extractMarkdownFromReturnStatementWithOriginalSource(returnNode: ts.Ret
     const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
 
     const interpolations: Array<{ placeholder: string; expression: string }> = [];
-    const conditionalBlocks: Array<{ condition: string; content: string }> = [];
-    const ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
+    const conditionalBlocks: Array<{ condition: string; content: any }> = [];
+    const ternaryExpressions: Array<{ condition: string; trueValue: any; falseValue: any }> = [];
     const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
 
     let processedContent = parseContent(normalizedMarkdown, {
@@ -777,8 +799,8 @@ function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sour
     const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
 
     const interpolations: Array<{ placeholder: string; expression: string }> = [];
-    const conditionalBlocks: Array<{ condition: string; content: string }> = [];
-    const ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
+    const conditionalBlocks: Array<{ condition: string; content: any }> = [];
+    const ternaryExpressions: Array<{ condition: string; trueValue: any; falseValue: any }> = [];
     const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
 
     let processedContent = parseContent(normalizedMarkdown, {

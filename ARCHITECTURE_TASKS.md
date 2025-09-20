@@ -64,7 +64,6 @@ Based on the architecture specification in `ARCHITECTURE.md` and the current fai
 ### 3.2 Import Management
 - [ ] **Enhance import handling** to automatically add TSM runtime imports:
   - [ ] Add `import { __tsm, __tsmJoin, __erasePrevLine } from "tsm-runtime"` when needed
-  - [ ] Tree-shake unused runtime functions
   - [ ] Handle component imports for `<@Component/>` usage
 
 ### 3.3 Full-File Compilation Integration
@@ -75,13 +74,6 @@ Based on the architecture specification in `ARCHITECTURE.md` and the current fai
   - [ ] Handle global template syntax outside functions properly
 
 ## Phase 4: Advanced TSM Features
-
-### 4.1 Conditional Rendering
-- [ ] **Implement conditional rendering** as specified in architecture:
-  - [ ] `{{ cond ? (Block) : (Block) }}` → ternary with nested `__tsm` calls
-  - [ ] `{{ cond && (Block) }}` → logical AND with conditional `__tsm` call
-  - [ ] `{{ !cond && (Block) }}` → logical NOT with conditional `__tsm` call
-  - [ ] Parse nested blocks recursively within conditionals
 
 ### 4.2 Component System
 - [ ] **Implement TSM component system**:
@@ -94,7 +86,6 @@ Based on the architecture specification in `ARCHITECTURE.md` and the current fai
 - [ ] **Implement precise whitespace rules**:
   - [ ] Preserve author indentation exactly as written
   - [ ] Handle falsy compaction (no placeholder whitespace for falsy values)
-  - [ ] Implement `{{ null }}` line-erase functionality
   - [ ] Handle trailing newlines only if authored
   - [ ] Support for authoring comments (lines starting with `//`)
 

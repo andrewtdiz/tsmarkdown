@@ -19,43 +19,43 @@ import {
 
 // Test data that mimics what the transpiler would generate
 const testChunks: Array<Chunk> = [
-    "# Admin Panel\n",
-    "Welcome to the dashboard\n",
+    "# Admin Panel", "\n",
+    "Welcome to the dashboard", "\n",
     null, // Should be ignored AND erase previous "\n" or " "
-    "User: John Doe\n",
+    "User: John Doe", "\n",
     false, // Should be ignored
-    "Status: Active\n",
+    "Status: Active", "\n",
     undefined, // Should be ignored
-    "Last login: 2024-01-15\n"
+    "Last login: 2024-01-15", "\n"
 ];
 
 const testChunksWithErase: Array<Chunk> = [
-    "Line 1\n",
-    "Line 2\n",
+    "Line 1", "\n",
+    "Line 2", "\n",
     __ERASE_PREV_LINE, // Should erase "Line 2"
-    "Line 3\n"
+    "Line 3", "\n"
 ];
 
 const testNestedChunks: Array<Chunk> = [
-    "Header\n",
-    ["Nested", " ", "content\n"],
+    "Header", "\n",
+    ["Nested content", "\n"],
     null,
-    ["More", " ", "nested", " ", "content\n"]
+    ["More nested content"], "\n"
 ];
 
 const testFalsyChunks: Array<Chunk> = [
-    "Before\n",
+    "Before", "\n",
     null,
     undefined,
     false,
-    "After\n"
+    "After", "\n"
 ];
 
 const testWhitespaceChunks: Array<Chunk> = [
-    "  \t  Line with leading whitespace\n",
+    "  \t  Line with leading whitespace", "\n",
     "Line with trailing spaces   \t\n",
-    "\n\n\nMultiple newlines\n\n\n",
-    "Normal line\n"
+    "\n", "\n", "\n", "Multiple newlines", "\n", "\n", "\n",
+    "Normal line", "\n"
 ];
 
 describe('Phase 1: TSM Runtime Module', () => {
@@ -91,7 +91,7 @@ describe('Phase 1: TSM Runtime Module', () => {
 
     it('should flatten chunks with __tsmJoin', () => {
         const result = __tsmJoin(testNestedChunks);
-        const expected: Chunk[] = ["Header\n", "Nested", " ", "content\n", __ERASE_PREV_LINE, "More", " ", "nested", " ", "content\n"];
+        const expected: Chunk[] = ["Header", "\n", "Nested content", "\n", __ERASE_PREV_LINE, "More nested content", "\n"];
         expect(result).toEqual(expected);
     });
 

@@ -13,7 +13,7 @@
 export const __ERASE_PREV_LINE = Symbol('__ERASE_PREV_LINE');
 
 // Core chunk type that can be processed by the TSM runtime
-export type Chunk = string | null | undefined | false | Iterable<Chunk> | typeof __ERASE_PREV_LINE;
+export type Chunk = string | null | undefined | false | Iterable<Chunk> | typeof __ERASE_PREV_LINE | '\n';
 
 /**
  * Main TSM runtime function that processes an array of chunks and returns a string
@@ -32,6 +32,9 @@ export function __tsm(chunks: Array<Chunk>): string {
         } else if (chunk === undefined || chunk === false) {
             // undefined and false don't emit text or whitespace
             continue;
+        } else if (chunk === '\n') {
+            // Handle newline chunks by adding actual newline
+            buffer.push('\n');
         } else if (typeof chunk === 'string') {
             buffer.push(chunk);
         } else if (chunk && typeof chunk[Symbol.iterator] === 'function') {
@@ -43,10 +46,34 @@ export function __tsm(chunks: Array<Chunk>): string {
                 } else if (item === undefined || item === false) {
                     // undefined and false don't emit text or whitespace
                     continue;
+                } else if (item === '\n') {
+                    // Handle newline chunks by adding actual newline
+                    buffer.push('\n');
                 } else if (typeof item === 'string') {
                     buffer.push(item);
+                } else if (typeof item === 'object' && item !== null && typeof item[Symbol.iterator] === 'function') {
+                    // Handle nested iterables recursively
+                    for (const nestedItem of item) {
+                        if (nestedItem === __ERASE_PREV_LINE || nestedItem === null) {
+                            __erasePrevLine(buffer);
+                        } else if (nestedItem === undefined || nestedItem === false) {
+                            continue;
+                        } else if (nestedItem === '\n') {
+                            buffer.push('\n');
+                        } else if (typeof nestedItem === 'string') {
+                            buffer.push(nestedItem);
+                        } else {
+                            buffer.push(String(nestedItem));
+                        }
+                    }
+                } else if (typeof item === 'object' && item !== null) {
+                    // Handle nested objects
+                    buffer.push(String(item));
                 }
             }
+        } else if (typeof chunk === 'object' && chunk !== null) {
+            // Handle objects by converting to string
+            buffer.push(String(chunk));
         }
     }
 
@@ -55,7 +82,7 @@ export function __tsm(chunks: Array<Chunk>): string {
 
 /**
  * Flatten helper that processes nested chunks and handles falsy compaction
- * 
+ *
  * @param parts Array of chunks to flatten
  * @returns Flattened array of chunks
  */
@@ -69,14 +96,30 @@ export function __tsmJoin(parts: Array<Chunk>): Array<Chunk> {
         } else if (part === undefined || part === false) {
             // undefined and false don't emit text or whitespace
             continue;
-        } else if (typeof part === 'string') {
+        } else if (part === '\n') {
+            // Handle newline chunks
             result.push(part);
+        } else if (typeof part === 'string') {
+            // Split strings on newlines and create separate chunks
+            const stringParts = part.split('\n');
+            for (let i = 0; i < stringParts.length; i++) {
+                if (stringParts[i]) {
+                    result.push(stringParts[i]);
+                }
+                // Add newline chunk after each part except the last one
+                if (i < stringParts.length - 1) {
+                    result.push('\n');
+                }
+            }
         } else if (part === __ERASE_PREV_LINE) {
             result.push(part);
         } else if (part && typeof part[Symbol.iterator] === 'function') {
             // Recursively flatten iterable chunks
             const flattened = __tsmJoin(Array.from(part));
             result.push(...flattened);
+        } else if (typeof part === 'object' && part !== null) {
+            // Handle objects by converting to string
+            result.push(String(part));
         }
     }
 

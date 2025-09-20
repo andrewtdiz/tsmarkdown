@@ -131,7 +131,7 @@ function parseExtractedReturnContent(content: string): { content: string; interp
     const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
 
     const interpolations: Array<{ placeholder: string; expression: string }> = [];
-    const conditionalBlocks: Array<{ condition: string; content: string }> = [];
+    const conditionalBlocks: Array<{ condition: string; content: any }> = [];
     const ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
     const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
 
@@ -495,7 +495,7 @@ function extractMarkdownFromReturnStatementWithOriginalSource(returnNode: ts.Ret
     const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
 
     const interpolations: Array<{ placeholder: string; expression: string }> = [];
-    const conditionalBlocks: Array<{ condition: string; content: string }> = [];
+    const conditionalBlocks: Array<{ condition: string; content: any }> = [];
     const ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
     const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
 
@@ -598,7 +598,7 @@ function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sour
     const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
 
     const interpolations: Array<{ placeholder: string; expression: string }> = [];
-    const conditionalBlocks: Array<{ condition: string; content: string }> = [];
+    const conditionalBlocks: Array<{ condition: string; content: any }> = [];
     const ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
     const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
 

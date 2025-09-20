@@ -1,5 +1,7 @@
 // Code Protection - protects code blocks and inline code from Better MDX parsing
 
+import { Chunk } from "../runtime/tsm-runtime";
+
 export interface CodeProtection {
     placeholder: string;
     content: string;
@@ -41,22 +43,72 @@ export function protectCodeBlocks(content: string): { protectedContent: string; 
 /**
  * Restores code blocks and inline code after Better MDX parsing
  */
-export function restoreCodeBlocks(content: string, codeBlocks: CodeProtection[]): string {
-    let restoredContent = content;
+export function restoreCodeBlocks(content: Chunk[], codeBlocks: CodeProtection[]): Chunk[] {
+    // If there are no code blocks to restore, return the content as-is
+    if (codeBlocks.length === 0) {
+        return content;
+    }
 
-    // Restore all code blocks and inline code
-    for (const codeBlock of codeBlocks) {
-        // For code blocks, normalize the indentation by removing the common leading whitespace
-        if (codeBlock.placeholder.startsWith('__CODE_BLOCK_')) {
-            const normalizedContent = normalizeCodeBlockIndentation(codeBlock.content);
-            restoredContent = restoredContent.replace(codeBlock.placeholder, normalizedContent);
+    // Handle chunks
+    const restoredChunks: Chunk[] = [];
+    let currentString = '';
+
+    for (const chunk of content) {
+        if (typeof chunk === 'string') {
+            currentString += chunk;
+        } else if (Array.isArray(chunk)) {
+            // If there's accumulated string content, add it first
+            if (currentString) {
+                restoredChunks.push(currentString);
+                currentString = '';
+            }
+            // Add the array chunk as-is
+            restoredChunks.push(chunk as Chunk);
         } else {
-            // For inline code, restore as-is
-            restoredContent = restoredContent.replace(codeBlock.placeholder, codeBlock.content);
+            // Handle other chunk types
+            if (currentString) {
+                restoredChunks.push(currentString);
+                currentString = '';
+            }
+            restoredChunks.push(chunk);
         }
     }
 
-    return restoredContent;
+    // Add any remaining string content
+    if (currentString) {
+        restoredChunks.push(currentString);
+    }
+
+    // Now restore code blocks in the chunks
+    return restoreCodeBlocksInChunks(restoredChunks, codeBlocks);
+}
+
+/**
+ * Restores code blocks in chunk arrays
+ */
+function restoreCodeBlocksInChunks(chunks: Chunk[], codeBlocks: CodeProtection[]): Chunk[] {
+    const restoredChunks: Chunk[] = [];
+
+    for (const chunk of chunks) {
+        if (typeof chunk === 'string') {
+            // Replace placeholders in string chunks
+            let restoredString = chunk;
+            for (const codeBlock of codeBlocks) {
+                if (codeBlock.placeholder.startsWith('__CODE_BLOCK_')) {
+                    const normalizedContent = normalizeCodeBlockIndentation(codeBlock.content);
+                    restoredString = restoredString.replace(codeBlock.placeholder, normalizedContent);
+                } else {
+                    restoredString = restoredString.replace(codeBlock.placeholder, codeBlock.content);
+                }
+            }
+            restoredChunks.push(restoredString);
+        } else {
+            // Pass non-string chunks through unchanged
+            restoredChunks.push(chunk);
+        }
+    }
+
+    return restoredChunks;
 }
 
 /**

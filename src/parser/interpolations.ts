@@ -1,6 +1,11 @@
 // Unified double-brace syntax dispatcher
 import { findMatchingDoubleBrace, findMatchingBrace } from './string-helpers';
 import type { ParseContext } from './types';
+import type { Chunk } from '../runtime/tsm-runtime';
+import type { TSMChunk } from './tsm-ast';
+import { protectCodeBlocks, restoreCodeBlocks } from './code-protection';
+import { normalizeIndentation } from '../renderer/string-helpers';
+import { parseContent } from './pipeline';
 
 // Warning system for legacy single-brace usage
 const legacyWarnings = new Set<string>();
@@ -120,7 +125,7 @@ function classifyExpression(expression: string): 'conditional' | 'ternary' | 'js
     // Check for conditional pattern: condition && (content)
     // Must have && followed by ( and the pattern should be at the start
     if (trimmed.includes('&&') && trimmed.includes('(') && trimmed.includes(')')) {
-        const andPattern = /^[^{}]*&&\s*\(/;
+        const andPattern = /&&\s*\(/;
         if (andPattern.test(trimmed)) {
             return 'conditional';
         }
@@ -142,6 +147,7 @@ function classifyExpression(expression: string): 'conditional' | 'ternary' | 'js
     }
 
     // Default to interpolation
+    console.log('DEBUG: Classified as interpolation:', trimmed);
     return 'interpolation';
 }
 
@@ -428,4 +434,318 @@ export function processNestedInterpolations(
     }
 
     return processedContent;
+}
+
+// TSM AST parser that builds AST nodes instead of chunks
+import type { TSMBlock, TSMLine, TSMTextChunk, TSMInterpolation } from './tsm-ast';
+
+// Helper function to create TSM AST nodes
+function createTSMTextChunk(content: string): TSMTextChunk {
+    return {
+        type: 'TSMTextChunk',
+        content
+    };
+}
+
+function createTSMInterpolation(expression: string, isLogical?: boolean, isConditional?: boolean): TSMInterpolation {
+    return {
+        type: 'TSMInterpolation',
+        expression,
+        isLogical,
+        isConditional
+    };
+}
+
+// TSM AST parser that builds AST nodes instead of chunks
+export function parseInterpolationsToAST(content: string, context: ParseContext): TSMBlock {
+    // First, split content into lines
+    const lines = content.split('\n');
+    const tsmLines: TSMLine[] = [];
+
+    // Process the entire content at once, not line by line
+    const chunks: TSMChunk[] = [];
+    let startIndex = 0;
+
+    // First pass: process double-brace syntax {{...}}
+    while (startIndex < content.length) {
+        // Find the next {{ pattern
+        const openIndex = content.indexOf('{{', startIndex);
+        if (openIndex === -1) {
+            // No more {{, add remaining text as text chunk
+            if (startIndex < content.length) {
+                chunks.push(createTSMTextChunk(content.substring(startIndex)));
+            }
+            break;
+        }
+
+        // Add text before {{ as text chunk
+        if (openIndex > startIndex) {
+            chunks.push(createTSMTextChunk(content.substring(startIndex, openIndex)));
+        }
+
+        // Find the matching }} using the helper function
+        const closeIndex = findMatchingDoubleBrace(content, openIndex);
+        if (closeIndex === -1) {
+            // No matching }} found, add {{ and continue
+            chunks.push(createTSMTextChunk('{{'));
+            startIndex = openIndex + 2;
+            continue;
+        }
+
+        // Extract the expression (everything between {{ and }})
+        const expression = content.substring(openIndex + 2, closeIndex).trim();
+
+        if (expression) {
+            // Classify the expression type
+            const expressionType = classifyExpression(expression);
+
+            switch (expressionType) {
+                case 'conditional':
+                    // Parse conditional logic
+                    const andPattern = /&&\s*\(/;
+                    const match = expression.match(andPattern);
+                    if (match) {
+                        const andIndex = match.index!;
+                        const condition = expression.substring(0, andIndex).trim();
+                        const parenStart = andIndex + match[0].length - 1;
+                        const parenEnd = findMatchingParen(expression, parenStart);
+                        if (parenEnd !== -1) {
+                            const blockContent = expression.substring(parenStart + 1, parenEnd).trim();
+
+                            // Process the conditional content through the parsing pipeline
+                            const { protectedContent, codeBlocks } = protectCodeBlocks(blockContent);
+                            const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
+                            const content = parseContent(normalizedMarkdown, context);
+                            const restoredContent = restoreCodeBlocks(content, codeBlocks);
+
+                            console.log('DEBUG: Conditional blockContent:', blockContent);
+                            console.log('DEBUG: Conditional content type:', typeof content);
+                            console.log('DEBUG: Conditional content:', content);
+
+                            // Store the conditional block
+                            const currentIndex = context.conditionalBlocks.length;
+                            context.conditionalBlocks.push({
+                                condition: condition,
+                                content: restoredContent,
+                            });
+
+
+                            // Add the conditional expression as TSMInterpolation
+                            chunks.push(createTSMInterpolation(expression, true, false));
+                        } else {
+                            // Invalid conditional syntax, treat as regular interpolation
+                            chunks.push(createTSMInterpolation(expression, false, false));
+                        }
+                    } else {
+                        // Invalid conditional syntax, treat as regular interpolation
+                        chunks.push(createTSMInterpolation(expression, false, false));
+                    }
+                    break;
+
+                case 'ternary':
+                    // Parse ternary logic with proper nesting support
+                    const { condition, trueValue, falseValue } = parseNestedTernary(expression);
+                    if (condition && trueValue && falseValue) {
+                        // Process the true and false values through the parsing pipeline
+                        const processValue = (value: string): Chunk[] => {
+                            if (value.trim()) {
+                                const { protectedContent, codeBlocks } = protectCodeBlocks(value);
+                                const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
+                                const chunks = parseContent(normalizedMarkdown, context);
+                                return restoreCodeBlocks(chunks, codeBlocks);
+                            }
+                            return [];
+                        };
+
+                        const processedTrueValue = processValue(trueValue);
+                        const processedFalseValue = processValue(falseValue);
+
+                        context.ternaryExpressions.push({
+                            condition: condition,
+                            trueValue: processedTrueValue,
+                            falseValue: processedFalseValue,
+                        });
+
+                        // Add the ternary expression as TSMInterpolation
+                        chunks.push(createTSMInterpolation(expression, false, true));
+                    } else {
+                        // Invalid ternary syntax, treat as regular interpolation
+                        chunks.push(createTSMInterpolation(expression, false, false));
+                    }
+                    break;
+
+                case 'jsx':
+                    // Handle JSX expressions
+                    chunks.push(createTSMInterpolation(expression, false, false));
+                    break;
+
+                case 'interpolation':
+                default:
+                    // Regular interpolation
+                    chunks.push(createTSMInterpolation(expression, false, false));
+                    break;
+            }
+
+            // Update startIndex to continue after the }}
+            startIndex = closeIndex + 2;
+        } else {
+            // Empty expression, add {{}} as text
+            chunks.push(createTSMTextChunk('{{}}'));
+            startIndex = closeIndex + 2;
+        }
+    }
+
+    // Create TSM lines from chunks, splitting on newlines
+    let currentLineChunks: TSMChunk[] = [];
+
+    for (const chunk of chunks) {
+        if (chunk.type === 'TSMTextChunk' && chunk.content.includes('\n')) {
+            // Split text chunk on newlines
+            const parts = chunk.content.split('\n');
+            for (let i = 0; i < parts.length; i++) {
+                if (parts[i]) {
+                    currentLineChunks.push(createTSMTextChunk(parts[i]));
+                }
+                if (i < parts.length - 1) {
+                    // End current line and start new one
+                    if (currentLineChunks.length > 0) {
+                        tsmLines.push({
+                            type: 'TSMLine',
+                            chunks: currentLineChunks
+                        });
+                        currentLineChunks = [];
+                    }
+                }
+            }
+        } else {
+            currentLineChunks.push(chunk);
+        }
+    }
+
+    // Add final line if it has content
+    if (currentLineChunks.length > 0) {
+        tsmLines.push({
+            type: 'TSMLine',
+            chunks: currentLineChunks
+        });
+    }
+
+    return {
+        type: 'TSMBlock',
+        lines: tsmLines
+    };
+}
+
+// TSM AST renderer that converts AST nodes to chunks
+export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[] {
+    const chunks: Chunk[] = [];
+
+    for (const line of ast.lines) {
+        for (const chunk of line.chunks) {
+            if (chunk.type === 'TSMTextChunk') {
+                chunks.push(chunk.content);
+            } else if (chunk.type === 'TSMInterpolation') {
+                const interpolation = chunk as TSMInterpolation;
+
+                // Handle different types of interpolations
+                if (interpolation.isLogical) {
+                    // Handle conditional expressions like {{ cond && (content) }}
+                    // Extract condition by finding the && pattern and getting text before it
+                    const andMatch = interpolation.expression.match(/(.+?)\s*&&\s*\(/);
+                    console.log('DEBUG: andMatch:', andMatch);
+                    console.log('DEBUG: context.conditionalBlocks:', context.conditionalBlocks);
+                    const conditionalIndex = andMatch ? context.conditionalBlocks.findIndex(cb => cb.condition === andMatch[1].trim()) : -1;
+                    console.log('DEBUG: conditionalIndex:', conditionalIndex);
+                    if (conditionalIndex !== -1) {
+                        const conditional = context.conditionalBlocks[conditionalIndex];
+                        // Convert chunks to JavaScript literals
+                        const processChunks = (chunks: any[]): any => {
+                            if (chunks.length === 0) return '""';
+                            if (chunks.length === 1) {
+                                const chunk = chunks[0];
+                                if (typeof chunk === 'string') return `"${chunk}"`;
+                                if (Array.isArray(chunk)) {
+                                    // Recursively process nested chunks
+                                    return processChunks(chunk);
+                                }
+                                return String(chunk);
+                            }
+                            return chunks.map(chunk => {
+                                if (typeof chunk === 'string') return `"${chunk}"`;
+                                if (Array.isArray(chunk)) {
+                                    // Recursively process nested chunks
+                                    return processChunks(chunk);
+                                }
+                                return String(chunk);
+                            }).join(' + ');
+                        };
+
+                        console.log('DEBUG: conditional.content:', conditional.content);
+                        console.log('DEBUG: conditional.content type:', typeof conditional.content);
+                        console.log('DEBUG: Array.isArray(conditional.content):', Array.isArray(conditional.content));
+
+                        console.log('DEBUG: About to call processChunks with:', conditional.content);
+                        const content = processChunks(conditional.content);
+                        console.log('DEBUG: processChunks returned:', content);
+                        chunks.push([conditional.condition, ' && ', content] as Chunk);
+                    }
+                } else if (interpolation.isConditional) {
+                    // Handle ternary expressions like {{ cond ? true : false }}
+                    // Parse the ternary expression directly instead of matching to stored expressions
+                    const { condition, trueValue, falseValue } = parseNestedTernary(interpolation.expression);
+                    if (condition && trueValue && falseValue) {
+                        // Convert chunks to JavaScript literals
+                        const processChunks = (chunks: any[]): any => {
+                            if (chunks.length === 0) return '""';
+                            if (chunks.length === 1) {
+                                const chunk = chunks[0];
+                                if (typeof chunk === 'string') return `"${chunk}"`;
+                                if (Array.isArray(chunk)) {
+                                    // Recursively process nested chunks
+                                    return processChunks(chunk);
+                                }
+                                return String(chunk);
+                            }
+                            return chunks.map(chunk => {
+                                if (typeof chunk === 'string') return `"${chunk}"`;
+                                if (Array.isArray(chunk)) {
+                                    // Recursively process nested chunks
+                                    return processChunks(chunk);
+                                }
+                                return String(chunk);
+                            }).join(' + ');
+                        };
+
+                        const trueVal = processChunks(trueValue);
+                        const falseVal = processChunks(falseValue);
+                        chunks.push([condition, ' ? ', trueVal, ' : ', falseVal] as Chunk);
+                    } else {
+                        // Fallback to treating as regular interpolation if parsing fails
+                        chunks.push([interpolation.expression] as Chunk);
+                    }
+                } else {
+                    // Regular interpolation
+                    chunks.push([interpolation.expression] as Chunk);
+                }
+            } else if (chunk.type === 'TSMComponent') {
+                // Handle components
+                chunks.push([chunk.name] as Chunk);
+            }
+        }
+
+        // Add newline between lines (but not after the last line)
+        if (line !== ast.lines[ast.lines.length - 1]) {
+            chunks.push('\n');
+        }
+    }
+
+    return chunks;
+}
+
+// Legacy chunk-based parser (keeping for backward compatibility)
+export function parseInterpolationsToChunks(content: string, context: ParseContext): Chunk[] {
+    const ast = parseInterpolationsToAST(content, context);
+
+    // Convert AST to chunks
+    return renderASTToChunks(ast, context);
 }

@@ -10,8 +10,8 @@ export interface CompiledMDX {
   dependencies: string[];
   functionParams: string[];
   interpolations: Array<{ placeholder: string; expression: string }>;
-  conditionalBlocks: Array<{ condition: string; content: string }>;
-  ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>;
+  conditionalBlocks: Array<{ condition: string; content: any[] }>;
+  ternaryExpressions: Array<{ condition: string; trueValue: any[]; falseValue: any[] }>;
   jsxExpressions: Array<{ placeholder: string; expression: string }>;
   returnStatements: Array<{ condition?: string; content: string; isTemplate: boolean }>;
   metadata: {
@@ -36,8 +36,15 @@ export function compile(parsed: ParsedMDX): CompiledMDX {
     dependencies,
     functionParams: parsed.functionParams,
     interpolations: parsed.interpolations,
-    conditionalBlocks: parsed.conditionalBlocks,
-    ternaryExpressions: parsed.ternaryExpressions,
+    conditionalBlocks: parsed.conditionalBlocks.map(block => ({
+      condition: block.condition,
+      content: Array.isArray(block.content) ? block.content : [block.content]
+    })),
+    ternaryExpressions: parsed.ternaryExpressions.map(expr => ({
+      condition: expr.condition,
+      trueValue: Array.isArray(expr.trueValue) ? expr.trueValue : [expr.trueValue],
+      falseValue: Array.isArray(expr.falseValue) ? expr.falseValue : [expr.falseValue]
+    })),
     jsxExpressions: parsed.jsxExpressions,
     returnStatements: parsed.returnStatements,
     metadata: {

@@ -1,4 +1,5 @@
 import { ParsedMDX } from "../parser";
+import type { Chunk } from "../runtime/tsm-runtime";
 
 export interface DependencyInfo {
     modulePath: string;
@@ -135,146 +136,38 @@ export function generateReturnStatement(parsed: ParsedMDX): string {
 }
 
 function generateSingleReturnStatement(parsed: ParsedMDX): string {
-    // Process interpolations in the markdown template
-    let processedMarkdown = parsed.markdown;
+    // Generate chunk-based code instead of template literals
+    const chunks: string[] = [];
 
-    // Clean up the markdown - remove leading/trailing whitespace and fix common issues
-    processedMarkdown = processedMarkdown.trim();
-
-    // Remove the opening parenthesis and newline if it starts with "(\n"
-    if (processedMarkdown.startsWith('(\n')) {
-        processedMarkdown = processedMarkdown.substring(2);
-    }
-
-    // Replace interpolation placeholders with actual expressions
-    for (const interpolation of parsed.interpolations) {
-        const placeholder = interpolation.placeholder;
-        const expression = interpolation.expression;
-
-        // Replace the placeholder with the expression wrapped in ${}
-        processedMarkdown = processedMarkdown.replace(
-            new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-            `\${${expression}}`
-        );
-    }
-
-    // Replace conditional block placeholders with actual conditional logic
-    // Process in reverse order to handle nested conditionals correctly
-    for (let i = parsed.conditionalBlocks.length - 1; i >= 0; i--) {
-        const conditional = parsed.conditionalBlocks[i];
-        const placeholder = `__CONDITIONAL_${i}__`;
-
-        // Process the content to handle any interpolations within it
-        let processedContent = conditional.content;
-
-        // Process any interpolations within the conditional content
-        for (const interpolation of parsed.interpolations) {
-            const interpolationPlaceholder = interpolation.placeholder;
-            const interpolationExpression = interpolation.expression;
-
-            processedContent = processedContent.replace(
-                new RegExp(interpolationPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-                `\${${interpolationExpression}}`
-            );
-        }
-
-        // Create the conditional expression
-        const escapedContent = processedContent.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
-        const conditionalExpression = `\${${conditional.condition} ? \`${escapedContent}\` : ''}`;
-
-        // Replace the placeholder with the conditional expression
-        processedMarkdown = processedMarkdown.replace(
-            new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-            conditionalExpression
-        );
-    }
-
-    // Replace ternary expression placeholders with actual ternary logic
-    // Process in reverse order to handle nested ternaries correctly
-    for (let i = parsed.ternaryExpressions.length - 1; i >= 0; i--) {
-        const ternary = parsed.ternaryExpressions[i];
-        const placeholder = `__TERNARY_${i}__`;
-
-        // Process the trueValue and falseValue to handle any interpolations within them
-        let processedTrueValue = ternary.trueValue;
-        let processedFalseValue = ternary.falseValue;
-
-        // Remove wrapping parentheses if they exist, but preserve indentation
-        if (processedTrueValue.trim().startsWith('(') && processedTrueValue.trim().endsWith(')')) {
-            // Find the first newline after the opening parenthesis
-            const firstNewline = processedTrueValue.indexOf('\n');
-            if (firstNewline !== -1) {
-                // Keep the content after the first newline, preserving indentation
-                processedTrueValue = processedTrueValue.substring(firstNewline + 1);
-                // Remove the closing parenthesis and any trailing whitespace
-                const lastParen = processedTrueValue.lastIndexOf(')');
-                if (lastParen !== -1) {
-                    processedTrueValue = processedTrueValue.substring(0, lastParen);
-                }
+    // Add the parsed content as chunks
+    if (parsed.markdown && parsed.markdown.length > 0) {
+        // Content is already chunks - convert them to JavaScript literals
+        for (const chunk of parsed.markdown) {
+            if (chunk === null) {
+                chunks.push('__ERASE_PREV_LINE');
+            } else if (chunk === undefined || chunk === false) {
+                chunks.push(String(chunk));
+            } else if (chunk === '\n') {
+                chunks.push('"\\n"');
+            } else if (typeof chunk === 'string') {
+                chunks.push(`"${chunk}"`);
+            } else if (Array.isArray(chunk)) {
+                // TSMInterpolations should be evaluated by TypeScript as expressions
+                // Join array elements as a single expression
+                const expression = chunk.join('');
+                chunks.push(expression);
             } else {
-                // Single line case
-                processedTrueValue = processedTrueValue.trim().slice(1, -1).trim();
+                chunks.push(String(chunk));
             }
         }
-
-        if (processedFalseValue.trim().startsWith('(') && processedFalseValue.trim().endsWith(')')) {
-            // Find the first newline after the opening parenthesis
-            const firstNewline = processedFalseValue.indexOf('\n');
-            if (firstNewline !== -1) {
-                // Keep the content after the first newline, preserving indentation
-                processedFalseValue = processedFalseValue.substring(firstNewline + 1);
-                // Remove the closing parenthesis and any trailing whitespace
-                const lastParen = processedFalseValue.lastIndexOf(')');
-                if (lastParen !== -1) {
-                    processedFalseValue = processedFalseValue.substring(0, lastParen);
-                }
-            } else {
-                // Single line case
-                processedFalseValue = processedFalseValue.trim().slice(1, -1).trim();
-            }
-        }
-
-        // Process any interpolations within the ternary values
-        for (const interpolation of parsed.interpolations) {
-            const interpolationPlaceholder = interpolation.placeholder;
-            const interpolationExpression = interpolation.expression;
-
-            processedTrueValue = processedTrueValue.replace(
-                new RegExp(interpolationPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-                `\${${interpolationExpression}}`
-            );
-
-            processedFalseValue = processedFalseValue.replace(
-                new RegExp(interpolationPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-                `\${${interpolationExpression}}`
-            );
-        }
-
-        // Create the ternary expression using string concatenation to avoid escaping issues
-        const escapedTrueValue = processedTrueValue.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
-        const escapedFalseValue = processedFalseValue.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
-        const ternaryExpression = `\${${ternary.condition} ? \`${escapedTrueValue}\` : \`${escapedFalseValue}\`}`;
-
-        // Replace the placeholder with the ternary expression
-        processedMarkdown = processedMarkdown.replace(
-            new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-            ternaryExpression
-        );
     }
 
-    // Escape the template literal properly
-    // First escape backslashes
-    let escapedMarkdown = processedMarkdown.replace(/\\/g, '\\\\');
-
-    // Don't escape backticks since ternary expressions already have properly escaped backticks
-    // and we don't want to double-escape them
-
-    // Check if the content is already a template literal (starts with backtick)
-    if (escapedMarkdown.startsWith('`') && escapedMarkdown.endsWith('`')) {
-        return `return ${escapedMarkdown};`;
-    } else {
-        return `return \`${escapedMarkdown}\`;`;
+    if (chunks.length === 0) {
+        return 'return "";';
     }
+
+    const chunksString = chunks.join(',\n    ');
+    return `return __tsm([\n    ${chunksString}\n]);`;
 }
 
 function generateMultipleReturnStatements(parsed: ParsedMDX): string {
@@ -285,139 +178,50 @@ function generateMultipleReturnStatements(parsed: ParsedMDX): string {
     for (let i = 0; i < parsed.returnStatements.length; i++) {
         const returnStmt = parsed.returnStatements[i];
         if (returnStmt.isTemplate) {
-            // Process interpolations in the markdown template
-            let processedMarkdown = returnStmt.content;
+            // Generate chunk-based code for this return statement
+            const chunks: string[] = [];
 
-            // Clean up the markdown - remove leading/trailing whitespace and fix common issues
-            processedMarkdown = processedMarkdown.trim();
-
-            // Remove the opening parenthesis and newline if it starts with "(\n"
-            if (processedMarkdown.startsWith('(\n')) {
-                processedMarkdown = processedMarkdown.substring(2);
-            }
-
-            // Replace interpolation placeholders with actual expressions
-            for (const interpolation of parsed.interpolations) {
-                const placeholder = interpolation.placeholder;
-                const expression = interpolation.expression;
-
-                // Replace the placeholder with the expression wrapped in ${}
-                processedMarkdown = processedMarkdown.replace(
-                    new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-                    `\${${expression}}`
-                );
-            }
-
-            // Replace ternary expression placeholders with actual ternary logic
-            // Process in reverse order to handle nested ternaries correctly
-            for (let i = parsed.ternaryExpressions.length - 1; i >= 0; i--) {
-                const ternary = parsed.ternaryExpressions[i];
-                const placeholder = `__TERNARY_${i}__`;
-
-                // Process the trueValue and falseValue to handle any interpolations within them
-                let processedTrueValue = ternary.trueValue;
-                let processedFalseValue = ternary.falseValue;
-
-                // Remove wrapping parentheses if they exist, but preserve indentation
-                if (processedTrueValue.trim().startsWith('(') && processedTrueValue.trim().endsWith(')')) {
-                    // Find the first newline after the opening parenthesis
-                    const firstNewline = processedTrueValue.indexOf('\n');
-                    if (firstNewline !== -1) {
-                        // Keep the content after the first newline, preserving indentation
-                        processedTrueValue = processedTrueValue.substring(firstNewline + 1);
-                        // Remove the closing parenthesis and any trailing whitespace
-                        const lastParen = processedTrueValue.lastIndexOf(')');
-                        if (lastParen !== -1) {
-                            processedTrueValue = processedTrueValue.substring(0, lastParen);
+            // Add the markdown content as chunks
+            if (returnStmt.content) {
+                if (Array.isArray(returnStmt.content)) {
+                    // Content is already chunks - convert them to JavaScript literals
+                    for (const chunk of returnStmt.content) {
+                        if (chunk === null || chunk === undefined || chunk === false) {
+                            chunks.push(String(chunk));
+                        } else if (chunk === '\n') {
+                            chunks.push("'\\n'");
+                        } else if (typeof chunk === 'string') {
+                            chunks.push(`"${chunk}"`);
+                        } else if (Array.isArray(chunk)) {
+                            // TSMInterpolations should be evaluated by TypeScript as expressions
+                            // Join array elements as a single expression
+                            const expression = chunk.join('');
+                            chunks.push(expression);
+                        } else {
+                            chunks.push(String(chunk));
                         }
-                    } else {
-                        // Single line case
-                        processedTrueValue = processedTrueValue.trim().slice(1, -1).trim();
+                    }
+                } else {
+                    // Content is a string, split by newlines
+                    const lines = returnStmt.content.split('\n');
+                    for (let j = 0; j < lines.length; j++) {
+                        if (lines[j].trim()) {
+                            chunks.push(`"${lines[j]}"`);
+                        }
+                        if (j < lines.length - 1) {
+                            chunks.push("'\\n'");
+                        }
                     }
                 }
-
-                if (processedFalseValue.trim().startsWith('(') && processedFalseValue.trim().endsWith(')')) {
-                    // Find the first newline after the opening parenthesis
-                    const firstNewline = processedFalseValue.indexOf('\n');
-                    if (firstNewline !== -1) {
-                        // Keep the content after the first newline, preserving indentation
-                        processedFalseValue = processedFalseValue.substring(firstNewline + 1);
-                        // Remove the closing parenthesis and any trailing whitespace
-                        const lastParen = processedFalseValue.lastIndexOf(')');
-                        if (lastParen !== -1) {
-                            processedFalseValue = processedFalseValue.substring(0, lastParen);
-                        }
-                    } else {
-                        // Single line case
-                        processedFalseValue = processedFalseValue.trim().slice(1, -1).trim();
-                    }
-                }
-
-                // Process any interpolations within the ternary values
-                for (const interpolation of parsed.interpolations) {
-                    const interpolationPlaceholder = interpolation.placeholder;
-                    const interpolationExpression = interpolation.expression;
-
-                    processedTrueValue = processedTrueValue.replace(
-                        new RegExp(interpolationPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-                        `\${${interpolationExpression}}`
-                    );
-
-                    processedFalseValue = processedFalseValue.replace(
-                        new RegExp(interpolationPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-                        `\${${interpolationExpression}}`
-                    );
-                }
-
-                // Create the ternary expression using string concatenation to avoid escaping issues
-                const escapedTrueValue = processedTrueValue.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
-                const escapedFalseValue = processedFalseValue.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
-                const ternaryExpression = `\${${ternary.condition} ? \`${escapedTrueValue}\` : \`${escapedFalseValue}\`}`;
-
-                // Replace the placeholder with the ternary expression
-                processedMarkdown = processedMarkdown.replace(
-                    new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-                    ternaryExpression
-                );
             }
 
-            // Replace conditional block placeholders with actual conditional logic
-            // Process in reverse order to handle nested conditionals correctly
-            for (let j = parsed.conditionalBlocks.length - 1; j >= 0; j--) {
-                const conditional = parsed.conditionalBlocks[j];
-                const placeholder = `__CONDITIONAL_${j}__`;
+            // Note: Conditional blocks, ternary expressions, and interpolations
+            // should already be included in the returnStmt.content as chunks
+            // We don't need to add them separately
 
-                // Process the content to handle any interpolations within it
-                let processedContent = conditional.content;
-
-                // Process any interpolations within the conditional content
-                for (const interpolation of parsed.interpolations) {
-                    const interpolationPlaceholder = interpolation.placeholder;
-                    const interpolationExpression = interpolation.expression;
-
-                    processedContent = processedContent.replace(
-                        new RegExp(interpolationPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-                        `\${${interpolationExpression}}`
-                    );
-                }
-
-                // Create the conditional expression using &&
-                const escapedContent = processedContent.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
-                const conditionalExpression = `\${${conditional.condition} && \`${escapedContent}\`}`;
-
-                // Replace the placeholder with the conditional expression
-                processedMarkdown = processedMarkdown.replace(
-                    new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-                    conditionalExpression
-                );
-            }
-
-            // Escape the template literal properly
-            // First escape backslashes
-            let escapedMarkdown = processedMarkdown.replace(/\\/g, '\\\\');
-
-            // Don't escape backticks since ternary expressions already have properly escaped backticks
-            // and we don't want to double-escape them
+            // Generate the return statement
+            const chunksString = chunks.join(',\n    ');
+            const returnStatement = `return __tsm([\n    ${chunksString}\n]);`;
 
             // Determine if this should be a conditional or default return
             const isLastReturn = i === parsed.returnStatements.length - 1;
@@ -425,20 +229,10 @@ function generateMultipleReturnStatements(parsed: ParsedMDX): string {
 
             if (hasCondition && !isLastReturn) {
                 // Conditional return statement (not the last one)
-                // Check if the content is already a template literal
-                if (escapedMarkdown.startsWith('`') && escapedMarkdown.endsWith('`')) {
-                    conditionalReturns.push(`if (${returnStmt.condition}) return ${escapedMarkdown};`);
-                } else {
-                    conditionalReturns.push(`if (${returnStmt.condition}) return \`${escapedMarkdown}\`;`);
-                }
+                conditionalReturns.push(`if (${returnStmt.condition}) ${returnStatement}`);
             } else {
                 // Default return statement (last one or no condition)
-                // Check if the content is already a template literal
-                if (escapedMarkdown.startsWith('`') && escapedMarkdown.endsWith('`')) {
-                    defaultReturn = `return ${escapedMarkdown};`;
-                } else {
-                    defaultReturn = `return \`${escapedMarkdown}\`;`;
-                }
+                defaultReturn = returnStatement;
             }
         }
     }
@@ -480,9 +274,14 @@ export function generateTypedFunction(parsed: ParsedMDX): string {
 }`;
 }
 
-export function compileTemplate(markdown: string): string {
-    // For now, return markdown as-is
+export function compileTemplate(markdown: string | Chunk[]): string {
+    // For now, if markdown is chunks, convert to string
     // Later we'll add more sophisticated template compilation
+    if (Array.isArray(markdown)) {
+        // Import __tsm here to avoid circular dependencies
+        const { __tsm } = require('../runtime/tsm-runtime');
+        return __tsm(markdown);
+    }
     return markdown;
 }
 

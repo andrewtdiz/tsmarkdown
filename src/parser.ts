@@ -3,13 +3,14 @@ import { processJSXExpressions } from "./renderer/jsx-runtime";
 import { normalizeIndentation } from "./renderer/string-helpers";
 import { parseContent } from "./parser/pipeline";
 import { protectCodeBlocks, restoreCodeBlocks } from "./parser/code-protection";
+import type { Chunk } from "./runtime/tsm-runtime";
 
 export interface ParsedMDX {
   imports: string[];
   functionName: string;
   functionParams: string[];
   typescript: string;
-  markdown: string;
+  markdown: Chunk[];
   interpolations: Array<{ placeholder: string; expression: string }>;
   conditionalBlocks: Array<{ condition: string; content: string }>;
   ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>;
@@ -32,7 +33,7 @@ export function parseMDX(content: string): ParsedMDX {
   let functionName = "";
   let functionParams: string[] = [];
   let typescript = "";
-  let markdown = "";
+  let markdownString = "";
   let inFunction = false;
   let inReturn = false;
   let braceLevel = 0;
@@ -96,12 +97,12 @@ export function parseMDX(content: string): ParsedMDX {
         break;
       }
 
-      markdown += line + "\n";
+      markdownString += line + "\n";
     }
   }
 
   // Second pass: process markdown for interpolations, conditionals, ternary expressions, and JSX expressions
-  const normalizedMarkdown = normalizeIndentation(markdown).trim();
+  const normalizedMarkdown = normalizeIndentation(markdownString).trim();
 
   // Use the new parsing pipeline with code protection
   const context = {
@@ -111,7 +112,7 @@ export function parseMDX(content: string): ParsedMDX {
     jsxExpressions
   };
 
-  markdown = parseContent(normalizedMarkdown, context);
+  let markdown = parseContent(normalizedMarkdown, context);
 
   // Restore the protected code blocks in the final markdown
   markdown = restoreCodeBlocks(markdown, allCodeBlocks);
