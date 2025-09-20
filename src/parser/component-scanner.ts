@@ -73,13 +73,15 @@ export function locateComponent(source: string): ComponentLocation | null {
             break;
         }
 
-        // Check for arrow function patterns
-        if (line.includes(' = () =>') || line.includes(' = async () =>')) {
-            const match = line.match(/(?:export\s+)?(?:const\s+)?(\w+)\s*=\s*(?:async\s+)?\(\)\s*=>/);
-            functionName = match?.[1] || '';
-            componentFunctionLine = i;
-            isDefaultExport = line.startsWith('export');
-            break;
+        // Check for arrow function patterns (with or without parameters)
+        if (line.includes(' = ') && line.includes(' =>')) {
+            const match = line.match(/(?:export\s+)?(?:const\s+)?(\w+)\s*=\s*(?:async\s+)?\([^)]*\)\s*=>/);
+            if (match) {
+                functionName = match[1];
+                componentFunctionLine = i;
+                isDefaultExport = line.startsWith('export');
+                break;
+            }
         }
     }
 
@@ -336,7 +338,9 @@ export function validateComponentStructure(source: string): {
         diagnostics.push('TypeScript prelude is empty');
     }
 
-    if (split.markdownBody.length === 0) {
+    // For components with multiple return statements, empty markdown body is valid
+    // since content is inside the return statements
+    if (split.markdownBody.length === 0 && split.returnStatements.length <= 1) {
         diagnostics.push('Markdown body is empty');
     }
 

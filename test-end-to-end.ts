@@ -23,63 +23,6 @@ import * as ts from 'typescript';
 import { validateComponentStructure } from "./src/parser/component-scanner";
 import jscodeshift, { Transform } from 'jscodeshift';
 
-/**
- * Apply a jscodeshift transformation to TypeScript code
- */
-async function applyJSCodeshiftTransform(typescriptCode: string, transform: Transform): Promise<string> {
-
-    try {
-        const result = await transform(
-            { source: typescriptCode, path: 'test.ts' },
-            { j: jscodeshift, jscodeshift, stats: () => { }, report: () => { } },
-            { parser: 'babel' }
-        );
-        return result || typescriptCode;
-    } catch (error) {
-        console.warn('JSCodeshift transformation failed:', error);
-        return typescriptCode;
-    }
-}
-
-/**
- * Simple jscodeshift transformation that demonstrates AST manipulation
- * This codemod adds a console.log statement at the beginning of function bodies
- * 
- * This is a proof-of-concept showing how to use jscodeshift for declarative
- * AST transformations instead of manual string parsing or regex manipulation.
- */
-const addConsoleLogTransform: Transform = (fileInfo, api) => {
-    const j = api.jscodeshift;
-    const source = j(fileInfo.source);
-
-    // Find all function declarations
-    source.find(j.FunctionDeclaration).forEach(path => {
-        const functionBody = path.value.body;
-
-        // Only process if the function has a block statement body
-        if (j.BlockStatement.check(functionBody)) {
-            // Create a console.log statement
-            const consoleLog = j.expressionStatement(
-                j.callExpression(
-                    j.memberExpression(
-                        j.identifier('console'),
-                        j.identifier('log')
-                    ),
-                    [j.literal(`Function ${path.value.id?.name || 'anonymous'} called`)]
-                )
-            );
-
-            // Add the console.log as the first statement in the function body
-            functionBody.body.unshift(consoleLog);
-        }
-    });
-
-    return source.toSource({
-        quote: 'single',
-        trailingComma: true,
-    });
-};
-
 function findMainFunctionInAST(ast: any): any {
     if (!ast) {
         return null;
@@ -231,19 +174,40 @@ async function buildParsedMDXWithTSParser(source: string): Promise<ParsedMDX> {
 
 
 const completeTypeScriptSource = `
-const someName = "Bob";
-const exportedConst = (*Hey there, {{ someName }}!*);
+import { Dashboard } from "./components/Dashboard";
+import { getData } from "./api/getData";
 
-export function MiniComponent({ name, isLoggedIn = true }: { name: string, isLoggedIn: boolean }) {
-  const excited = name.split("").map(letter => {
-    return letter.toUpperCase()
-  }).join("");
+const VERSION_NUMBER = "1.0.0";
+const inlineVersion = (*Version: {{ VERSION_NUMBER }}!*);
 
-  if (name === "") return (Welcome, {{ someName }}!)
-  return (# Hello {{ excited }}!)
+async function TestComponent() {
+  const { data, error, timedout } = await getData();
+
+  if (error) return false;
+  if (timedout) return (**API Error**)
+  if (!data) {
+    return (
+      **Error**: No data available
+
+      {{ null }}
+    )
+  }
+
+  return (
+    # Admin panel
+    {{ data.isAuthorized ? (Authorized) : (Not Authorized) }}
+    {{ !data.active && (Account is inactive) }}
+    - Name: {{ data.name }}
+    - Description: {{ data.description }}
+      Access your information here
+
+    <content>
+      <@Dashboard />
+    </content>
+    
+    {{ inlineVersion }}
+  )
 }
-
-const arrowFunction = () => (# Arrow Function);
 `;
 
 // Test the new full-file compiler that processes template syntax outside of functions

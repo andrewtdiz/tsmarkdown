@@ -128,7 +128,7 @@ describe('TypeScript Parser integration', () => {
             expect(validation.isValid).toBe(true);
         });
 
-        test('should validate expected number of return statements - multiple-returns.mdx', async () => {
+        test('analyzes return statements in basic conditional component with 2 returns', async () => {
             const mdx = await Bun.file(import.meta.dir + '/multiple-returns.mdx').text();
 
             const validation = validateComponentStructure(mdx);
@@ -141,7 +141,7 @@ describe('TypeScript Parser integration', () => {
             expect(returnAnalysis.returnCount).toBe(expectedReturns);
         });
 
-        test('should validate expected number of return statements - basic-multiple-returns.mdx', async () => {
+        test('analyzes return statements in complex component with loading, error, and success states', async () => {
             const mdx = await Bun.file(import.meta.dir + '/basic-multiple-returns.mdx').text();
 
             const validation = validateComponentStructure(mdx);
@@ -153,7 +153,7 @@ describe('TypeScript Parser integration', () => {
             expect(returnAnalysis.returnCount).toBe(expectedReturns);
         });
 
-        test('should validate expected number of return statements - conditional-returns.mdx', async () => {
+        test('analyzes return statements in role-based conditional rendering component', async () => {
             const mdx = await Bun.file(import.meta.dir + '/conditional-returns.mdx').text();
 
             const validation = validateComponentStructure(mdx);
@@ -165,7 +165,7 @@ describe('TypeScript Parser integration', () => {
             expect(returnAnalysis.returnCount).toBe(expectedReturns);
         });
 
-        test('should validate expected number of return statements - error-handling.mdx', async () => {
+        test('analyzes return statements in error handling component with early returns', async () => {
             const mdx = await Bun.file(import.meta.dir + '/error-handling.mdx').text();
 
             const validation = validateComponentStructure(mdx);
@@ -178,7 +178,7 @@ describe('TypeScript Parser integration', () => {
             expect(returnAnalysis.returnCount).toBe(expectedReturns);
         });
 
-        test('should validate expected number of return statements - edge-cases.mdx', async () => {
+        test('analyzes return statements in edge cases component with boundary conditions', async () => {
             const mdx = await Bun.file(import.meta.dir + '/edge-cases.mdx').text();
 
             const validation = validateComponentStructure(mdx);
@@ -191,7 +191,7 @@ describe('TypeScript Parser integration', () => {
             expect(returnAnalysis.returnCount).toBe(expectedReturns);
         });
 
-        test('should validate return statement patterns and conditions', async () => {
+        test('validates return statement patterns and conditional logic across multiple components', async () => {
             const testCases = [
                 {
                     file: 'multiple-returns.mdx',
@@ -238,7 +238,7 @@ describe('TypeScript Parser integration', () => {
             }
         });
 
-        test('should validate TypeScript parser parsing for all multiple return components', async () => {
+        test('validates TypeScript parser can parse all multiple return statement components', async () => {
             const testFiles = [
                 'multiple-returns.mdx',
                 'basic-multiple-returns.mdx',
@@ -266,7 +266,7 @@ describe('TypeScript Parser integration', () => {
             }
         });
 
-        test('should provide comprehensive type checking summary for multiple return components', async () => {
+        test('provides comprehensive type checking summary for all multiple return statement components', async () => {
             const testFiles = [
                 { file: 'multiple-returns.mdx', expectedReturns: 2, description: 'Basic conditional with 2 returns' },
                 { file: 'basic-multiple-returns.mdx', expectedReturns: 3, description: 'Loading, error, and success states' },
@@ -287,7 +287,7 @@ describe('TypeScript Parser integration', () => {
             }
         });
 
-        test('should render simple single return component', async () => {
+        test('renders simple single return component with user context', async () => {
             const mdx = await Bun.file(import.meta.dir + '/simple-single-return.mdx').text();
 
             const validation = validateComponentStructure(mdx);
@@ -318,33 +318,7 @@ describe('TypeScript Parser integration', () => {
             expect(result.passed).toBe(true);
         });
 
-        test('should render simple single return component', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/simple-single-return.mdx').text();
-
-            const validation = validateComponentStructure(mdx);
-            expect(validation.isValid).toBe(true);
-
-            // Test actual rendering
-            const testCase = createExactMDXTest(
-                'Simple single return component',
-                mdx
-            )
-                .withContext({ name: 'John' })
-                .expectExactLines(
-                    '# User Dashboard',
-                    'Welcome back, John!',
-                    '',
-                    '## Your Account',
-                    'Status: "Active"',
-                    'Last login: Today'
-                )
-                .build();
-
-            const result = await runner.runTestCase(testCase);
-            expect(result.passed).toBe(true);
-        });
-
-        test('should demonstrate multiple return statements limitation', async () => {
+        test('demonstrates multiple return statements component behavior with empty name', async () => {
             const mdx = await Bun.file(import.meta.dir + '/simple-multiple-returns.mdx').text();
 
             const validation = validateComponentStructure(mdx);
@@ -366,7 +340,7 @@ describe('TypeScript Parser integration', () => {
     });
 
     describe('Should handle typed props and interfaces', () => {
-        test('should handle typed props with valid user', async () => {
+        test('renders typed props component with valid user data', async () => {
             const mdx = await Bun.file(import.meta.dir + '/typed-props.mdx').text();
 
             const testCase = createExactMDXTest(
@@ -387,7 +361,7 @@ describe('TypeScript Parser integration', () => {
             expect(result.passed).toBe(true);
         });
 
-        test('should handle typed props with undefined user', async () => {
+        test('renders typed props component with undefined user data', async () => {
             const mdx = await Bun.file(import.meta.dir + '/typed-props.mdx').text();
 
             const testCase = createExactMDXTest(
@@ -404,7 +378,7 @@ describe('TypeScript Parser integration', () => {
             expect(result.passed).toBe(true);
         });
 
-        test('should handle typed props with null user', async () => {
+        test('renders typed props component with null user data', async () => {
             const mdx = await Bun.file(import.meta.dir + '/typed-props.mdx').text();
 
             const testCase = createExactMDXTest(
@@ -421,7 +395,7 @@ describe('TypeScript Parser integration', () => {
             expect(result.passed).toBe(true);
         });
 
-        test('should validate typed props component structure', async () => {
+        test('validates typed props component structure and TypeScript interfaces', async () => {
             const mdx = await Bun.file(import.meta.dir + '/typed-props.mdx').text();
 
             const validation = validateComponentStructure(mdx);
@@ -431,7 +405,7 @@ describe('TypeScript Parser integration', () => {
             expect(validation.split?.tsPrelude).toContain('type UserRole');
         });
 
-        test('should extract type information from typed props', async () => {
+        test('extracts TypeScript type information from typed props component', async () => {
             const mdx = await Bun.file(import.meta.dir + '/typed-props.mdx').text();
 
             const typeInfo = extractTypeInfo(mdx);
@@ -440,7 +414,7 @@ describe('TypeScript Parser integration', () => {
             expect(typeInfo.types).toContain('UserRole');
         });
 
-        test('should parse typed props component for TypeScript parser', async () => {
+        test('parses typed props component using TypeScript parser with JSX support', async () => {
             const mdx = await Bun.file(import.meta.dir + '/typed-props.mdx').text();
 
             const parseResult = parseWithTypeScript(mdx, {

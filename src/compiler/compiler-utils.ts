@@ -238,7 +238,12 @@ function generateSingleReturnStatement(parsed: ParsedMDX): string {
     // Don't escape backticks since ternary expressions already have properly escaped backticks
     // and we don't want to double-escape them
 
-    return `return \`${escapedMarkdown}\`;`;
+    // Check if the content is already a template literal (starts with backtick)
+    if (escapedMarkdown.startsWith('`') && escapedMarkdown.endsWith('`')) {
+        return `return ${escapedMarkdown};`;
+    } else {
+        return `return \`${escapedMarkdown}\`;`;
+    }
 }
 
 function generateMultipleReturnStatements(parsed: ParsedMDX): string {
@@ -358,10 +363,20 @@ function generateMultipleReturnStatements(parsed: ParsedMDX): string {
 
             if (hasCondition && !isLastReturn) {
                 // Conditional return statement (not the last one)
-                conditionalReturns.push(`if (${returnStmt.condition}) return \`${escapedMarkdown}\`;`);
+                // Check if the content is already a template literal
+                if (escapedMarkdown.startsWith('`') && escapedMarkdown.endsWith('`')) {
+                    conditionalReturns.push(`if (${returnStmt.condition}) return ${escapedMarkdown};`);
+                } else {
+                    conditionalReturns.push(`if (${returnStmt.condition}) return \`${escapedMarkdown}\`;`);
+                }
             } else {
                 // Default return statement (last one or no condition)
-                defaultReturn = `return \`${escapedMarkdown}\`;`;
+                // Check if the content is already a template literal
+                if (escapedMarkdown.startsWith('`') && escapedMarkdown.endsWith('`')) {
+                    defaultReturn = `return ${escapedMarkdown};`;
+                } else {
+                    defaultReturn = `return \`${escapedMarkdown}\`;`;
+                }
             }
         }
     }

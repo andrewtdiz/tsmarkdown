@@ -347,17 +347,20 @@ export function analyzeReturnStatements(source: string): {
         // Create a TypeScript-compatible source by converting MDX syntax to valid TypeScript
         const tsSource = convertMDXToTypeScriptForAnalysis(source);
 
-        // Parse the TypeScript source
+        // Parse the TypeScript source with JSX support
         const sourceFile = ts.createSourceFile(
-            'return-analysis.bmdx',
+            'return-analysis.tsx',
             tsSource,
             ts.ScriptTarget.Latest,
             true // setParentNodes
         );
         const host = ts.createCompilerHost({});
         const program = ts.createProgram({
-            rootNames: ['file.ts'],
-            options: {},
+            rootNames: ['return-analysis.tsx'],
+            options: {
+                jsx: ts.JsxEmit.React,
+                target: ts.ScriptTarget.Latest
+            },
             host,
         });
 
@@ -408,11 +411,11 @@ export function analyzeReturnStatements(source: string): {
 function convertMDXToTypeScriptForAnalysis(source: string): string {
     let converted = source;
 
-    // Convert MDX interpolation syntax {{ }} to JSX expressions
-    converted = converted.replace(/\{\{([^}]+)\}\}/g, '{/* MDX interpolation: $1 */}');
+    // Convert MDX interpolation syntax {{ }} to valid JSX expressions
+    converted = converted.replace(/\{\{([^}]+)\}\}/g, '{$1}');
 
     // Convert markdown headers to JSX elements
-    converted = converted.replace(/^(#{1,6})\s+(.*)$/gm, '<h$1>{/* MDX header: $2 */}</h$1>');
+    converted = converted.replace(/^(#{1,6})\s+(.*)$/gm, '<h$1>$2</h$1>');
 
     // Handle multiple return statements by converting each one individually
     // This preserves the conditional structure while making the content valid JSX

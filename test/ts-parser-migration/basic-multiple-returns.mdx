@@ -2,7 +2,7 @@ function BasicMultipleReturns() {
     const user = { name: "John Doe", isActive: true };
     const isLoading = false;
     const name = user.name.split('').map((char) => {
-        return (char)
+        return char
     }).join('');
 
     if (isLoading) {

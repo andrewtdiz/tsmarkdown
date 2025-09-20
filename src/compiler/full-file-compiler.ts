@@ -22,27 +22,29 @@ function preprocessMDXInFunctions(source: string): string {
 
     let processedSource = source;
 
-    // Find return statements with parentheses that contain MDX syntax (but don't start with #)
-    const returnWithParensRegex = /return\s*\(\s*([^#][^)]*\{\{[^}]+\}\}[^)]*)\s*\)/g;
+    // Find return statements with parentheses that contain multi-line content
+    // This regex matches return ( followed by any content until the matching closing paren
+    const returnWithParensRegex = /return\s*\(\s*([\s\S]*?)\s*\)/g;
 
     processedSource = processedSource.replace(returnWithParensRegex, (match, content) => {
-        // Convert MDX syntax to valid TypeScript string literal (preserve interpolation syntax)
-        let templateContent = content
-            .replace(/#\s+/g, '# ')
-            .trim();
+        // Check if the content contains MDX syntax (headers, interpolations, etc.)
+        const hasMDXSyntax = /(^#{1,6}\s|\{\{[^}]+\}\})/m.test(content);
 
-        return `return "${templateContent}"`;
-    });
+        if (hasMDXSyntax) {
+            // Convert MDX syntax to valid TypeScript template literal
+            let templateContent = content
+                .trim()
+                // Escape backticks and dollar signs for template literals
+                .replace(/`/g, '\\`')
+                .replace(/\$/g, '\\$')
+                // Convert {{ }} to ${ } for template literals
+                .replace(/\{\{([^}]+)\}\}/g, '${$1}');
 
-    // Also handle return statements with hash syntax (like # Hello)
-    const returnWithHashRegex = /return\s*\(\s*(#[^)]*)\s*\)/g;
+            return 'return `' + templateContent + '`';
+        }
 
-    processedSource = processedSource.replace(returnWithHashRegex, (match, content) => {
-        // Convert MDX syntax to valid TypeScript string literal (preserve interpolation syntax)
-        let templateContent = content
-            .trim();
-
-        return `return "${templateContent}"`;
+        // If no MDX syntax, return as-is
+        return match;
     });
 
     return processedSource;
@@ -341,8 +343,8 @@ function convertToTemplateLiteral(
         result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), expression);
     });
 
-    // Wrap in template literal backticks
-    return `\`${result}\``;
+    // Return the result without wrapping in backticks (they're already handled elsewhere)
+    return result;
 }
 
 /**
