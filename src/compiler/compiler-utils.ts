@@ -244,7 +244,25 @@ function generateMultipleReturnStatements(parsed: ParsedMDX): string {
 
             // Generate the return statement
             console.log("CHUNKS: ", chunks);
-            const chunksString = chunks.join(',\n    ');
+            const processedChunks: Chunk[][] = [];
+            let i = 0;
+            for (const chunk of chunks) {
+                console.log("CHUNK: ", chunk);
+                if (chunk !== "'\\n'") {
+                    if (processedChunks[i]) {
+                        processedChunks[i].push(chunk);
+                    } else {
+                        processedChunks.push([chunk]);
+                    }
+                    i++;
+
+                } else {
+                    processedChunks.push([chunk]);
+                }
+
+            }
+            console.log("PROCESSED CHUNKS: ", processedChunks);
+            const chunksString = processedChunks.map(chunk => chunk.join(',')).join(',\n    ');
             const returnStatement = `return __tsm([\n    ${chunksString}\n]);`;
 
             // Determine if this should be a conditional or default return
