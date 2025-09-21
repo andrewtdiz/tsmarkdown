@@ -7,6 +7,7 @@ const VERSION_NUMBER = "1.0.0";
 
 async function TestComponent() {
    const someNumber = 1;
+   const currentUser = { name: "John", id: 123 };
   return (
     # Version
     ## Here i am
@@ -14,7 +15,7 @@ async function TestComponent() {
     Test: More content *bolded*
 
     <@Dashboard />
-    <@Dashboard title="My Dashboard" showHeader={true} user={currentUser} />
+    <@Dashboard title="My Dashboard" showHeader user={currentUser} />
 
     {{ someNumber > 5 ? (
       Some number is greater than 5

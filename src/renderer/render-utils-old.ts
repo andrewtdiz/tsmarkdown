@@ -386,7 +386,7 @@ export function processJSXExpressionsForParsing(
                 startIndex = openBraceIndex + placeholder.length;
             } else {
                 const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
-                jsxExpressions.push({ placeholder, expression: trimmedExpression });
+                jsxExpressions.push({ placeholder, expression: processedContent.substring(openBraceIndex, endIndex + 1) });
                 processedContent = processedContent.substring(0, openBraceIndex) + placeholder + processedContent.substring(endIndex + 1);
                 startIndex = openBraceIndex + placeholder.length;
             }

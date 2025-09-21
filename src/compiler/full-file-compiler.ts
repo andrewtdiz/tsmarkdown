@@ -247,7 +247,6 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
                 };
 
                 const compiled = compile(parsed);
-                console.log('Compiled: ', compiled);
                 functions.push({ functionInfo, compiled });
             } catch (error: any) {
                 errors.push(`Failed to compile function ${functionInfo.name}: ${error.message}`);

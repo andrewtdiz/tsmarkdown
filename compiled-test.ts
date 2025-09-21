@@ -1,5 +1,8 @@
 
 import { __tsm } from "./src/runtime/tsm-runtime";
+
+import { Dashboard } from "./components/Dashboard";
+
 const VERSION_NUMBER = "1.0.0";
 
 export function TestComponent(): string {
@@ -18,11 +21,9 @@ const currentUser = { name: "John", id: 123 };
     '\n',
     "",
     '\n',
-    "<@Dashboard />",
+    Dashboard(),
     '\n',
     "",
-    '\n',
-    "<@Dashboard title="My Dashboard" />",
     '\n',
     "",
     '\n',

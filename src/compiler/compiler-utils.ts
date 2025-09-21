@@ -177,7 +177,6 @@ function generateMultipleReturnStatements(parsed: ParsedMDX): string {
     let defaultReturn: string | null = null;
 
     // Process return statements in order
-    console.log("PARSing RETURN STATEMENTS: ", parsed);
     for (let i = 0; i < parsed.returnStatements.length; i++) {
         const returnStmt = parsed.returnStatements[i];
         if (returnStmt.isTemplate) {
@@ -198,15 +197,11 @@ function generateMultipleReturnStatements(parsed: ParsedMDX): string {
                             // Replace JSX expression placeholders with actual expressions
                             let processedChunk = chunk;
                             if (chunk.includes('__JSX_EXPRESSION_')) {
-                                console.log("PARSING JSX: ", chunk);
-                                console.log("JSX EXPRESSIONS: ", parsed.jsxExpressions);
                                 parsed.jsxExpressions.filter(expr => expr.placeholder === chunk).forEach(({ name, props }) => {
                                     // Remove braces from expression and replace placeholder
                                     // const cleanExpression = expression.replace(/^\{+|\}+$/g, '');
                                     // processedChunk = processedChunk.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), cleanExpression);
-                                    console.log("PROPS: ", props);
                                     processedChunk = `${name}(${propsToObjectString(props)})`
-                                    console.log("PROCESSED CHUNK: ", processedChunk);
                                 });
                                 includeQuotes = false;
                             }

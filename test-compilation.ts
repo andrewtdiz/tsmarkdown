@@ -4,7 +4,7 @@ import { parseJSXExpressionToTSMComponent } from "./src/parser/interpolations";
 
 
 const completeTypeScriptSource = `
-import { Dashboard } from "./components/Dashboard";
+import Dashboard from "./components/Dashboard";
 import { getData } from "./api/getData";
 
 const VERSION_NUMBER = "1.0.0";
@@ -20,7 +20,6 @@ async function TestComponent() {
 
     <@Dashboard />
 
-    <@Dashboard title="My Dashboard" />
 
     {{ someNumber > 5 ? (
       Some number is greater than 5. It's
@@ -41,29 +40,13 @@ const fullFileResult = await compileFullFile(completeTypeScriptSource);
 // Parse JSX expressions into TSMComponent objects
 console.log("\n=== TSMComponent Parsing ===");
 
-// Get jsxExpressions from functions and globalTemplates
-const jsxExpressions = [
-  ...fullFileResult.functions.flatMap(func => (func.compiled as any)?.jsxExpressions || []),
-  ...fullFileResult.globalTemplates.flatMap(template => template.jsxExpressions || [])
-];
-jsxExpressions.forEach((jsxExpr, index) => {
-  console.log(`JSX Expression ${index}: ${jsxExpr.expression}`);
-  const tsmComponent = parseJSXExpressionToTSMComponent(jsxExpr.expression);
-  if (tsmComponent) {
-    console.log(`Parsed TSMComponent:`);
-    console.log(`  Name: ${tsmComponent.name}`);
-    console.log(`  Is Self-Closing: ${tsmComponent.isSelfClosing}`);
-    console.log(`  Attributes:`, tsmComponent.attributes.map(attr => ({
-      name: attr.name,
-      value: attr.value
-    })));
-  } else {
-    console.log("Failed to parse as TSMComponent");
-  }
-});
+console.log("TRANSPILED FILE: ", fullFileResult.transpiledFile);
 
 const fileToRun = `
 import { __tsm } from "./src/runtime/tsm-runtime";
+
+import { Dashboard } from "./components/Dashboard";
+
 ${fullFileResult.transpiledFile}
 
 (async () => {
@@ -77,6 +60,8 @@ ${fullFileResult.transpiledFile}
   }
 })();
 `;
+
+console.log("FILE TO RUN: \n", fileToRun);
 
 Bun.write("compiled-test.ts", fileToRun);
 

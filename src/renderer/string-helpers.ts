@@ -214,7 +214,8 @@ export function parseJSXProps(
                         } else {
                             // Use the expression directly (no placeholder needed)
                             console.log("EXPRESSION: ", expression);
-                            propValue = expression;
+                            const parsedExpression = expression.replace("{", "").replace("}", "");
+                            propValue = parsedExpression;
                         }
                         isExpression = true;
                     } else {

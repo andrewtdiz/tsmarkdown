@@ -146,8 +146,6 @@ function classifyExpression(expression: string): 'conditional' | 'ternary' | 'js
         return 'jsx';
     }
 
-    // Default to interpolation
-    console.log('DEBUG: Classified as interpolation:', trimmed);
     return 'interpolation';
 }
 
