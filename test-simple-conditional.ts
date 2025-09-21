@@ -20,7 +20,7 @@ async function test() {
   console.log("\nOutput:");
 
   const result = await compileFullFile(simpleTest);
-  console.log(JSON.stringify(result.transpiledFile));
+  console.log((result.transpiledFile));
 }
 
 test().catch(console.error);

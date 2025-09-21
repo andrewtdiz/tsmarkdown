@@ -61,7 +61,7 @@ export { locateComponent, splitComponent, validateComponentStructure } from './c
 // TypeScript parser types
 export type { TypeScriptParseResult, TypeScriptParseOptions } from './typescript-parser';
 export type { ComponentSplit, ComponentLocation } from './component-scanner';
-
 // Legacy compatibility - maintain ESLint parser interface for backward compatibility
 export { parseWithTypeScript as parseForESLint, validateWithTypeScript as validateForESLint } from './typescript-parser';
 export type { TypeScriptParseResult as ESLintParseResult, TypeScriptParseOptions as ESLintParseOptions } from './typescript-parser';
+

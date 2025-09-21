@@ -1137,8 +1137,8 @@ export async function renderJSXElement(
 }
 
 export async function renderJSXComponent(jsxElement: string, context: any, jsxExpressions?: Array<{ placeholder: string; expression: string }>): Promise<string> {
-    // Parse JSX like: <ListItem item={item} /> or <@Component prop={value} /> or <OlItem item=__JSX_EXPRESSION_0__ index=__JSX_EXPRESSION_1__ />
-    const componentMatch = jsxElement.match(/<(@?)(\w+)([^/>]*)\/>/);
+    // Parse JSX like: <ListItem item={item} /> or <@Component prop={value} /> or <@_Component prop={value} /> or <OlItem item=__JSX_EXPRESSION_0__ index=__JSX_EXPRESSION_1__ />
+    const componentMatch = jsxElement.match(/<(@?_?)(\w+)([^/>]*)\/>/);
 
     if (!componentMatch) {
         return jsxElement; // Return as-is if we can't parse it
@@ -1206,14 +1206,17 @@ export async function renderJSXComponent(jsxElement: string, context: any, jsxEx
         }
     }
 
-    // Handle @ syntax for imported MDX components
-    if (atSymbol === '@') {
+    // Handle @ and @_ syntax for imported MDX components
+    if (atSymbol === '@' || atSymbol === '@_') {
+        // Remove underscore prefix for component lookup
+        const lookupName = componentName.startsWith('_') ? componentName.substring(1) : componentName;
+
         // Check if we have the component in our registry (imported MDX components)
-        if (componentRegistry[componentName]) {
+        if (componentRegistry[lookupName]) {
             try {
                 // Merge JSX props with default values from component metadata
-                const mergedProps = mergePropsWithDefaults(propValues, componentRegistry[componentName]);
-                const componentResult = await renderComponent(componentRegistry[componentName], {}, mergedProps);
+                const mergedProps = mergePropsWithDefaults(propValues, componentRegistry[lookupName]);
+                const componentResult = await renderComponent(componentRegistry[lookupName], {}, mergedProps);
                 return componentResult.content;
             } catch (error) {
                 return `<@${componentName}:ERROR>`;
@@ -1223,14 +1226,14 @@ export async function renderJSXComponent(jsxElement: string, context: any, jsxEx
         // If not found in registry, try to load it as a dependency
         try {
             const basePath = context.basePath || process.cwd();
-            const componentPath = await resolveComponentPath(componentName, basePath);
+            const componentPath = await resolveComponentPath(lookupName, basePath);
             if (componentPath) {
                 const componentContent = await Bun.file(componentPath).text();
                 const parsed = parseMDX(componentContent);
                 const compiled = compile(parsed);
 
                 // Register the component for future use
-                componentRegistry[componentName] = compiled;
+                componentRegistry[lookupName] = compiled;
 
                 // Render the component
                 const mergedProps = mergePropsWithDefaults(propValues, compiled);

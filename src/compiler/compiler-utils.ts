@@ -1,5 +1,7 @@
 import { ParsedMDX } from "../parser";
 import type { Chunk } from "../runtime/tsm-runtime";
+import { parseJSXProps, propsToObjectString } from "../renderer/string-helpers";
+import { TSMComponent, TSMComponentAttribute } from "../parser/tsm-ast";
 
 export interface DependencyInfo {
     modulePath: string;
@@ -311,19 +313,72 @@ export function compileTemplate(markdown: string | Chunk[], jsxExpressions?: Arr
     return markdown;
 }
 
+export function compileJSXExpression(jsxExpression: { placeholder: string; expression: string }): TSMComponent  {
+    const componentName = jsxExpression.expression.match(/<@(\w+)([^/>]*)\/>/)?.[1] ?? "UNKNOWN_COMPONENT";
+    const parsedProps = parseJSXProps(jsxExpression.expression);
+
+    const attributes: TSMComponentAttribute[] = parsedProps.map(prop => ({
+        type: 'TSMComponentAttribute',
+        name: prop.name,
+        value: prop.isExpression ? { type: 'expression', value: prop.value } : { type: 'string', value: prop.value }
+    }));
+    
+    return ({
+        type: 'TSMComponent',
+        name: componentName,
+        attributes: attributes,
+        isSelfClosing: true
+    });
+}
+
 function replaceJSXExpressionPlaceholders(chunks: Chunk[], jsxExpressions: Array<{ placeholder: string; expression: string }>): Chunk[] {
     return chunks.map(chunk => {
         if (typeof chunk === 'string') {
             let content = chunk;
             jsxExpressions.forEach(({ placeholder, expression }) => {
-                // Remove braces from expression and replace placeholder
-                const cleanExpression = expression.replace(/^\{+|\}+$/g, '');
-                content = content.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), cleanExpression);
+                // Replace JSX expression placeholders with the original JSX expressions
+                // The runtime renderer will handle JSX processing, not the template compiler
+                content = content.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), expression);
             });
             return content;
         }
         return chunk;
     });
+}
+
+/**
+ * Convert JSX expression to function call
+ */
+function convertJSXExpressionToFunctionCall(jsxExpression: string): string {
+    // Match <@ComponentName props /> syntax
+    const jsxElementRegex = /<@(\w+)([^/>]*)\/>/g;
+
+    let convertedExpression = jsxExpression;
+
+    convertedExpression = convertedExpression.replace(jsxElementRegex, (match, componentName, props) => {
+        // If the props contain JSX expression placeholders (__JSX_EXPRESSION_XX__),
+        // we need to extract them for proper runtime handling
+        const jsxExpressionMatches = props.match(/__JSX_EXPRESSION_\d+__/g);
+        let processedProps = props;
+
+        // Replace JSX expression placeholders with runtime-safe expressions
+        if (jsxExpressionMatches) {
+            jsxExpressionMatches.forEach((placeholder, index) => {
+                // Extract the original expression that was replaced with this placeholder
+                processedProps = processedProps.replace(placeholder, `__JSX_EXPRESSION_${index}__`);
+            });
+        }
+
+        // Parse props using the existing utility
+        const parsedProps = parseJSXProps(processedProps, [], true);
+        const propsString = propsToObjectString(parsedProps);
+
+        // Create function call for runtime execution
+        const functionCall = `${componentName}(${propsString})`;
+        return functionCall;
+    });
+
+    return convertedExpression;
 }
 
 export function parseImportStatement(importLine: string): DependencyInfo {

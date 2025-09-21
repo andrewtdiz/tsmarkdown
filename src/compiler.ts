@@ -1,5 +1,7 @@
 import { ParsedMDX } from './parser';
-import { extractDependencies, compileTypeScript, generateTypedFunction, compileTemplate } from './compiler/compiler-utils';
+import { extractDependencies, compileTypeScript, generateTypedFunction, compileTemplate, compileJSXExpression } from './compiler/compiler-utils';
+import { TSMComponent, TSMComponentAttribute } from './parser/tsm-ast';
+import { parseJSXExpressionToTSMComponent } from './parser/interpolations';
 export { compileAllExportedFunctions, compileAllFunctions, type MultiFunctionCompilationResult } from './compiler/multi-function-compiler';
 export { compileFullFile, executeFullFile, type FullFileCompilationResult, type FullFileExecutionResult } from './compiler/full-file-compiler';
 
@@ -12,7 +14,7 @@ export interface CompiledMDX {
   interpolations: Array<{ placeholder: string; expression: string }>;
   conditionalBlocks: Array<{ condition: string; content: any[] }>;
   ternaryExpressions: Array<{ condition: string; trueValue: any[]; falseValue: any[] }>;
-  jsxExpressions: Array<{ placeholder: string; expression: string }>;
+  jsxExpressions: Array<{ name: string; props: TSMComponentAttribute[] }>;
   returnStatements: Array<{ condition?: string; content: string; isTemplate: boolean }>;
   metadata: {
     functionName: string;
@@ -28,6 +30,12 @@ export function compile(parsed: ParsedMDX): CompiledMDX {
 
   // Generate a basic ID from function name
   const id = parsed.functionName || 'unnamed-component';
+
+  const jsxExpressions = parsed.jsxExpressions.map(expr => parseJSXExpressionToTSMComponent(expr.expression)).filter(expr => expr !== null).map((expr) => ({
+    name: expr.name,
+    props: expr.attributes
+  }))
+  console.log(JSON.stringify(jsxExpressions, null, 2));
 
   return {
     id,
@@ -45,7 +53,7 @@ export function compile(parsed: ParsedMDX): CompiledMDX {
       trueValue: Array.isArray(expr.trueValue) ? expr.trueValue : [expr.trueValue],
       falseValue: Array.isArray(expr.falseValue) ? expr.falseValue : [expr.falseValue]
     })),
-    jsxExpressions: parsed.jsxExpressions,
+    jsxExpressions,
     returnStatements: parsed.returnStatements,
     metadata: {
       functionName: parsed.functionName,

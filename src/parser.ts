@@ -5,12 +5,6 @@ import { parseContent } from "./parser/pipeline";
 import { protectCodeBlocks, restoreCodeBlocks } from "./parser/code-protection";
 import type { Chunk } from "./runtime/tsm-runtime";
 
-// Export function props adapter utilities
-export {
-  adaptFunctionWithProps,
-  createMDXFromFunctionAndProps,
-  type FunctionWithProps
-} from "./parser/function-props-adapter";
 
 export interface ParsedMDX {
   imports: string[];
@@ -23,6 +17,7 @@ export interface ParsedMDX {
   ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>;
   jsxExpressions: Array<{ placeholder: string; expression: string }>;
   returnStatements: Array<{ condition?: string; content: string; isTemplate: boolean }>;
+  componentCalls: Array<{ componentName: string; props: string }>;
   propsInterface?: string;
   parameterTypes: Array<{ name: string; type: string; required: boolean; defaultValue?: string }>;
 }

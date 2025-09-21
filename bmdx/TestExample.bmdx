@@ -14,13 +14,13 @@ function TestExample({ items }: { items: string[] }) {
 
     Welcome {{ userName }}! Your score is {{ score }}.
     
-    {isHighScore ? (
+    {{isHighScore ? (
       🎉 **Congratulations!** You achieved a high score!
     ) : (
       Keep trying to reach 80+ points.
-    )}
+    )}}
 
     ## Technologies Used
-    { List({ items }) }
+    {{ List({ items }) }}
   )
 }

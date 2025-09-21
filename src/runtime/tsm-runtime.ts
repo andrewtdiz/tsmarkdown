@@ -42,9 +42,17 @@ export function __tsm(chunks: Array<Chunk>): string {
             const chunkArray = Array.from(chunk);
             if (chunkArray.length === 1 && typeof chunkArray[0] === 'string') {
                 // This is a runtime interpolation - it should be evaluated as a TypeScript expression
-                // Since we don't have access to the execution context in the TSM runtime,
-                // we'll leave it as a placeholder that should be evaluated by the TypeScript runtime
-                buffer.push(chunkArray[0]);
+                const expression = chunkArray[0].trim();
+
+                // Check if this is a function call (e.g., "Dashboard()")
+                if (expression.match(/^\w+\(.*\)$/)) {
+                    // This is a function call - return it as-is for runtime execution
+                    // The actual execution will happen in the TypeScript runtime context
+                    buffer.push(expression);
+                } else {
+                    // This is a variable reference - leave it as a placeholder
+                    buffer.push(expression);
+                }
             } else {
                 // Handle regular iterable chunks (arrays, etc.)
                 for (const item of chunk) {

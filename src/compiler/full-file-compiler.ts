@@ -235,6 +235,7 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
                 };
 
                 const compiled = compile(parsed);
+                console.log('Compiled: ', compiled);
                 functions.push({ functionInfo, compiled });
             } catch (error: any) {
                 errors.push(`Failed to compile function ${functionInfo.name}: ${error.message}`);
@@ -465,20 +466,15 @@ function extractVariableValues(sourceFile: ts.SourceFile): Map<string, any> {
 
                         // Only store non-template variables (those without (*...*) syntax)
                         const hasTemplateSyntax = containsTemplateSyntax(initializerText);
-                        console.log(`DEBUG: Variable ${variableName} has template syntax:`, hasTemplateSyntax, 'Text:', initializerText);
                         if (!hasTemplateSyntax) {
-                            console.log(`DEBUG: Processing variable ${variableName} with initializer:`, initializerText);
                             // For simple literals, we can evaluate them
                             if (ts.isStringLiteral(declaration.initializer)) {
-                                console.log(`DEBUG: Setting ${variableName} to string:`, declaration.initializer.text);
                                 variableValues.set(variableName, declaration.initializer.text);
                             } else if (ts.isNumericLiteral(declaration.initializer)) {
                                 const value = parseFloat(declaration.initializer.text);
-                                console.log(`DEBUG: Setting ${variableName} to number:`, value);
                                 variableValues.set(variableName, value);
                             } else if (ts.isBooleanLiteral(declaration.initializer)) {
                                 const value = declaration.initializer.kind === ts.SyntaxKind.TrueKeyword;
-                                console.log(`DEBUG: Setting ${variableName} to boolean:`, value);
                                 variableValues.set(variableName, value);
                             } else if (ts.isObjectLiteralExpression(declaration.initializer)) {
                                 // For object literals, convert to a simple object representation
@@ -495,11 +491,9 @@ function extractVariableValues(sourceFile: ts.SourceFile): Map<string, any> {
                                         }
                                     }
                                 }
-                                console.log(`DEBUG: Setting ${variableName} to object:`, obj);
                                 variableValues.set(variableName, obj);
                             } else {
                                 // For more complex expressions, store as string for JSON parsing later
-                                console.log(`DEBUG: Setting ${variableName} to complex value:`, initializerText.trim());
                                 variableValues.set(variableName, initializerText.trim());
                             }
                         } else {
@@ -608,7 +602,6 @@ async function processGlobalTemplates(sourceFile: ts.SourceFile): Promise<{ proc
 function containsTemplateSyntax(expression: string): boolean {
     // Check for parentheses template syntax (*...*) - can contain nested braces
     const result = expression.includes('(*') && expression.includes('*)');
-    console.log(`DEBUG: containsTemplateSyntax for "${expression.replace(/\n/g, '\\n')}":`, result);
     return result;
 }
 
@@ -762,7 +755,8 @@ function convertToTemplateLiteral(
     jsxExpressions.forEach(({ placeholder, expression }) => {
         // Convert JSX expressions containing <@Component /> syntax to function calls
         const convertedExpression = convertJSXToFunctionCalls(expression, jsxExpressions);
-        result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), convertedExpression);
+        // Wrap in template literal syntax so the expression executes at runtime
+        result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), `\${${convertedExpression}}`);
     });
 
     // Return the result without wrapping in backticks (they're already handled elsewhere)

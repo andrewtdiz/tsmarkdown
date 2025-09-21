@@ -2,7 +2,7 @@
 import { findMatchingDoubleBrace, findMatchingBrace } from './string-helpers';
 import type { ParseContext } from './types';
 import type { Chunk } from '../runtime/tsm-runtime';
-import type { TSMChunk } from './tsm-ast';
+import type { TSMChunk, TSMComponent, TSMComponentAttribute, TSMAttributeValue } from './tsm-ast';
 import { protectCodeBlocks, restoreCodeBlocks } from './code-protection';
 import { normalizeIndentation, parseJSXProps, propsToObjectString } from '../renderer/string-helpers';
 import { parseContent } from './pipeline';
@@ -150,6 +150,7 @@ function classifyExpression(expression: string): 'conditional' | 'ternary' | 'js
     console.log('DEBUG: Classified as interpolation:', trimmed);
     return 'interpolation';
 }
+
 
 // Unified dispatcher for double-brace syntax with legacy support
 export function parseInterpolations(content: string, context: ParseContext): string {
@@ -458,6 +459,7 @@ function createTSMInterpolation(expression: string, isLogical?: boolean, isCondi
 
 // TSM AST parser that builds AST nodes instead of chunks
 export function parseInterpolationsToAST(content: string, context: ParseContext): TSMBlock {
+
     // First, split content into lines
     const lines = content.split('\n');
     const tsmLines: TSMLine[] = [];
@@ -471,16 +473,20 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
         // Find the next {{ pattern
         const openIndex = content.indexOf('{{', startIndex);
         if (openIndex === -1) {
-            // No more {{, add remaining text as text chunk
+            // No more {{, process remaining text for JSX elements before adding as text chunk
             if (startIndex < content.length) {
-                chunks.push(createTSMTextChunk(content.substring(startIndex)));
+                const remainingText = content.substring(startIndex);
+                const processedText = processJSXElementsInText(remainingText, context);
+                chunks.push(createTSMTextChunk(processedText));
             }
             break;
         }
 
-        // Add text before {{ as text chunk
+        // Add text before {{ as text chunk, but process JSX elements first
         if (openIndex > startIndex) {
-            chunks.push(createTSMTextChunk(content.substring(startIndex, openIndex)));
+            const textSegment = content.substring(startIndex, openIndex);
+            const processedText = processJSXElementsInText(textSegment, context);
+            chunks.push(createTSMTextChunk(processedText));
         }
 
         // Find the matching }} using the helper function
@@ -933,18 +939,61 @@ function processJSXElementsInText(content: string, context: ParseContext): strin
     // Find JSX elements like <@Component prop={value} />
     const jsxElementRegex = /<@(\w+)([^/>]*)\/>/g;
 
-    return content.replace(jsxElementRegex, (match, componentName, props) => {
-        // Use the shared prop parser to handle all prop types correctly
-        // Pass the context.jsxExpressions array so expressions within props can be tracked
-        const parsedProps = parseJSXProps(props, context.jsxExpressions, true);
+    let processedContent = content;
 
-        // Convert parsed props to function call arguments
-        const propsString = propsToObjectString(parsedProps);
+    let match;
+    while ((match = jsxElementRegex.exec(content)) !== null) {
+        const fullMatch = match[0];
+        const componentName = match[1];
+        const props = match[2] || '';
 
-        // Convert JSX element to function call: ComponentName({ prop1: value1, prop2: value2 })
-        const functionCall = `${componentName}(${propsString})`;
-        return functionCall;
-    });
+        // Create a JSX expression placeholder
+        const placeholder = `__JSX_EXPRESSION_${context.jsxExpressions.length}__`;
+        const fullJsxElement = fullMatch; // Keep the full JSX element for later processing
+
+        // Add to JSX expressions array
+        context.jsxExpressions.push({ placeholder, expression: fullJsxElement });
+
+        // Replace the JSX element with the placeholder
+        processedContent = processedContent.replace(fullMatch, placeholder);
+    }
+
+    return processedContent;
+}
+
+/**
+ * Parses a JSX expression like <@Dashboard title="My Title" showHeader={true} /> into a TSMComponent
+ */
+export function parseJSXExpressionToTSMComponent(jsxExpression: string): TSMComponent | null {
+    // Match JSX element pattern: <@ComponentName props... />
+    const jsxElementRegex = /<@(\w+)([^/>]*)\/>/;
+    const match = jsxExpression.match(jsxElementRegex);
+
+    if (!match) {
+        return null;
+    }
+
+    const componentName = match[1];
+    const propsString = match[2] || '';
+
+    // Parse props using the existing parseJSXProps function
+    const parsedProps = parseJSXProps(propsString);
+
+    // Convert parsed props to TSMComponentAttribute objects
+    const attributes: TSMComponentAttribute[] = parsedProps.map(prop => ({
+        type: 'TSMComponentAttribute',
+        name: prop.name,
+        value: prop.isExpression
+            ? { type: 'expression', value: prop.value }
+            : { type: 'string', value: prop.value }
+    }));
+
+    return {
+        type: 'TSMComponent',
+        name: componentName,
+        attributes,
+        isSelfClosing: true
+    };
 }
 
 // Legacy chunk-based parser (keeping for backward compatibility)
