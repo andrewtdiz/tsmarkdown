@@ -537,8 +537,8 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
                             chunks.push({
                                 type: 'TSMInterpolation',
                                 expression: expression,
-                                isConditional: true,
-                                isLogical: false,
+                                isConditional: false,
+                                isLogical: true,
                             });
                         } else {
                             // Invalid conditional syntax, treat as regular interpolation
@@ -745,13 +745,20 @@ export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[]
                             return `__tsm([${tsmChunks.join(', ')}])`;
                         };
 
+                        // Process conditional content - always process through TSM runtime
+                        let content: any = conditional.content;
                         console.log('DEBUG: conditional.content:', conditional.content);
-                        console.log('DEBUG: conditional.content type:', typeof conditional.content);
-                        console.log('DEBUG: Array.isArray(conditional.content):', Array.isArray(conditional.content));
 
-                        console.log('DEBUG: About to call processChunks with:', conditional.content);
-                        const content = processChunks(conditional.content, true);
-                        console.log('DEBUG: processChunks returned:', content);
+                        if (Array.isArray(content)) {
+                            // For arrays, process through chunks to ensure TSM rendering
+                            // If it's a simple array with one string, wrap it in __tsm explicitly
+                            if (content.length === 1 && typeof content[0] === 'string') {
+                                content = `__tsm(["${content[0]}"])`;
+                            } else {
+                                content = processChunks(content, true);
+                            }
+                        }
+
                         chunks.push([conditional.condition, ' && ', content] as Chunk);
                     }
                 } else if (interpolation.isConditional) {
@@ -767,11 +774,16 @@ export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[]
                                 const chunks = parseContent(normalizedMarkdown, context);
                                 const restoredChunks = restoreCodeBlocks(chunks, codeBlocks);
 
-                                // If we have chunks, use __tsm, otherwise use the string
+                                // If we have chunks, check if they represent a conditional expression
                                 if (Array.isArray(restoredChunks) && restoredChunks.length > 0) {
                                     if (restoredChunks.length === 1) {
                                         const chunk = restoredChunks[0];
                                         if (typeof chunk === 'string') {
+                                            // Check if this is a conditional expression pattern
+                                            if (chunk.includes('&&') && chunk.includes('(') && chunk.includes(')')) {
+                                                // This is a conditional - return as-is to be processed later
+                                                return chunk;
+                                            }
                                             return `"${chunk}"`;
                                         }
                                         if (Array.isArray(chunk)) {

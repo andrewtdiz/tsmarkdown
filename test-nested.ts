@@ -4,13 +4,15 @@ import { parseJSXExpressionToTSMComponent } from "./src/parser/interpolations";
 
 
 const completeTypeScriptSource = `
-async function TestComponent() {
+function TestComponent() {
    const someNumber = 10;
-   const anotherNumber = 20
+   const anotherNumber = 20;
+
   return (
-    Some number: {{ someNumber }}
+    Hello {{ userName }}!
+
     {{ someNumber > 5 && (
-      Some number is greater than 5
+      Some number is large with value {{ someNumber }}
     )}}
   )
 }
