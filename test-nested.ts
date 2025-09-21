@@ -6,11 +6,11 @@ import { parseJSXExpressionToTSMComponent } from "./src/parser/interpolations";
 const completeTypeScriptSource = `
 async function TestComponent() {
    const someNumber = 10;
+   const anotherNumber = 20
   return (
-    {{ someNumber > 5 ? (
-      Some number is greater than 5. It's {{ someNumber }}
-    ) : (
-      Some number is less than 5
+    In the markdown {{ anotherNumber }}
+    {{ someNumber > 5 && (
+      Some number is greater than 5. Another number is {{ anotherNumber }}
     )}}
   )
 }

@@ -16,6 +16,7 @@ export function generateReturnStatements(parsed: ParsedMDX): string {
             // Add the markdown content as chunks
             if (returnStmt.content) {
                 if (Array.isArray(returnStmt.content)) {
+                    console.log("RETURN STMT CONTENT: ", returnStmt.content);
                     // Content is already chunks - convert them to JavaScript literals
                     for (const chunk of returnStmt.content) {
                         if (chunk === null || chunk === undefined || chunk === false) {
@@ -39,7 +40,13 @@ export function generateReturnStatements(parsed: ParsedMDX): string {
                         } else if (Array.isArray(chunk)) {
                             // TSMInterpolations should be evaluated by TypeScript as expressions
                             // Join array elements as a single expression
-                            const expression = chunk.join('');
+                            console.log("CHUNK: ", chunk);
+                            const hasNestedChunks = chunk.some(c => Array.isArray(c));
+                            let expression = chunk.join('');
+                            if (hasNestedChunks) {
+                                expression = `__tsm([${expression}])`;
+                            }
+                            console.log("EXPRESSION: ", expression);
                             chunks.push(expression);
                         } else {
                             chunks.push(String(chunk));
