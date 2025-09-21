@@ -533,9 +533,13 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
                                 content: restoredContent,
                             });
 
-
                             // Add the conditional expression as TSMInterpolation
-                            chunks.push(createTSMInterpolation(expression, true, false));
+                            chunks.push({
+                                type: 'TSMInterpolation',
+                                expression: expression,
+                                isConditional: true,
+                                isLogical: false,
+                            });
                         } else {
                             // Invalid conditional syntax, treat as regular interpolation
                             chunks.push(createTSMInterpolation(expression, false, false));
