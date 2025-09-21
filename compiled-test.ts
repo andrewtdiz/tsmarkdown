@@ -8,7 +8,7 @@ import { getData } from "./api/getData";
 const VERSION_NUMBER = "1.0.0";
 
 export function TestComponent(): string {
-  const someNumber = 10;
+  const someNumber = 3;
 const currentUser = { name: "John", id: 123 };
     return __tsm([
     "# Version", '\n',
@@ -20,7 +20,7 @@ const currentUser = { name: "John", id: 123 };
     "", '\n',
     Dashboard({ title: "My Dashboard", showHeader: true }), '\n',
     "", '\n',
-    "", someNumber > 5 ? "Some number is greater than 5. It's" : "Some number is less than 5", "", '\n',
+    "", someNumber > 5 ? __tsm(["Some number is greater than 5! It's ", someNumber]) : __tsm(["Some number is less than 5, it's ", someNumber]), "", '\n',
     "More Content"
 ]);
 }

@@ -22,6 +22,7 @@ export type Chunk = string | null | undefined | false | Iterable<Chunk> | typeof
  * @returns Processed string with proper whitespace handling
  */
 export function __tsm(chunks: Array<Chunk>): string {
+    console.log("TSM CHUNKS: ", chunks);
     const buffer: string[] = [];
     const flattenedChunks = __tsmJoin(chunks);
 
@@ -88,12 +89,12 @@ export function __tsm(chunks: Array<Chunk>): string {
                     }
                 }
             }
-        } else if (typeof chunk === 'object' && chunk !== null) {
+        } else {
             // Handle objects by converting to string
             buffer.push(String(chunk));
         }
     }
-
+    console.log("BUFFER: ", buffer);
     return buffer.join('');
 }
 
@@ -133,7 +134,7 @@ export function __tsmJoin(parts: Array<Chunk>): Array<Chunk> {
             // Recursively flatten iterable chunks
             const flattened = __tsmJoin(Array.from(part));
             result.push(...flattened);
-        } else if (typeof part === 'object' && part !== null) {
+        } else {
             // Handle objects by converting to string
             result.push(String(part));
         }

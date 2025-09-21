@@ -10,7 +10,7 @@ import { getData } from "./api/getData";
 const VERSION_NUMBER = "1.0.0";
 
 async function TestComponent() {
-   const someNumber = 10;
+   const someNumber = 3;
    const currentUser = { name: "John", id: 123 };
   return (
     # Version
@@ -23,21 +23,19 @@ async function TestComponent() {
     <@Dashboard title="My Dashboard" showHeader={true} />
 
     {{ someNumber > 5 ? (
-      Some number is greater than 5. It's
+      Some number is greater than 5! It's {{ someNumber }}
     ) : (
-      Some number is less than 5
+      Some number is less than 5, it's {{ someNumber }}
     )}}
     More Content
   )
 }
 `;
 
-const expectedOutput = `# Version
-*Version: 1.0.0!*`;
-
 const totalStart = performance.now();
 const fullFileResult = await compileFullFile(completeTypeScriptSource);
 
+console.log("FULL FILE RESULT: ", fullFileResult.transpiledFile);
 
 const fileToRun = `
 import { __tsm } from "./src/runtime/tsm-runtime";
