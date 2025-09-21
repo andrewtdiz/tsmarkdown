@@ -31,12 +31,6 @@ export function compile(parsed: ParsedMDX): CompiledMDX {
   // Generate a basic ID from function name
   const id = parsed.functionName || 'unnamed-component';
 
-  const jsxExpressions = parsed.jsxExpressions.map(expr => parseJSXExpressionToTSMComponent(expr.expression)).filter(expr => expr !== null).map((expr) => ({
-    name: expr.name,
-    props: expr.attributes
-  }))
-  console.log(JSON.stringify(jsxExpressions, null, 2));
-
   return {
     id,
     typescript: compileTypeScript(parsed),
@@ -53,7 +47,7 @@ export function compile(parsed: ParsedMDX): CompiledMDX {
       trueValue: Array.isArray(expr.trueValue) ? expr.trueValue : [expr.trueValue],
       falseValue: Array.isArray(expr.falseValue) ? expr.falseValue : [expr.falseValue]
     })),
-    jsxExpressions,
+    jsxExpressions: parsed.jsxExpressions,
     returnStatements: parsed.returnStatements,
     metadata: {
       functionName: parsed.functionName,

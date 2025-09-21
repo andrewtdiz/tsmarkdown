@@ -16,6 +16,8 @@ import { convertJSXToFunctionCalls } from '../renderer/template-parsing';
 import { Chunk, __tsm } from '../runtime/tsm-runtime';
 import { render } from '../renderer';
 import { createSafeContext } from '../renderer/typescript-runtime';
+import { TSMComponentAttribute } from '../parser/tsm-ast';
+import { parseJSXExpressionToTSMComponent } from '../parser/interpolations';
 
 /**
  * Preprocesses MDX syntax within functions to make them parseable by TypeScript
@@ -143,7 +145,7 @@ export interface FullFileCompilationResult {
         interpolations: Array<{ placeholder: string; expression: string }>;
         conditionalBlocks: Array<{ condition: string; content: any }>;
         ternaryExpressions: Array<{ condition: string; trueValue: any; falseValue: any }>;
-        jsxExpressions: Array<{ placeholder: string; expression: string }>;
+        jsxExpressions: Array<{ placeholder: string; expression: string; name: string; props: Array<TSMComponentAttribute> }>;
     }>;
     transpiledFile: string;
     errors: string[];
@@ -217,6 +219,16 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
 
                 // Create ParsedMDX for each function
                 const markdownContent = returnStatements.length > 0 ? returnStatements[0].content : `# ${functionInfo.name} Content`;
+                
+                const jsxExpressionsMapped = jsxExpressions
+                    .map(expr => ({ parsed: parseJSXExpressionToTSMComponent(expr.expression), ...expr }))
+                    .filter(expr => expr.parsed !== null)
+                    .map((expr) => ({
+                        placeholder: expr.placeholder,
+                        expression: expr.expression,
+                        name: expr.parsed.name,
+                        props: expr.parsed.attributes
+                    }));
 
                 const parsed: ParsedMDX = {
                     imports: [],
@@ -227,7 +239,7 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
                     interpolations: interpolations,
                     conditionalBlocks: conditionalBlocks,
                     ternaryExpressions: ternaryExpressions,
-                    jsxExpressions: jsxExpressions,
+                    jsxExpressions: jsxExpressionsMapped,
                     returnStatements: returnStatements,
                     propsInterface: functionInfo.parameters.length > 0 ?
                         `interface ${functionInfo.name}Props {\n  ${functionInfo.parameters.map(p => `${p.name}: ${p.type}${p.required ? '' : '?'}`).join(';\n  ')}\n}` : '',
@@ -307,12 +319,13 @@ export async function executeFullFile(source: string, context: any = {}): Promis
                         functionName: template.variableName,
                         functionParams: [],
                         typescript: '',
-                        markdown: templateResult.transpiled,
+                        markdown: [templateResult.transpiled],
                         interpolations: templateResult.interpolations,
                         conditionalBlocks: templateResult.conditionalBlocks,
                         ternaryExpressions: templateResult.ternaryExpressions,
-                        jsxExpressions: templateResult.jsxExpressions,
+                        jsxExpressions: [], // This is handled differently for global templates
                         returnStatements: [],
+                        componentCalls: [],
                         propsInterface: '',
                         parameterTypes: []
                     };
@@ -613,7 +626,7 @@ function processTemplateInExpression(expression: string, sourceFile: ts.SourceFi
     interpolations: Array<{ placeholder: string; expression: string }>;
     conditionalBlocks: Array<{ condition: string; content: any }>;
     ternaryExpressions: Array<{ condition: string; trueValue: any; falseValue: any }>;
-    jsxExpressions: Array<{ placeholder: string; expression: string }>;
+    jsxExpressions: Array<{ name: string; props: Array<{ name: string; value: { type: string; value: string } }> }>;
 } | null {
 
     // Find parentheses template syntax (*...*) - can contain nested braces
@@ -632,7 +645,7 @@ function processTemplateInExpression(expression: string, sourceFile: ts.SourceFi
     const interpolations: Array<{ placeholder: string; expression: string }> = [];
     const conditionalBlocks: Array<{ condition: string; content: any }> = [];
     const ternaryExpressions: Array<{ condition: string; trueValue: any; falseValue: any }> = [];
-    const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
+    const jsxExpressions: Array<{ placeholder: string; expression: string; name: string; props: Array<TSMComponentAttribute> }> = [];
 
     let processedContent = parseContent(normalizedMarkdown, {
         interpolations,
@@ -647,15 +660,21 @@ function processTemplateInExpression(expression: string, sourceFile: ts.SourceFi
     // Convert chunks to string first
     const contentString = chunksToTemplateLiteral(processedContent);
 
+    // Convert TSMComponent jsxExpressions to the old format for convertToTemplateLiteral
+    const oldJSXExpressions = jsxExpressions.map((jsx, index) => ({
+        placeholder: `__JSX_EXPRESSION_${index}__`,
+        expression: convertTSMComponentToFunctionCall(jsx.name, jsx.props)
+    }));
+
     // Convert the processed content to a template literal
-    const transpiled = convertToTemplateLiteral(contentString, interpolations, conditionalBlocks, ternaryExpressions, jsxExpressions);
+    const transpiled = convertToTemplateLiteral(contentString, interpolations, conditionalBlocks, ternaryExpressions, oldJSXExpressions);
 
     return {
         transpiled,
         interpolations,
         conditionalBlocks,
         ternaryExpressions,
-        jsxExpressions
+        jsxExpressions // Return the new TSMComponent structure
     };
 }
 
@@ -724,7 +743,7 @@ function convertToTemplateLiteral(
     interpolations: Array<{ placeholder: string; expression: string }>,
     conditionalBlocks: Array<{ condition: string; content: any }>,
     ternaryExpressions: Array<{ condition: string; trueValue: any; falseValue: any }>,
-    jsxExpressions: Array<{ placeholder: string; expression: string }>
+    jsxExpressions: Array<{ name: string; props: Array<{ name: string; value: { type: string; value: string } }> }>
 ): string {
     let result = content;
 
@@ -752,15 +771,39 @@ function convertToTemplateLiteral(
     });
 
     // Replace JSX expressions
-    jsxExpressions.forEach(({ placeholder, expression }) => {
-        // Convert JSX expressions containing <@Component /> syntax to function calls
-        const convertedExpression = convertJSXToFunctionCalls(expression, jsxExpressions);
+    jsxExpressions.forEach(({ name, props }) => {
+        // Convert TSMComponent to function call
+        const functionCall = convertTSMComponentToFunctionCall(name, props);
         // Wrap in template literal syntax so the expression executes at runtime
-        result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), `\${${convertedExpression}}`);
+        result = result.replace(new RegExp(`__JSX_EXPRESSION_\\d+__`, 'g'), `\${${functionCall}}`);
     });
 
     // Return the result without wrapping in backticks (they're already handled elsewhere)
     return result;
+}
+
+/**
+ * Converts TSMComponent to function call string
+ */
+function convertTSMComponentToFunctionCall(name: string, props: Array<{ name: string; value: { type: string; value: string } }>): string {
+    // Build props object
+    const propsObj: Record<string, any> = {};
+
+    props.forEach(prop => {
+        if (prop.value.type === 'string') {
+            // Remove quotes from string values
+            propsObj[prop.name] = prop.value.value.replace(/^"(.*)"$/, '$1');
+        } else if (prop.value.type === 'expression') {
+            propsObj[prop.name] = prop.value.value;
+        }
+    });
+
+    // Convert props object to string
+    const propsString = Object.keys(propsObj).length > 0
+        ? `{ ${Object.entries(propsObj).map(([key, value]) => `${key}: ${value}`).join(', ')} }`
+        : '';
+
+    return `${name}(${propsString})`;
 }
 
 /**
@@ -1128,7 +1171,7 @@ function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sour
     const interpolations: Array<{ placeholder: string; expression: string }> = [];
     const conditionalBlocks: Array<{ condition: string; content: any }> = [];
     const ternaryExpressions: Array<{ condition: string; trueValue: any; falseValue: any }> = [];
-    const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
+    const jsxExpressions: Array<{ placeholder: string; expression: string; name: string; props: Array<TSMComponentAttribute> }> = [];
 
     let processedContent = parseContent(normalizedMarkdown, {
         interpolations,

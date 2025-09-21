@@ -177,6 +177,7 @@ function generateMultipleReturnStatements(parsed: ParsedMDX): string {
     let defaultReturn: string | null = null;
 
     // Process return statements in order
+    console.log("PARSing RETURN STATEMENTS: ", parsed);
     for (let i = 0; i < parsed.returnStatements.length; i++) {
         const returnStmt = parsed.returnStatements[i];
         if (returnStmt.isTemplate) {
@@ -193,16 +194,23 @@ function generateMultipleReturnStatements(parsed: ParsedMDX): string {
                         } else if (chunk === '\n') {
                             chunks.push("'\\n'");
                         } else if (typeof chunk === 'string') {
+                            let includeQuotes = true;
                             // Replace JSX expression placeholders with actual expressions
                             let processedChunk = chunk;
-                            if (parsed.jsxExpressions) {
-                                parsed.jsxExpressions.forEach(({ placeholder, expression }) => {
+                            if (chunk.includes('__JSX_EXPRESSION_')) {
+                                console.log("PARSING JSX: ", chunk);
+                                console.log("JSX EXPRESSIONS: ", parsed.jsxExpressions);
+                                parsed.jsxExpressions.filter(expr => expr.placeholder === chunk).forEach(({ name, props }) => {
                                     // Remove braces from expression and replace placeholder
-                                    const cleanExpression = expression.replace(/^\{+|\}+$/g, '');
-                                    processedChunk = processedChunk.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), cleanExpression);
+                                    // const cleanExpression = expression.replace(/^\{+|\}+$/g, '');
+                                    // processedChunk = processedChunk.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), cleanExpression);
+                                    console.log("PROPS: ", props);
+                                    processedChunk = `${name}(${propsToObjectString(props)})`
+                                    console.log("PROCESSED CHUNK: ", processedChunk);
                                 });
+                                includeQuotes = false;
                             }
-                            chunks.push(`"${processedChunk}"`);
+                            chunks.push(includeQuotes ? `"${processedChunk}"` : processedChunk);
                         } else if (Array.isArray(chunk)) {
                             // TSMInterpolations should be evaluated by TypeScript as expressions
                             // Join array elements as a single expression
@@ -294,7 +302,7 @@ export function generateTypedFunction(parsed: ParsedMDX): string {
 }`;
 }
 
-export function compileTemplate(markdown: string | Chunk[], jsxExpressions?: Array<{ placeholder: string; expression: string }>): string {
+export function compileTemplate(markdown: string | Chunk[], jsxExpressions?: Array<{ placeholder: string; expression: string; name: string; props: Array<TSMComponentAttribute> }>): string {
     // For now, if markdown is chunks, convert to string
     // Later we'll add more sophisticated template compilation
     if (Array.isArray(markdown)) {
@@ -313,7 +321,7 @@ export function compileTemplate(markdown: string | Chunk[], jsxExpressions?: Arr
     return markdown;
 }
 
-export function compileJSXExpression(jsxExpression: { placeholder: string; expression: string }): TSMComponent  {
+export function compileJSXExpression(jsxExpression: { placeholder: string; expression: string }): TSMComponent {
     const componentName = jsxExpression.expression.match(/<@(\w+)([^/>]*)\/>/)?.[1] ?? "UNKNOWN_COMPONENT";
     const parsedProps = parseJSXProps(jsxExpression.expression);
 
@@ -322,7 +330,7 @@ export function compileJSXExpression(jsxExpression: { placeholder: string; expre
         name: prop.name,
         value: prop.isExpression ? { type: 'expression', value: prop.value } : { type: 'string', value: prop.value }
     }));
-    
+
     return ({
         type: 'TSMComponent',
         name: componentName,
@@ -363,7 +371,7 @@ function convertJSXExpressionToFunctionCall(jsxExpression: string): string {
 
         // Replace JSX expression placeholders with runtime-safe expressions
         if (jsxExpressionMatches) {
-            jsxExpressionMatches.forEach((placeholder, index) => {
+            jsxExpressionMatches.forEach((placeholder: any, index: any) => {
                 // Extract the original expression that was replaced with this placeholder
                 processedProps = processedProps.replace(placeholder, `__JSX_EXPRESSION_${index}__`);
             });

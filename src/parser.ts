@@ -4,6 +4,7 @@ import { normalizeIndentation } from "./renderer/string-helpers";
 import { parseContent } from "./parser/pipeline";
 import { protectCodeBlocks, restoreCodeBlocks } from "./parser/code-protection";
 import type { Chunk } from "./runtime/tsm-runtime";
+import { TSMComponentAttribute } from "./parser/tsm-ast";
 
 
 export interface ParsedMDX {
@@ -15,9 +16,8 @@ export interface ParsedMDX {
   interpolations: Array<{ placeholder: string; expression: string }>;
   conditionalBlocks: Array<{ condition: string; content: string }>;
   ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>;
-  jsxExpressions: Array<{ placeholder: string; expression: string }>;
+  jsxExpressions: Array<{ placeholder: string; expression: string; name: string; props: Array<TSMComponentAttribute> }>;
   returnStatements: Array<{ condition?: string; content: string; isTemplate: boolean }>;
-  componentCalls: Array<{ componentName: string; props: string }>;
   propsInterface?: string;
   parameterTypes: Array<{ name: string; type: string; required: boolean; defaultValue?: string }>;
 }
@@ -28,7 +28,7 @@ export function parseMDX(content: string): ParsedMDX {
     [];
   const conditionalBlocks: Array<{ condition: string; content: string }> = [];
   const ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
-  const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
+  const jsxExpressions: Array<{ name: string; props: TSMComponentAttribute[] }> = [];
   const returnStatements: Array<{ condition?: string; content: string; isTemplate: boolean }> = [];
 
   let functionName = "";

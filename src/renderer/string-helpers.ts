@@ -1,3 +1,5 @@
+import { TSMComponentAttribute } from "../parser/tsm-ast";
+
 export function findMatchingBrace(content: string, startIndex: number): number {
     let braceCount = 0;
     let parenCount = 0;
@@ -250,13 +252,13 @@ export function parseJSXProps(
 /**
  * Converts parsed props back to a props object string
  */
-export function propsToObjectString(props: ParsedProp[]): string {
+export function propsToObjectString(props: TSMComponentAttribute[]): string {
     const propStrings = props.map(prop => {
-        if (prop.isBoolean) {
+        if (prop.value.type === 'boolean') {
             return `${prop.name}: ${prop.value}`;
-        } else if (prop.isString) {
+        } else if (prop.value.type === 'string') {
             return `${prop.name}: ${prop.value}`;
-        } else if (prop.isExpression) {
+        } else if (prop.value.type === 'expression') {
             return `${prop.name}: ${prop.value}`;
         } else {
             return `${prop.name}: ${prop.value}`;
