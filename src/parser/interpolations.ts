@@ -915,7 +915,29 @@ export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[]
                                         return `__tsm([${tsmChunks.join(', ')}])`;
                                     };
 
-                                    return processChunks(restoredChunks, true);
+                                    // For mixed content in ternary values, manually construct TSM call
+                                    if (restoredChunks.length === 1 && typeof restoredChunks[0] === 'string') {
+                                        return `"${restoredChunks[0]}"`;
+                                    } else {
+                                        const tsmArgs: string[] = [];
+                                        for (const chunk of restoredChunks) {
+                                            if (typeof chunk === 'string') {
+                                                tsmArgs.push(`"${chunk}"`);
+                                            } else if (Array.isArray(chunk)) {
+                                                if (chunk.length === 1 && typeof chunk[0] === 'string') {
+                                                    // This is a runtime interpolation - treat as variable reference
+                                                    tsmArgs.push(chunk[0]);
+                                                } else {
+                                                    // Otherwise, recursively process
+                                                    const nestedResult = processChunks(chunk, true);
+                                                    tsmArgs.push(nestedResult);
+                                                }
+                                            } else {
+                                                tsmArgs.push(String(chunk));
+                                            }
+                                        }
+                                        return `__tsm([${tsmArgs.join(', ')}])`;
+                                    }
                                 }
                                 return `"${value}"`;
                             }

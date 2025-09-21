@@ -44,35 +44,12 @@ function reconstructTernary(arr: any[]): string {
 
     // Check if true/false values are __tsm calls that need recursive processing
     if (typeof trueValue === 'string' && trueValue.startsWith('__tsm([') && trueValue.endsWith('])')) {
-        // Extract the array content from __tsm([...])
-        const arrayContent = trueValue.slice(7, -2); // Remove "__tsm([" and "])"
-        // Create a temporary array to recursively process
-        try {
-            // This is a simplified approach - in a real implementation you'd parse the JavaScript array
-            // For now, we'll handle this specific case by checking if it's a ternary pattern
-            const nestedArray = arrayContent.split(',').map(s => s.trim().replace(/^["']|["']$/g, ''));
-            if (isTernaryArray(nestedArray)) {
-                trueValue = reconstructTernary(nestedArray);
-            } else {
-                trueValue = arrayContent;
-            }
-        } catch (e) {
-            // If parsing fails, keep as-is
-            trueValue = arrayContent;
-        }
+        // __tsm calls are already properly formatted, extract as-is
+        trueValue = trueValue;
     }
     if (typeof falseValue === 'string' && falseValue.startsWith('__tsm([') && falseValue.endsWith('])')) {
-        const arrayContent = falseValue.slice(7, -2);
-        try {
-            const nestedArray = arrayContent.split(',').map(s => s.trim().replace(/^["']|["']$/g, ''));
-            if (isTernaryArray(nestedArray)) {
-                falseValue = reconstructTernary(nestedArray);
-            } else {
-                falseValue = arrayContent;
-            }
-        } catch (e) {
-            falseValue = arrayContent;
-        }
+        // __tsm calls are already properly formatted, extract as-is
+        falseValue = falseValue;
     }
 
     // Recursively process nested ternary expressions
