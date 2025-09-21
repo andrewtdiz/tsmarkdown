@@ -21,7 +21,6 @@ async function TestComponent() {
     ) : (
       Some number is less than 5
     )}}
-
   )
 }
 `;

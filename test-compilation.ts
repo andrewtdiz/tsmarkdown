@@ -10,7 +10,7 @@ import { getData } from "./api/getData";
 const VERSION_NUMBER = "1.0.0";
 
 async function TestComponent() {
-   const someNumber = 1;
+   const someNumber = 10;
    const currentUser = { name: "John", id: 123 };
   return (
     # Version
@@ -27,6 +27,7 @@ async function TestComponent() {
     ) : (
       Some number is less than 5
     )}}
+    More Content
   )
 }
 `;
@@ -37,10 +38,6 @@ const expectedOutput = `# Version
 const totalStart = performance.now();
 const fullFileResult = await compileFullFile(completeTypeScriptSource);
 
-// Parse JSX expressions into TSMComponent objects
-console.log("\n=== TSMComponent Parsing ===");
-
-console.log("TRANSPILED FILE: ", fullFileResult.transpiledFile);
 
 const fileToRun = `
 import { __tsm } from "./src/runtime/tsm-runtime";
@@ -58,8 +55,6 @@ ${fullFileResult.transpiledFile}
   }
 })();
 `;
-
-console.log("FILE TO RUN: \n", fileToRun);
 
 Bun.write("compiled-test.ts", fileToRun);
 

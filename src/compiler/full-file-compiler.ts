@@ -198,7 +198,6 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
         const { processedSource, templates } = await processGlobalTemplates(sourceFile);
 
 
-
         // Store the global templates
         globalTemplates.push(...templates);
 
@@ -248,6 +247,8 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
                         `interface ${functionInfo.name}Props {\n  ${functionInfo.parameters.map(p => `${p.name}: ${p.type}${p.required ? '' : '?'}`).join(';\n  ')}\n}` : '',
                     parameterTypes: functionInfo.parameters
                 };
+
+                console.log("PARSED: ", parsed);
 
                 const compiled = compile(parsed);
                 functions.push({ functionInfo, compiled });
