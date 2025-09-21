@@ -34,5 +34,5 @@ const expectedOutput = `# Version
 const totalStart = performance.now();
 const fullFileResult = await compileFullFile(completeTypeScriptSource);
 
-
+console.log("FULL TRANSPILED FILE RESULT: ");
 console.log(fullFileResult.transpiledFile);

@@ -197,6 +197,8 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
         // First, process all global template syntax outside of functions
         const { processedSource, templates } = await processGlobalTemplates(sourceFile);
 
+        
+
         // Store the global templates
         globalTemplates.push(...templates);
 
@@ -207,6 +209,7 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
             ts.ScriptTarget.Latest,
             true
         );
+
         const variableValues = extractVariableValues(processedSourceFile);
 
         // Now extract and compile functions from the processed source
