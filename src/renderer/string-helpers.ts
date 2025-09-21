@@ -195,7 +195,7 @@ export function parseJSXProps(
                         currentPos++;
                     }
 
-                    propValue = `"${trimmed.slice(stringStart, currentPos)}"`;
+                    propValue = `${trimmed.slice(stringStart, currentPos)}`;
                     isString = true;
                     currentPos++; // Skip closing quote
                 } else if (trimmed[currentPos] === '{') {
@@ -206,13 +206,14 @@ export function parseJSXProps(
                         currentPos = closingBrace + 1; // Skip closing brace
                         const expression = trimmed.slice(braceStart, closingBrace + 1);
 
-                        if (createPlaceholdersForExpressions) {
+                        if (createPlaceholdersForExpressions && expression.includes('<@')) {
                             // Create placeholder for JSX expression processing
                             const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
                             jsxExpressions.push({ placeholder, expression });
                             propValue = placeholder;
                         } else {
                             // Use the expression directly (no placeholder needed)
+                            console.log("EXPRESSION: ", expression);
                             propValue = expression;
                         }
                         isExpression = true;
@@ -254,14 +255,20 @@ export function parseJSXProps(
  */
 export function propsToObjectString(props: TSMComponentAttribute[]): string {
     const propStrings = props.map(prop => {
-        if (prop.value.type === 'boolean') {
-            return `${prop.name}: ${prop.value}`;
-        } else if (prop.value.type === 'string') {
-            return `${prop.name}: ${prop.value}`;
+        const propValue = prop.value.value;
+
+        if (prop.value.type === 'string') {
+            // For string props, quote the value unless it's a boolean string
+            if (propValue === 'true' || propValue === 'false') {
+                return `${prop.name}: ${propValue}`;
+            } else {
+                return `${prop.name}: "${propValue}"`;
+            }
         } else if (prop.value.type === 'expression') {
-            return `${prop.name}: ${prop.value}`;
+            return `${prop.name}: ${propValue}`;
         } else {
-            return `${prop.name}: ${prop.value}`;
+            // Fallback for any other types
+            return `${prop.name}: ${propValue}`;
         }
     });
 

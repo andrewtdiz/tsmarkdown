@@ -284,25 +284,32 @@ export function processJSXExpressionsForParsing(
             continue;
         }
 
-        // Check if this expression contains nested JSX expressions that need to be processed first
-        if (trimmedExpression.includes('{') && trimmedExpression.includes('}')) {
-            // Process nested JSX expressions recursively
-            const nestedExpressions: Array<{ placeholder: string; expression: string }> = [];
-            const processedNestedExpression = processJSXExpressionsForParsing(trimmedExpression, nestedExpressions);
+        // Only process expressions that contain JSX components (start with <@)
+        if (trimmedExpression.includes('<@')) {
+            // Check if this expression contains nested JSX expressions that need to be processed first
+            if (trimmedExpression.includes('{') && trimmedExpression.includes('}')) {
+                // Process nested JSX expressions recursively
+                const nestedExpressions: Array<{ placeholder: string; expression: string }> = [];
+                const processedNestedExpression = processJSXExpressionsForParsing(trimmedExpression, nestedExpressions);
 
-            // Add nested expressions to the main array
-            jsxExpressions.push(...nestedExpressions);
+                // Add nested expressions to the main array
+                jsxExpressions.push(...nestedExpressions);
 
-            // Use the processed expression
-            const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
-            jsxExpressions.push({ placeholder, expression: processedNestedExpression });
-            processedContent = processedContent.substring(0, openBraceIndex) + placeholder + processedContent.substring(endIndex + 1);
-            startIndex = openBraceIndex + placeholder.length;
+                // Use the processed expression
+                const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
+                jsxExpressions.push({ placeholder, expression: processedNestedExpression });
+                processedContent = processedContent.substring(0, openBraceIndex) + placeholder + processedContent.substring(endIndex + 1);
+                startIndex = openBraceIndex + placeholder.length;
+            } else {
+                const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
+                jsxExpressions.push({ placeholder, expression: trimmedExpression });
+                processedContent = processedContent.substring(0, openBraceIndex) + placeholder + processedContent.substring(endIndex + 1);
+                startIndex = openBraceIndex + placeholder.length;
+            }
         } else {
-            const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
-            jsxExpressions.push({ placeholder, expression: trimmedExpression });
-            processedContent = processedContent.substring(0, openBraceIndex) + placeholder + processedContent.substring(endIndex + 1);
-            startIndex = openBraceIndex + placeholder.length;
+            // This is a regular JavaScript expression, leave it as-is
+            startIndex = endIndex + 1;
+            continue;
         }
     }
 
