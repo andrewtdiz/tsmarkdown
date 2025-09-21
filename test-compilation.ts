@@ -20,6 +20,8 @@ async function TestComponent() {
 
     <@Dashboard />
 
+    <@Dashboard title="My Dashboard" showHeader={true} />
+
 
     {{ someNumber > 5 ? (
       Some number is greater than 5. It's

@@ -4,6 +4,7 @@ import { compileFullFile } from "./src/compiler";
 
 const completeTypeScriptSource = `
 const VERSION_NUMBER = "1.0.0";
+import { Dashboard } from "./components/Dashboard";
 
 async function TestComponent() {
    const someNumber = 1;
