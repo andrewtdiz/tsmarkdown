@@ -725,14 +725,8 @@ export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[]
                                             tsmChunks.push(chunk[i]);
                                         }
                                     } else if (chunk.length === 1 && typeof chunk[0] === 'string') {
-                                        // This is a runtime interpolation
-                                        // In nested context (like conditional content), treat as variable reference
-                                        // In non-nested context, execute as expression
-                                        if (isNested) {
-                                            tsmChunks.push(chunk[0]);
-                                        } else {
-                                            tsmChunks.push(chunk.join(''));
-                                        }
+                                        // This is a runtime interpolation - always treat as variable reference
+                                        tsmChunks.push(chunk[0]);
                                     } else {
                                         // Otherwise, recursively process nested chunks
                                         tsmChunks.push(processChunks(chunk, true));
@@ -747,15 +741,32 @@ export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[]
 
                         // Process conditional content - always process through TSM runtime
                         let content: any = conditional.content;
-                        console.log('DEBUG: conditional.content:', conditional.content);
 
                         if (Array.isArray(content)) {
                             // For arrays, process through chunks to ensure TSM rendering
-                            // If it's a simple array with one string, wrap it in __tsm explicitly
+                            // Always process through TSM runtime for any array content
                             if (content.length === 1 && typeof content[0] === 'string') {
                                 content = `__tsm(["${content[0]}"])`;
                             } else {
-                                content = processChunks(content, true);
+                                // For mixed content or multiple elements, manually construct TSM call
+                                const tsmArgs: string[] = [];
+                                for (const chunk of content) {
+                                    if (typeof chunk === 'string') {
+                                        tsmArgs.push(`"${chunk}"`);
+                                    } else if (Array.isArray(chunk)) {
+                                        if (chunk.length === 1 && typeof chunk[0] === 'string') {
+                                            // This is a runtime interpolation - treat as variable reference
+                                            tsmArgs.push(chunk[0]);
+                                        } else {
+                                            // Otherwise, recursively process
+                                            const nestedResult = processChunks(chunk, true);
+                                            tsmArgs.push(nestedResult);
+                                        }
+                                    } else {
+                                        tsmArgs.push(String(chunk));
+                                    }
+                                }
+                                content = `__tsm([${tsmArgs.join(', ')}])`;
                             }
                         }
 

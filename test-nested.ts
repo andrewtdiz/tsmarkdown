@@ -11,8 +11,10 @@ function TestComponent() {
   return (
     Hello {{ userName }}!
 
-    {{ someNumber > 5 && (
-      Some number is large with value {{ someNumber }}
+    {{ someNumber > 10 ? (
+      Some number is large with value {{ someNumber }}!
+    ) : (
+      Some number is small
     )}}
   )
 }
