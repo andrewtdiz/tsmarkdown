@@ -4,7 +4,7 @@ import type { ParseContext } from './types';
 import type { Chunk } from '../runtime/tsm-runtime';
 import type { TSMChunk } from './tsm-ast';
 import { protectCodeBlocks, restoreCodeBlocks } from './code-protection';
-import { normalizeIndentation } from '../renderer/string-helpers';
+import { normalizeIndentation, parseJSXProps, propsToObjectString } from '../renderer/string-helpers';
 import { parseContent } from './pipeline';
 
 // Warning system for legacy single-brace usage
@@ -581,7 +581,9 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
 
                 case 'interpolation':
                 default:
-                    // Regular interpolation
+                    // Regular interpolation - add to context and create chunk
+                    const placeholder = `__INTERPOLATION_${context.interpolations.length}__`;
+                    context.interpolations.push({ placeholder, expression });
                     chunks.push(createTSMInterpolation(expression, false, false));
                     break;
             }
@@ -605,16 +607,17 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
             for (let i = 0; i < parts.length; i++) {
                 if (parts[i]) {
                     currentLineChunks.push(createTSMTextChunk(parts[i]));
+                } else {
+                    // Create empty text chunk to preserve empty lines
+                    currentLineChunks.push(createTSMTextChunk(''));
                 }
                 if (i < parts.length - 1) {
                     // End current line and start new one
-                    if (currentLineChunks.length > 0) {
-                        tsmLines.push({
-                            type: 'TSMLine',
-                            chunks: currentLineChunks
-                        });
-                        currentLineChunks = [];
-                    }
+                    tsmLines.push({
+                        type: 'TSMLine',
+                        chunks: currentLineChunks
+                    });
+                    currentLineChunks = [];
                 }
             }
         } else {
@@ -643,7 +646,9 @@ export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[]
     for (const line of ast.lines) {
         for (const chunk of line.chunks) {
             if (chunk.type === 'TSMTextChunk') {
-                chunks.push(chunk.content);
+                // Process JSX elements in text chunks
+                const processedContent = processJSXElementsInText(chunk.content, context);
+                chunks.push(processedContent);
             } else if (chunk.type === 'TSMInterpolation') {
                 const interpolation = chunk as TSMInterpolation;
 
@@ -658,26 +663,78 @@ export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[]
                     console.log('DEBUG: conditionalIndex:', conditionalIndex);
                     if (conditionalIndex !== -1) {
                         const conditional = context.conditionalBlocks[conditionalIndex];
-                        // Convert chunks to JavaScript literals
-                        const processChunks = (chunks: any[]): any => {
-                            if (chunks.length === 0) return '""';
+                        // Convert chunks to TSM runtime calls
+                        const processChunks = (chunks: any[], isNested: boolean = false): any => {
+                            // Ensure chunks is always treated as an array
+                            if (!Array.isArray(chunks)) {
+                                chunks = [chunks];
+                            }
+
+                            if (chunks.length === 0) return isNested ? [] : '__tsm([])';
                             if (chunks.length === 1) {
                                 const chunk = chunks[0];
-                                if (typeof chunk === 'string') return `"${chunk}"`;
-                                if (Array.isArray(chunk)) {
-                                    // Recursively process nested chunks
-                                    return processChunks(chunk);
+                                if (typeof chunk === 'string') {
+                                    // Single string - return simple string or chunk depending on context
+                                    return isNested ? chunk : `"${chunk}"`;
                                 }
-                                return String(chunk);
+                                if (Array.isArray(chunk)) {
+                                    // Check if this is a runtime interpolation array [ "variable.name" ]
+                                    if (chunk.length === 1 && typeof chunk[0] === 'string') {
+                                        // This is a runtime interpolation
+                                        // In nested context (like conditional content), treat as variable reference
+                                        // In non-nested context, execute as expression
+                                        return isNested ? chunk[0] : chunk.join('');
+                                    }
+                                    // Otherwise, recursively process nested chunks
+                                    return processChunks(chunk, true);
+                                }
+                                return isNested ? chunk : String(chunk);
                             }
-                            return chunks.map(chunk => {
-                                if (typeof chunk === 'string') return `"${chunk}"`;
-                                if (Array.isArray(chunk)) {
-                                    // Recursively process nested chunks
-                                    return processChunks(chunk);
+
+                            // Check if this is nested content (mixed strings and arrays)
+                            const hasMixedContent = chunks.some(chunk =>
+                                Array.isArray(chunk) && chunk.length > 1
+                            ) || (chunks.some(chunk => typeof chunk === 'string') &&
+                                chunks.some(chunk => Array.isArray(chunk)));
+
+                            if (isNested || hasMixedContent) {
+                                // Return chunks directly for nested content
+                                return chunks;
+                            }
+
+                            // Multiple chunks - collect them for __tsm call
+                            const tsmChunks: string[] = [];
+                            for (const chunk of chunks) {
+                                if (typeof chunk === 'string') {
+                                    tsmChunks.push(`"${chunk}"`);
+                                } else if (Array.isArray(chunk)) {
+                                    // Check if this is a ternary condition array [ "condition", " ? ", ... ]
+                                    if (chunk.length >= 3 && chunk[1] === ' ? ') {
+                                        // This is a ternary expression, preserve the condition as a variable reference
+                                        tsmChunks.push(chunk[0]); // The condition
+                                        // Add the rest of the ternary as-is
+                                        for (let i = 1; i < chunk.length; i++) {
+                                            tsmChunks.push(chunk[i]);
+                                        }
+                                    } else if (chunk.length === 1 && typeof chunk[0] === 'string') {
+                                        // This is a runtime interpolation
+                                        // In nested context (like conditional content), treat as variable reference
+                                        // In non-nested context, execute as expression
+                                        if (isNested) {
+                                            tsmChunks.push(chunk[0]);
+                                        } else {
+                                            tsmChunks.push(chunk.join(''));
+                                        }
+                                    } else {
+                                        // Otherwise, recursively process nested chunks
+                                        tsmChunks.push(processChunks(chunk, true));
+                                    }
+                                } else {
+                                    tsmChunks.push(String(chunk));
                                 }
-                                return String(chunk);
-                            }).join(' + ');
+                            }
+
+                            return `__tsm([${tsmChunks.join(', ')}])`;
                         };
 
                         console.log('DEBUG: conditional.content:', conditional.content);
@@ -685,7 +742,7 @@ export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[]
                         console.log('DEBUG: Array.isArray(conditional.content):', Array.isArray(conditional.content));
 
                         console.log('DEBUG: About to call processChunks with:', conditional.content);
-                        const content = processChunks(conditional.content);
+                        const content = processChunks(conditional.content, true);
                         console.log('DEBUG: processChunks returned:', content);
                         chunks.push([conditional.condition, ' && ', content] as Chunk);
                     }
@@ -694,38 +751,167 @@ export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[]
                     // Parse the ternary expression directly instead of matching to stored expressions
                     const { condition, trueValue, falseValue } = parseNestedTernary(interpolation.expression);
                     if (condition && trueValue && falseValue) {
-                        // Convert chunks to JavaScript literals
-                        const processChunks = (chunks: any[]): any => {
-                            if (chunks.length === 0) return '""';
-                            if (chunks.length === 1) {
-                                const chunk = chunks[0];
-                                if (typeof chunk === 'string') return `"${chunk}"`;
-                                if (Array.isArray(chunk)) {
-                                    // Recursively process nested chunks
-                                    return processChunks(chunk);
+                        // Process the true and false values through the parsing pipeline
+                        const processValue = (value: string): any => {
+                            if (value.trim()) {
+                                const { protectedContent, codeBlocks } = protectCodeBlocks(value);
+                                const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
+                                const chunks = parseContent(normalizedMarkdown, context);
+                                const restoredChunks = restoreCodeBlocks(chunks, codeBlocks);
+
+                                // If we have chunks, use __tsm, otherwise use the string
+                                if (Array.isArray(restoredChunks) && restoredChunks.length > 0) {
+                                    if (restoredChunks.length === 1) {
+                                        const chunk = restoredChunks[0];
+                                        if (typeof chunk === 'string') {
+                                            return `"${chunk}"`;
+                                        }
+                                        if (Array.isArray(chunk)) {
+                                            // Recursively process nested chunks
+                                            const processChunks = (chunks: any[], isNested: boolean = false): any => {
+                                                // Ensure chunks is always treated as an array
+                                                if (!Array.isArray(chunks)) {
+                                                    chunks = [chunks];
+                                                }
+
+                                                if (chunks.length === 0) return isNested ? [] : '__tsm([])';
+                                                if (chunks.length === 1) {
+                                                    const chunk = chunks[0];
+                                                    if (typeof chunk === 'string') {
+                                                        return isNested ? chunk : `"${chunk}"`;
+                                                    }
+                                                    if (Array.isArray(chunk)) {
+                                                        // Recursively process nested chunks
+                                                        return processChunks(chunk, true);
+                                                    }
+                                                    return isNested ? chunk : String(chunk);
+                                                }
+
+                                                // Check if this is nested content (mixed strings and arrays)
+                                                const hasMixedContent = chunks.some(chunk =>
+                                                    Array.isArray(chunk) && chunk.length > 1
+                                                ) || (chunks.some(chunk => typeof chunk === 'string') &&
+                                                    chunks.some(chunk => Array.isArray(chunk)));
+
+                                                if (isNested || hasMixedContent) {
+                                                    // Return chunks directly for nested content
+                                                    return chunks;
+                                                }
+
+                                                // Multiple chunks - collect them for __tsm call
+                                                const tsmChunks: string[] = [];
+                                                for (const chunk of chunks) {
+                                                    if (typeof chunk === 'string') {
+                                                        tsmChunks.push(`"${chunk}"`);
+                                                    } else if (Array.isArray(chunk)) {
+                                                        // Recursively process nested chunks
+                                                        tsmChunks.push(processChunks(chunk, true));
+                                                    } else {
+                                                        tsmChunks.push(String(chunk));
+                                                    }
+                                                }
+
+                                                return `__tsm([${tsmChunks.join(', ')}])`;
+                                            };
+                                            return processChunks(chunk);
+                                        }
+                                        return String(chunk);
+                                    }
+
+                                    // Multiple chunks - collect them for __tsm call
+                                    const processChunks = (chunks: any[], isNested: boolean = false): any => {
+                                        // Ensure chunks is always treated as an array
+                                        if (!Array.isArray(chunks)) {
+                                            chunks = [chunks];
+                                        }
+
+                                        if (chunks.length === 0) return isNested ? [] : '__tsm([])';
+                                        if (chunks.length === 1) {
+                                            const chunk = chunks[0];
+                                            if (typeof chunk === 'string') {
+                                                return isNested ? chunk : `"${chunk}"`;
+                                            }
+                                            if (Array.isArray(chunk)) {
+                                                // Check if this is a runtime interpolation array [ "variable.name" ]
+                                                if (chunk.length === 1 && typeof chunk[0] === 'string') {
+                                                    // This is a runtime interpolation
+                                                    // In nested context (like conditional content), treat as variable reference
+                                                    // In non-nested context, execute as expression
+                                                    return isNested ? chunk[0] : chunk.join('');
+                                                }
+                                                // Otherwise, recursively process nested chunks
+                                                return processChunks(chunk, true);
+                                            }
+                                            return isNested ? chunk : String(chunk);
+                                        }
+
+                                        // Check if this is nested content (mixed strings and arrays)
+                                        const hasMixedContent = chunks.some(chunk =>
+                                            Array.isArray(chunk) && chunk.length > 1
+                                        ) || (chunks.some(chunk => typeof chunk === 'string') &&
+                                            chunks.some(chunk => Array.isArray(chunk)));
+
+                                        if (isNested || hasMixedContent) {
+                                            // Return chunks directly for nested content
+                                            return chunks;
+                                        }
+
+                                        // Multiple chunks - collect them for __tsm call
+                                        const tsmChunks: string[] = [];
+                                        for (const chunk of chunks) {
+                                            if (typeof chunk === 'string') {
+                                                tsmChunks.push(`"${chunk}"`);
+                                            } else if (Array.isArray(chunk)) {
+                                                // Check if this is a runtime interpolation array [ "variable.name" ]
+                                                if (chunk.length === 1 && typeof chunk[0] === 'string') {
+                                                    // This is a runtime interpolation
+                                                    // In nested context (like conditional content), treat as variable reference
+                                                    // In non-nested context, execute as expression
+                                                    if (isNested) {
+                                                        tsmChunks.push(chunk[0]);
+                                                    } else {
+                                                        tsmChunks.push(chunk.join(''));
+                                                    }
+                                                } else {
+                                                    // Otherwise, recursively process nested chunks
+                                                    tsmChunks.push(processChunks(chunk, true));
+                                                }
+                                            } else {
+                                                tsmChunks.push(String(chunk));
+                                            }
+                                        }
+
+                                        return `__tsm([${tsmChunks.join(', ')}])`;
+                                    };
+
+                                    return processChunks(restoredChunks, true);
                                 }
-                                return String(chunk);
+                                return `"${value}"`;
                             }
-                            return chunks.map(chunk => {
-                                if (typeof chunk === 'string') return `"${chunk}"`;
-                                if (Array.isArray(chunk)) {
-                                    // Recursively process nested chunks
-                                    return processChunks(chunk);
-                                }
-                                return String(chunk);
-                            }).join(' + ');
+                            return '""';
                         };
 
-                        const trueVal = processChunks(trueValue);
-                        const falseVal = processChunks(falseValue);
-                        chunks.push([condition, ' ? ', trueVal, ' : ', falseVal] as Chunk);
+                        const trueVal = processValue(trueValue);
+                        const falseVal = processValue(falseValue);
+                        // The condition should be preserved as a runtime variable reference
+                        chunks.push([condition.trim(), ' ? ', trueVal, ' : ', falseVal] as Chunk);
                     } else {
                         // Fallback to treating as regular interpolation if parsing fails
                         chunks.push([interpolation.expression] as Chunk);
                     }
                 } else {
-                    // Regular interpolation
-                    chunks.push([interpolation.expression] as Chunk);
+                    // Regular interpolation - check if it's a variable reference that can be resolved
+                    const expression = interpolation.expression.trim();
+
+                    // Check if this is a simple variable reference (no dots, no function calls, etc.)
+                    if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(expression) && context.variableValues?.has(expression)) {
+                        // This is a variable reference that can be resolved
+                        const resolvedValue = context.variableValues.get(expression);
+                        chunks.push(resolvedValue);
+                    } else {
+                        // Regular interpolation that can't be resolved
+                        chunks.push([interpolation.expression] as Chunk);
+                    }
                 }
             } else if (chunk.type === 'TSMComponent') {
                 // Handle components
@@ -740,6 +926,25 @@ export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[]
     }
 
     return chunks;
+}
+
+// Helper function to process JSX elements in text chunks
+function processJSXElementsInText(content: string, context: ParseContext): string {
+    // Find JSX elements like <@Component prop={value} />
+    const jsxElementRegex = /<@(\w+)([^/>]*)\/>/g;
+
+    return content.replace(jsxElementRegex, (match, componentName, props) => {
+        // Use the shared prop parser to handle all prop types correctly
+        // Pass the context.jsxExpressions array so expressions within props can be tracked
+        const parsedProps = parseJSXProps(props, context.jsxExpressions, true);
+
+        // Convert parsed props to function call arguments
+        const propsString = propsToObjectString(parsedProps);
+
+        // Convert JSX element to function call: ComponentName({ prop1: value1, prop2: value2 })
+        const functionCall = `${componentName}(${propsString})`;
+        return functionCall;
+    });
 }
 
 // Legacy chunk-based parser (keeping for backward compatibility)

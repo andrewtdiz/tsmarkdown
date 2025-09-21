@@ -12,7 +12,10 @@ import { extractFunctions } from '../parser/typescript-parser';
 import { parseContent } from '../parser/pipeline';
 import { protectCodeBlocks, restoreCodeBlocks } from '../parser/code-protection';
 import { normalizeIndentation } from '../renderer/string-helpers';
-import { Chunk } from '../runtime/tsm-runtime';
+import { convertJSXToFunctionCalls } from '../renderer/template-parsing';
+import { Chunk, __tsm } from '../runtime/tsm-runtime';
+import { render } from '../renderer';
+import { createSafeContext } from '../renderer/typescript-runtime';
 
 /**
  * Preprocesses MDX syntax within functions to make them parseable by TypeScript
@@ -146,6 +149,29 @@ export interface FullFileCompilationResult {
     errors: string[];
 }
 
+export interface FullFileExecutionResult {
+    functions: Array<{
+        functionInfo: {
+            name: string;
+            isExported: boolean;
+            isDefaultExport: boolean;
+            parameters: Array<{ name: string; type: string; required: boolean; defaultValue?: string }>;
+            returnType?: string;
+            line: number;
+            column: number;
+        };
+        renderedOutput: string;
+        errors: string[];
+    }>;
+    globalTemplates: Array<{
+        variableName: string;
+        isExported: boolean;
+        renderedValue: string;
+        errors: string[];
+    }>;
+    errors: string[];
+}
+
 /**
  * Compiles an entire TypeScript source file, processing template syntax everywhere
  */
@@ -172,13 +198,14 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
         // Store the global templates
         globalTemplates.push(...templates);
 
-        // Create a new source file with the processed global templates
+        // Extract variable values from the processed source for use in function processing
         const processedSourceFile = ts.createSourceFile(
             'processed.ts',
             processedSource,
             ts.ScriptTarget.Latest,
             true
         );
+        const variableValues = extractVariableValues(processedSourceFile);
 
         // Now extract and compile functions from the processed source
         const allFunctions = extractFunctions(processedSourceFile);
@@ -236,11 +263,271 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
 }
 
 /**
+ * Executes an entire TypeScript source file, processing template syntax everywhere and returning rendered output
+ */
+export async function executeFullFile(source: string, context: any = {}): Promise<FullFileExecutionResult> {
+    const errors: string[] = [];
+    const functions: Array<{
+        functionInfo: any;
+        renderedOutput: string;
+        errors: string[];
+    }> = [];
+    const globalTemplates: Array<{
+        variableName: string;
+        isExported: boolean;
+        renderedValue: string;
+        errors: string[];
+    }> = [];
+
+    try {
+        // Preprocess MDX syntax within functions first
+        const preprocessedSource = preprocessMDXInFunctions(source);
+
+        // Use TypeScript compiler API with the preprocessed source
+        const sourceFile = ts.createSourceFile(
+            'input.ts',
+            preprocessedSource,
+            ts.ScriptTarget.Latest,
+            true
+        );
+
+        // First, process all global template syntax outside of functions
+        const { processedSource, templates } = await processGlobalTemplates(sourceFile);
+
+        // Execute global templates and store rendered values
+        for (const template of templates) {
+            try {
+                const templateResult = processTemplateInExpression(template.originalValue, sourceFile);
+                if (templateResult) {
+                    // For global templates, we need to create a simple component-like structure to render them
+                    // Create a minimal ParsedMDX-like structure for rendering
+                    const mockParsed: ParsedMDX = {
+                        imports: [],
+                        functionName: template.variableName,
+                        functionParams: [],
+                        typescript: '',
+                        markdown: templateResult.transpiled,
+                        interpolations: templateResult.interpolations,
+                        conditionalBlocks: templateResult.conditionalBlocks,
+                        ternaryExpressions: templateResult.ternaryExpressions,
+                        jsxExpressions: templateResult.jsxExpressions,
+                        returnStatements: [],
+                        propsInterface: '',
+                        parameterTypes: []
+                    };
+
+                    // Compile and render the global template
+                    const compiled = compile(mockParsed);
+
+                    // Create execution context with runtime support
+                    const executionContext = createSafeContext(context, compiled.typescript);
+                    // Add runtime functions to context
+                    executionContext.__tsm = __tsm;
+                    executionContext.Math = Math;
+
+                    const renderResult = await render(compiled, executionContext, {});
+
+                    globalTemplates.push({
+                        variableName: template.variableName,
+                        isExported: template.isExported,
+                        renderedValue: renderResult.content,
+                        errors: renderResult.errors
+                    });
+                }
+            } catch (error: any) {
+                globalTemplates.push({
+                    variableName: template.variableName,
+                    isExported: template.isExported,
+                    renderedValue: '',
+                    errors: [`Failed to render global template: ${error.message}`]
+                });
+            }
+        }
+
+        // Create a new source file with the processed global templates
+        const processedSourceFile = ts.createSourceFile(
+            'processed.ts',
+            processedSource,
+            ts.ScriptTarget.Latest,
+            true
+        );
+
+        // Now extract and execute functions from the processed source
+        const allFunctions = extractFunctions(processedSourceFile);
+
+        for (const functionInfo of allFunctions) {
+            try {
+                // Extract the actual function content from the AST
+                const { typescript, returnStatements, interpolations, conditionalBlocks, ternaryExpressions, jsxExpressions } = extractFunctionContent(processedSourceFile, functionInfo.name);
+
+                // Create ParsedMDX for each function
+                const markdownContent = returnStatements.length > 0 ? returnStatements[0].content : `# ${functionInfo.name} Content`;
+
+                const parsed: ParsedMDX = {
+                    imports: [],
+                    functionName: functionInfo.name,
+                    functionParams: functionInfo.parameters.map(p => p.name),
+                    typescript: typescript,
+                    markdown: markdownContent,
+                    interpolations: interpolations,
+                    conditionalBlocks: conditionalBlocks,
+                    ternaryExpressions: ternaryExpressions,
+                    jsxExpressions: jsxExpressions,
+                    returnStatements: returnStatements,
+                    propsInterface: functionInfo.parameters.length > 0 ?
+                        `interface ${functionInfo.name}Props {\n  ${functionInfo.parameters.map(p => `${p.name}: ${p.type}${p.required ? '' : '?'}`).join(';\n  ')}\n}` : '',
+                    parameterTypes: functionInfo.parameters
+                };
+
+                // Compile to get the CompiledMDX structure
+                const compiled = compile(parsed);
+
+                // Create execution context with runtime support
+                const executionContext = createSafeContext(context, compiled.typescript);
+                // Add runtime functions to context
+                executionContext.__tsm = __tsm;
+                executionContext.Math = Math;
+
+                // Execute the compiled component
+                const renderResult = await render(compiled, executionContext, {});
+
+                functions.push({
+                    functionInfo,
+                    renderedOutput: renderResult.content,
+                    errors: renderResult.errors
+                });
+            } catch (error: any) {
+                functions.push({
+                    functionInfo,
+                    renderedOutput: '',
+                    errors: [`Failed to execute function ${functionInfo.name}: ${error.message}`]
+                });
+            }
+        }
+
+        return {
+            functions,
+            globalTemplates,
+            errors
+        };
+
+    } catch (error: any) {
+        errors.push(`Failed to parse TypeScript source: ${error.message}`);
+        return {
+            functions: [],
+            globalTemplates: [],
+            errors
+        };
+    }
+}
+
+/**
+ * Extracts all variable declarations and their evaluated values from the source file
+ */
+function extractVariableValues(sourceFile: ts.SourceFile): Map<string, any> {
+    const variableValues = new Map<string, any>();
+
+    function visit(node: ts.Node): void {
+        if (ts.isVariableStatement(node)) {
+            for (const declaration of node.declarationList.declarations) {
+                if (ts.isIdentifier(declaration.name) && declaration.initializer) {
+                    const variableName = declaration.name.text;
+
+                    try {
+                        // Try to evaluate the initializer using TypeScript's evaluation capabilities
+                        // Get the raw source text for the initializer
+                        const sourceText = sourceFile.getFullText();
+                        const initializerStart = declaration.initializer.getStart();
+                        const initializerEnd = declaration.initializer.getEnd();
+                        let initializerText = sourceText.slice(initializerStart, initializerEnd);
+
+                        // For parentheses expressions, we need to manually find the matching closing parenthesis
+                        if (initializerText.startsWith('(') && !initializerText.endsWith(')')) {
+                            // Find the matching closing parenthesis manually
+                            let parenCount = 0;
+                            let endPos = initializerStart;
+                            let foundStart = false;
+
+                            for (let i = initializerStart; i < sourceText.length; i++) {
+                                if (sourceText[i] === '(') {
+                                    parenCount++;
+                                    foundStart = true;
+                                } else if (sourceText[i] === ')') {
+                                    parenCount--;
+                                    if (parenCount === 0 && foundStart) {
+                                        endPos = i;
+                                        break;
+                                    }
+                                }
+                            }
+                            initializerText = sourceText.slice(initializerStart, endPos + 1);
+                        }
+
+                        // Only store non-template variables (those without (*...*) syntax)
+                        const hasTemplateSyntax = containsTemplateSyntax(initializerText);
+                        console.log(`DEBUG: Variable ${variableName} has template syntax:`, hasTemplateSyntax, 'Text:', initializerText);
+                        if (!hasTemplateSyntax) {
+                            console.log(`DEBUG: Processing variable ${variableName} with initializer:`, initializerText);
+                            // For simple literals, we can evaluate them
+                            if (ts.isStringLiteral(declaration.initializer)) {
+                                console.log(`DEBUG: Setting ${variableName} to string:`, declaration.initializer.text);
+                                variableValues.set(variableName, declaration.initializer.text);
+                            } else if (ts.isNumericLiteral(declaration.initializer)) {
+                                const value = parseFloat(declaration.initializer.text);
+                                console.log(`DEBUG: Setting ${variableName} to number:`, value);
+                                variableValues.set(variableName, value);
+                            } else if (ts.isBooleanLiteral(declaration.initializer)) {
+                                const value = declaration.initializer.kind === ts.SyntaxKind.TrueKeyword;
+                                console.log(`DEBUG: Setting ${variableName} to boolean:`, value);
+                                variableValues.set(variableName, value);
+                            } else if (ts.isObjectLiteralExpression(declaration.initializer)) {
+                                // For object literals, convert to a simple object representation
+                                const obj: any = {};
+                                for (const prop of declaration.initializer.properties) {
+                                    if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
+                                        const propName = prop.name.text;
+                                        if (ts.isStringLiteral(prop.initializer)) {
+                                            obj[propName] = prop.initializer.text;
+                                        } else if (ts.isNumericLiteral(prop.initializer)) {
+                                            obj[propName] = parseFloat(prop.initializer.text);
+                                        } else if (ts.isBooleanLiteral(prop.initializer)) {
+                                            obj[propName] = prop.initializer.kind === ts.SyntaxKind.TrueKeyword;
+                                        }
+                                    }
+                                }
+                                console.log(`DEBUG: Setting ${variableName} to object:`, obj);
+                                variableValues.set(variableName, obj);
+                            } else {
+                                // For more complex expressions, store as string for JSON parsing later
+                                console.log(`DEBUG: Setting ${variableName} to complex value:`, initializerText.trim());
+                                variableValues.set(variableName, initializerText.trim());
+                            }
+                        } else {
+                            console.log(`DEBUG: Skipping template variable ${variableName}:`, initializerText);
+                        }
+                    } catch (error) {
+                        console.warn(`Failed to evaluate variable ${variableName}: ${error}`);
+                    }
+                }
+            }
+        }
+
+        ts.forEachChild(node, visit);
+    }
+
+    visit(sourceFile);
+    return variableValues;
+}
+
+/**
  * Processes global template syntax outside of functions
  */
 async function processGlobalTemplates(sourceFile: ts.SourceFile): Promise<{ processedSource: string; templates: any[] }> {
     const templates: any[] = [];
     let processedSource = sourceFile.getFullText();
+
+    // First, extract all variable values to use for resolution
+    const variableValues = extractVariableValues(sourceFile);
 
     // Find all variable declarations at the top level
     function visit(node: ts.Node): void {
@@ -280,8 +567,8 @@ async function processGlobalTemplates(sourceFile: ts.SourceFile): Promise<{ proc
 
 
                     if (containsTemplateSyntax(initializerText)) {
-                        // Extract and process the template content
-                        const templateResult = processTemplateInExpression(initializerText, sourceFile);
+                        // Extract and process the template content with variable resolution
+                        const templateResult = processTemplateInExpression(initializerText, sourceFile, variableValues);
 
                         if (templateResult) {
                             templates.push({
@@ -320,14 +607,15 @@ async function processGlobalTemplates(sourceFile: ts.SourceFile): Promise<{ proc
  */
 function containsTemplateSyntax(expression: string): boolean {
     // Check for parentheses template syntax (*...*) - can contain nested braces
-    const parenTemplateRegex = /\(\*[\s\S]*?\*\)/;
-    return parenTemplateRegex.test(expression);
+    const result = expression.includes('(*') && expression.includes('*)');
+    console.log(`DEBUG: containsTemplateSyntax for "${expression.replace(/\n/g, '\\n')}":`, result);
+    return result;
 }
 
 /**
  * Processes template syntax in an expression and returns the transpiled version
  */
-function processTemplateInExpression(expression: string, sourceFile: ts.SourceFile): {
+function processTemplateInExpression(expression: string, sourceFile: ts.SourceFile, variableValues?: Map<string, string>): {
     transpiled: string;
     interpolations: Array<{ placeholder: string; expression: string }>;
     conditionalBlocks: Array<{ condition: string; content: any }>;
@@ -358,12 +646,16 @@ function processTemplateInExpression(expression: string, sourceFile: ts.SourceFi
         conditionalBlocks,
         ternaryExpressions,
         jsxExpressions,
+        variableValues, // Pass variable values for resolution
     });
 
     processedContent = restoreCodeBlocks(processedContent, codeBlocks);
 
+    // Convert chunks to string first
+    const contentString = chunksToTemplateLiteral(processedContent);
+
     // Convert the processed content to a template literal
-    const transpiled = convertToTemplateLiteral(processedContent, interpolations, conditionalBlocks, ternaryExpressions, jsxExpressions);
+    const transpiled = convertToTemplateLiteral(contentString, interpolations, conditionalBlocks, ternaryExpressions, jsxExpressions);
 
     return {
         transpiled,
@@ -377,22 +669,61 @@ function processTemplateInExpression(expression: string, sourceFile: ts.SourceFi
 /**
  * Converts processed content to a template literal with proper substitutions
  */
-// Helper function to convert chunks to template literal content
+// Helper function to convert chunks to TSM runtime calls
 function chunksToTemplateLiteral(chunks: any[]): string {
     if (!Array.isArray(chunks)) {
         return String(chunks);
     }
 
-    return chunks.map(chunk => {
+    if (chunks.length === 0) {
+        return '__tsm([])';
+    }
+
+    if (chunks.length === 1) {
+        const chunk = chunks[0];
         if (typeof chunk === 'string') {
-            return chunk;
-        } else if (Array.isArray(chunk)) {
-            // Handle nested chunks
-            return chunksToTemplateLiteral(chunk);
-        } else {
-            return String(chunk);
+            // Single string - return simple string
+            return `"${chunk}"`;
         }
-    }).join('');
+        if (Array.isArray(chunk)) {
+            // Check if this is a runtime interpolation array [ "variable.name" ]
+            if (chunk.length === 1 && typeof chunk[0] === 'string') {
+                // This is a runtime interpolation, return the variable reference
+                return chunk[0];
+            }
+            // Otherwise, recursively process nested chunks
+            return chunksToTemplateLiteral(chunk);
+        }
+        return String(chunk);
+    }
+
+    // Multiple chunks - collect them for __tsm call
+    const tsmChunks: string[] = [];
+    for (const chunk of chunks) {
+        if (typeof chunk === 'string') {
+            tsmChunks.push(`"${chunk}"`);
+        } else if (Array.isArray(chunk)) {
+            // Check if this is a ternary condition array [ "condition", " ? ", ... ]
+            if (chunk.length >= 3 && chunk[1] === ' ? ') {
+                // This is a ternary expression, preserve the condition as a variable reference
+                tsmChunks.push(chunk[0]); // The condition
+                // Add the rest of the ternary as-is
+                for (let i = 1; i < chunk.length; i++) {
+                    tsmChunks.push(chunk[i]);
+                }
+            } else if (chunk.length === 1 && typeof chunk[0] === 'string') {
+                // This is a runtime interpolation, return the variable reference
+                tsmChunks.push(chunk[0]);
+            } else {
+                // Otherwise, recursively process nested chunks
+                tsmChunks.push(chunksToTemplateLiteral(chunk));
+            }
+        } else {
+            tsmChunks.push(String(chunk));
+        }
+    }
+
+    return `__tsm([${tsmChunks.join(', ')}])`;
 }
 
 function convertToTemplateLiteral(
@@ -429,7 +760,9 @@ function convertToTemplateLiteral(
 
     // Replace JSX expressions
     jsxExpressions.forEach(({ placeholder, expression }) => {
-        result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), expression);
+        // Convert JSX expressions containing <@Component /> syntax to function calls
+        const convertedExpression = convertJSXToFunctionCalls(expression, jsxExpressions);
+        result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), convertedExpression);
     });
 
     // Return the result without wrapping in backticks (they're already handled elsewhere)
@@ -653,7 +986,7 @@ function extractMarkdownFromReturnStatementWithOriginalSource(returnNode: ts.Ret
 
         // Extract content between the parentheses
         if (fullText.startsWith('(') && fullText.endsWith(')')) {
-            rawContent = fullText.slice(1, -1).trim();
+            rawContent = fullText.slice(1, -1);
         } else {
             rawContent = fullText.trim();
         }
@@ -693,7 +1026,7 @@ function extractMarkdownFromReturnStatementWithOriginalSource(returnNode: ts.Ret
 
     // Now parse the markdown content using the MDX parsing pipeline
     const { protectedContent, codeBlocks } = protectCodeBlocks(rawContent);
-    const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
+    const normalizedMarkdown = normalizeIndentation(protectedContent);
 
     const interpolations: Array<{ placeholder: string; expression: string }> = [];
     const conditionalBlocks: Array<{ condition: string; content: any }> = [];
@@ -718,9 +1051,9 @@ function extractMarkdownFromReturnStatementWithOriginalSource(returnNode: ts.Ret
     };
 }
 
-function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sourceFile: ts.SourceFile): { content: string; interpolations: any[]; conditionalBlocks: any[]; ternaryExpressions: any[]; jsxExpressions: any[] } {
+function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sourceFile: ts.SourceFile): { content: Chunk[]; interpolations: any[]; conditionalBlocks: any[]; ternaryExpressions: any[]; jsxExpressions: any[] } {
     if (!returnNode.expression) {
-        return { content: '', interpolations: [], conditionalBlocks: [], ternaryExpressions: [], jsxExpressions: [] };
+        return { content: [], interpolations: [], conditionalBlocks: [], ternaryExpressions: [], jsxExpressions: [] };
     }
 
     const sourceText = sourceFile.getFullText();
@@ -749,7 +1082,7 @@ function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sour
         const fullText = sourceText.slice(start, endPos + 1);
 
         if (fullText.startsWith('(') && fullText.endsWith(')')) {
-            rawContent = fullText.slice(1, -1).trim();
+            rawContent = fullText.slice(1, -1);
         } else {
             rawContent = fullText.trim();
         }

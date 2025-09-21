@@ -55,6 +55,12 @@ export async function executeCompiledFunction(typescript: string, context: Rende
         // Create a safe execution environment with resolved imports
         const safeContext = createSafeContext(context, typescript, resolvedImports);
 
+        // Import the TSM runtime
+        const { __tsm } = await import('../runtime/tsm-runtime');
+
+        // Add runtime to the context
+        safeContext.__tsm = __tsm;
+
         // Extract the function name and parameters
         const functionMatch = typescript.match(/export\s+function\s+(\w+)\s*\(([^)]*)\)\s*:\s*string\s*\{\s*([\s\S]*)\s*\}/);
         if (!functionMatch) {
@@ -98,11 +104,13 @@ export async function executeCompiledFunction(typescript: string, context: Rende
             // Extract just the destructuring part without the type annotation
             const destructuringEnd = params.indexOf('}');
             const destructuringPart = params.slice(0, destructuringEnd + 1); // Include the }
-            const destructuredFunctionBody = `const ${destructuringPart} = arguments[0]; ${functionBody}`;
+            const destructuredFunctionBody = `const ${destructuringPart} = arguments[0]; const __tsm = arguments[1]; ${functionBody}`;
             func = new AsyncFunction(destructuredFunctionBody);
         } else {
             // For regular parameters, use the extracted parameter names
-            func = new AsyncFunction(...paramNames, functionBody);
+            // Include runtime as the last parameter
+            const bodyWithRuntime = `const __tsm = arguments[${paramNames.length}]; ${functionBody}`;
+            func = new AsyncFunction(...paramNames, bodyWithRuntime);
         }
 
         // Get parameter values from context
@@ -114,11 +122,11 @@ export async function executeCompiledFunction(typescript: string, context: Rende
             for (const paramName of paramNames) {
                 destructuredObject[paramName] = context[paramName];
             }
-            paramValues = [destructuredObject];
+            paramValues = [destructuredObject, __tsm];
             // console.log('Destructured object:', destructuredObject);
         } else {
-            // For regular parameters, pass individual values
-            paramValues = paramNames.map(name => context[name]);
+            // For regular parameters, pass individual values plus runtime
+            paramValues = [...paramNames.map(name => context[name]), __tsm];
         }
 
         // Execute the function and return the result
@@ -144,7 +152,7 @@ export function extractExecutableCode(typescript: string): string {
 
         for (const line of lines) {
             const trimmed = line.trim();
-            if (trimmed.startsWith('return `') || trimmed.startsWith('return`')) {
+            if (trimmed.startsWith('return __tsm') || trimmed.startsWith('return `') || trimmed.startsWith('return"')) {
                 // Stop at the return statement - we don't want to execute the template literal
                 break;
             }

@@ -6,6 +6,15 @@ import {
   RenderResult
 } from './renderer/render-utils';
 
+// Export direct rendering functionality
+export {
+  DirectRenderer,
+  renderDirect,
+  renderDirectSimple,
+  type DirectRenderOptions,
+  type DirectRenderResult
+} from './renderer/direct-renderer';
+
 export type RenderedResult = RenderResult;
 
 // Backward compatibility alias

@@ -21,7 +21,7 @@ export { parseInterpolations, processNestedInterpolations } from './interpolatio
 export { parseConditionals, processConditionalBlocks } from './conditionals';
 
 // Ternary parsing
-export { parseTernary, processTernaryExpressions } from './ternary';
+export { processTernaryExpressions } from './ternary';
 
 // JSX parsing
 export { parseJSX, processJSXElements, processJSXExpressions } from './jsx';

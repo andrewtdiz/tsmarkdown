@@ -6,4 +6,5 @@ export interface ParseContext {
     conditionalBlocks: Array<{ condition: string, content: any[] }>;
     ternaryExpressions: Array<{ condition: string, trueValue: any[], falseValue: any[] }>;
     jsxExpressions: Array<{ placeholder: string, expression: string }>;
+    variableValues?: Map<string, any>;
 }

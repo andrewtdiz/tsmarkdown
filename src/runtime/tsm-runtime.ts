@@ -38,37 +38,46 @@ export function __tsm(chunks: Array<Chunk>): string {
         } else if (typeof chunk === 'string') {
             buffer.push(chunk);
         } else if (chunk && typeof chunk[Symbol.iterator] === 'function') {
-            // Handle iterable chunks (arrays, etc.)
-            for (const item of chunk) {
-                if (item === __ERASE_PREV_LINE || item === null) {
-                    // Both __ERASE_PREV_LINE and null should erase the previous line
-                    __erasePrevLine(buffer);
-                } else if (item === undefined || item === false) {
-                    // undefined and false don't emit text or whitespace
-                    continue;
-                } else if (item === '\n') {
-                    // Handle newline chunks by adding actual newline
-                    buffer.push('\n');
-                } else if (typeof item === 'string') {
-                    buffer.push(item);
-                } else if (typeof item === 'object' && item !== null && typeof item[Symbol.iterator] === 'function') {
-                    // Handle nested iterables recursively
-                    for (const nestedItem of item) {
-                        if (nestedItem === __ERASE_PREV_LINE || nestedItem === null) {
-                            __erasePrevLine(buffer);
-                        } else if (nestedItem === undefined || nestedItem === false) {
-                            continue;
-                        } else if (nestedItem === '\n') {
-                            buffer.push('\n');
-                        } else if (typeof nestedItem === 'string') {
-                            buffer.push(nestedItem);
-                        } else {
-                            buffer.push(String(nestedItem));
+            // Check if this is a runtime interpolation array [ "expression" ]
+            const chunkArray = Array.from(chunk);
+            if (chunkArray.length === 1 && typeof chunkArray[0] === 'string') {
+                // This is a runtime interpolation - it should be evaluated as a TypeScript expression
+                // Since we don't have access to the execution context in the TSM runtime,
+                // we'll leave it as a placeholder that should be evaluated by the TypeScript runtime
+                buffer.push(chunkArray[0]);
+            } else {
+                // Handle regular iterable chunks (arrays, etc.)
+                for (const item of chunk) {
+                    if (item === __ERASE_PREV_LINE || item === null) {
+                        // Both __ERASE_PREV_LINE and null should erase the previous line
+                        __erasePrevLine(buffer);
+                    } else if (item === undefined || item === false) {
+                        // undefined and false don't emit text or whitespace
+                        continue;
+                    } else if (item === '\n') {
+                        // Handle newline chunks by adding actual newline
+                        buffer.push('\n');
+                    } else if (typeof item === 'string') {
+                        buffer.push(item);
+                    } else if (item && typeof item[Symbol.iterator] === 'function') {
+                        // Handle nested iterables recursively
+                        for (const nestedItem of item) {
+                            if (nestedItem === __ERASE_PREV_LINE || nestedItem === null) {
+                                __erasePrevLine(buffer);
+                            } else if (nestedItem === undefined || nestedItem === false) {
+                                continue;
+                            } else if (nestedItem === '\n') {
+                                buffer.push('\n');
+                            } else if (typeof nestedItem === 'string') {
+                                buffer.push(nestedItem);
+                            } else {
+                                buffer.push(String(nestedItem));
+                            }
                         }
+                    } else if (typeof item === 'object' && item !== null) {
+                        // Handle nested objects
+                        buffer.push(String(item));
                     }
-                } else if (typeof item === 'object' && item !== null) {
-                    // Handle nested objects
-                    buffer.push(String(item));
                 }
             }
         } else if (typeof chunk === 'object' && chunk !== null) {
@@ -103,9 +112,8 @@ export function __tsmJoin(parts: Array<Chunk>): Array<Chunk> {
             // Split strings on newlines and create separate chunks
             const stringParts = part.split('\n');
             for (let i = 0; i < stringParts.length; i++) {
-                if (stringParts[i]) {
-                    result.push(stringParts[i]);
-                }
+                // Always push the string part, even if it's empty (to preserve empty lines)
+                result.push(stringParts[i]);
                 // Add newline chunk after each part except the last one
                 if (i < stringParts.length - 1) {
                     result.push('\n');
@@ -135,17 +143,41 @@ export function __tsmJoin(parts: Array<Chunk>): Array<Chunk> {
 export function __erasePrevLine(buf: string[]): void {
     if (buf.length === 0) return;
 
-    const lastItem = buf[buf.length - 1];
-    if (typeof lastItem === 'string') {
-        // Find the last newline in the last item
-        const lastNewlineIndex = lastItem.lastIndexOf('\n');
-        if (lastNewlineIndex !== -1) {
-            // Remove everything after the last newline
-            buf[buf.length - 1] = lastItem.substring(0, lastNewlineIndex);
-        } else {
-            // If no newline found, remove the entire last item
-            buf.pop();
+    // Find the last newline in the buffer
+    let lastNewlineIndex = -1;
+    let lastNewlineBufferIndex = -1;
+
+    // Search backwards through the buffer to find the last newline
+    for (let i = buf.length - 1; i >= 0; i--) {
+        const item = buf[i];
+        if (typeof item === 'string') {
+            const newlineIndex = item.lastIndexOf('\n');
+            if (newlineIndex !== -1) {
+                lastNewlineIndex = newlineIndex;
+                lastNewlineBufferIndex = i;
+                break;
+            }
         }
+    }
+
+    if (lastNewlineBufferIndex !== -1) {
+        const item = buf[lastNewlineBufferIndex];
+        if (typeof item === 'string') {
+            // Remove everything after the last newline in that item
+            buf[lastNewlineBufferIndex] = item.substring(0, lastNewlineIndex);
+            // Remove any empty items that come after
+            while (buf.length > lastNewlineBufferIndex + 1) {
+                const nextItem = buf[lastNewlineBufferIndex + 1];
+                if (typeof nextItem === 'string' && nextItem === '') {
+                    buf.splice(lastNewlineBufferIndex + 1, 1);
+                } else {
+                    break;
+                }
+            }
+        }
+    } else {
+        // If no newline found, remove the last item
+        buf.pop();
     }
 }
 

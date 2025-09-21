@@ -191,7 +191,16 @@ function generateMultipleReturnStatements(parsed: ParsedMDX): string {
                         } else if (chunk === '\n') {
                             chunks.push("'\\n'");
                         } else if (typeof chunk === 'string') {
-                            chunks.push(`"${chunk}"`);
+                            // Replace JSX expression placeholders with actual expressions
+                            let processedChunk = chunk;
+                            if (parsed.jsxExpressions) {
+                                parsed.jsxExpressions.forEach(({ placeholder, expression }) => {
+                                    // Remove braces from expression and replace placeholder
+                                    const cleanExpression = expression.replace(/^\{+|\}+$/g, '');
+                                    processedChunk = processedChunk.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), cleanExpression);
+                                });
+                            }
+                            chunks.push(`"${processedChunk}"`);
                         } else if (Array.isArray(chunk)) {
                             // TSMInterpolations should be evaluated by TypeScript as expressions
                             // Join array elements as a single expression
@@ -206,7 +215,16 @@ function generateMultipleReturnStatements(parsed: ParsedMDX): string {
                     const lines = returnStmt.content.split('\n');
                     for (let j = 0; j < lines.length; j++) {
                         if (lines[j].trim()) {
-                            chunks.push(`"${lines[j]}"`);
+                            // Replace JSX expression placeholders with actual expressions
+                            let processedLine = lines[j];
+                            if (parsed.jsxExpressions) {
+                                parsed.jsxExpressions.forEach(({ placeholder, expression }) => {
+                                    // Remove braces from expression and replace placeholder
+                                    const cleanExpression = expression.replace(/^\{+|\}+$/g, '');
+                                    processedLine = processedLine.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), cleanExpression);
+                                });
+                            }
+                            chunks.push(`"${processedLine}"`);
                         }
                         if (j < lines.length - 1) {
                             chunks.push("'\\n'");
@@ -274,15 +292,38 @@ export function generateTypedFunction(parsed: ParsedMDX): string {
 }`;
 }
 
-export function compileTemplate(markdown: string | Chunk[]): string {
+export function compileTemplate(markdown: string | Chunk[], jsxExpressions?: Array<{ placeholder: string; expression: string }>): string {
     // For now, if markdown is chunks, convert to string
     // Later we'll add more sophisticated template compilation
     if (Array.isArray(markdown)) {
-        // Import __tsm here to avoid circular dependencies
-        const { __tsm } = require('../runtime/tsm-runtime');
-        return __tsm(markdown);
+        // Replace JSX expression placeholders with actual expressions
+        if (jsxExpressions) {
+            const processedChunks = replaceJSXExpressionPlaceholders(markdown, jsxExpressions);
+            // Import __tsm here to avoid circular dependencies
+            const { __tsm } = require('../runtime/tsm-runtime');
+            return __tsm(processedChunks);
+        } else {
+            // Import __tsm here to avoid circular dependencies
+            const { __tsm } = require('../runtime/tsm-runtime');
+            return __tsm(markdown);
+        }
     }
     return markdown;
+}
+
+function replaceJSXExpressionPlaceholders(chunks: Chunk[], jsxExpressions: Array<{ placeholder: string; expression: string }>): Chunk[] {
+    return chunks.map(chunk => {
+        if (typeof chunk === 'string') {
+            let content = chunk;
+            jsxExpressions.forEach(({ placeholder, expression }) => {
+                // Remove braces from expression and replace placeholder
+                const cleanExpression = expression.replace(/^\{+|\}+$/g, '');
+                content = content.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), cleanExpression);
+            });
+            return content;
+        }
+        return chunk;
+    });
 }
 
 export function parseImportStatement(importLine: string): DependencyInfo {

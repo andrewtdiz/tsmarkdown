@@ -113,3 +113,155 @@ export function valueToString(value: any): string {
     }
     return String(value);
 }
+
+export interface ParsedProp {
+    name: string;
+    value: string;
+    isExpression: boolean;
+    isBoolean: boolean;
+    isString: boolean;
+}
+
+export interface JSXExpressionInfo {
+    placeholder: string;
+    expression: string;
+}
+
+/**
+ * Parses JSX element props from a props string like 'title="My Title" showHeader={user.isAdmin} visible'
+ * Supports string literals, expressions, and boolean props.
+ */
+export function parseJSXProps(
+    propsString: string,
+    jsxExpressions: Array<{ placeholder: string; expression: string }> = [],
+    createPlaceholdersForExpressions: boolean = true
+): ParsedProp[] {
+    const props: ParsedProp[] = [];
+
+    // Remove leading/trailing whitespace
+    const trimmed = propsString.trim();
+    if (!trimmed) return props;
+
+    let currentPos = 0;
+
+    while (currentPos < trimmed.length) {
+        // Skip whitespace
+        while (currentPos < trimmed.length && /\s/.test(trimmed[currentPos])) {
+            currentPos++;
+        }
+
+        if (currentPos >= trimmed.length) break;
+
+        // Match prop name
+        const propNameMatch = trimmed.slice(currentPos).match(/^\w+/);
+        if (!propNameMatch) break;
+
+        const propName = propNameMatch[0];
+        currentPos += propName.length;
+
+        // Skip whitespace after prop name
+        while (currentPos < trimmed.length && /\s/.test(trimmed[currentPos])) {
+            currentPos++;
+        }
+
+        let propValue = '';
+        let isExpression = false;
+        let isString = false;
+        let isBoolean = false;
+
+        if (currentPos < trimmed.length && trimmed[currentPos] === '=') {
+            // Has equals sign - either string or expression prop
+            currentPos++; // Skip =
+
+            // Skip whitespace after =
+            while (currentPos < trimmed.length && /\s/.test(trimmed[currentPos])) {
+                currentPos++;
+            }
+
+            if (currentPos < trimmed.length) {
+                if (trimmed[currentPos] === '"' || trimmed[currentPos] === "'") {
+                    // String literal prop
+                    const quoteChar = trimmed[currentPos];
+                    currentPos++; // Skip opening quote
+
+                    const stringStart = currentPos;
+                    // Find closing quote (not escaped)
+                    while (currentPos < trimmed.length) {
+                        if (trimmed[currentPos] === quoteChar && trimmed[currentPos - 1] !== '\\') {
+                            break;
+                        }
+                        currentPos++;
+                    }
+
+                    propValue = `"${trimmed.slice(stringStart, currentPos)}"`;
+                    isString = true;
+                    currentPos++; // Skip closing quote
+                } else if (trimmed[currentPos] === '{') {
+                    // Expression prop
+                    const braceStart = currentPos;
+                    const closingBrace = findMatchingBrace(trimmed, currentPos);
+                    if (closingBrace !== -1) {
+                        currentPos = closingBrace + 1; // Skip closing brace
+                        const expression = trimmed.slice(braceStart, closingBrace + 1);
+
+                        if (createPlaceholdersForExpressions) {
+                            // Create placeholder for JSX expression processing
+                            const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
+                            jsxExpressions.push({ placeholder, expression });
+                            propValue = placeholder;
+                        } else {
+                            // Use the expression directly (no placeholder needed)
+                            propValue = expression;
+                        }
+                        isExpression = true;
+                    } else {
+                        // Malformed expression, treat as text
+                        propValue = trimmed.slice(braceStart);
+                        isExpression = false;
+                    }
+                } else {
+                    // Malformed prop, skip it
+                    break;
+                }
+            }
+        } else {
+            // No equals sign - boolean prop
+            propValue = 'true';
+            isBoolean = true;
+        }
+
+        props.push({
+            name: propName,
+            value: propValue,
+            isExpression,
+            isBoolean,
+            isString
+        });
+
+        // Skip whitespace before next prop
+        while (currentPos < trimmed.length && /\s/.test(trimmed[currentPos])) {
+            currentPos++;
+        }
+    }
+
+    return props;
+}
+
+/**
+ * Converts parsed props back to a props object string
+ */
+export function propsToObjectString(props: ParsedProp[]): string {
+    const propStrings = props.map(prop => {
+        if (prop.isBoolean) {
+            return `${prop.name}: ${prop.value}`;
+        } else if (prop.isString) {
+            return `${prop.name}: ${prop.value}`;
+        } else if (prop.isExpression) {
+            return `${prop.name}: ${prop.value}`;
+        } else {
+            return `${prop.name}: ${prop.value}`;
+        }
+    });
+
+    return propStrings.length > 0 ? `{ ${propStrings.join(', ')} }` : '';
+}

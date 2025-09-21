@@ -5,6 +5,13 @@ import { parseContent } from "./parser/pipeline";
 import { protectCodeBlocks, restoreCodeBlocks } from "./parser/code-protection";
 import type { Chunk } from "./runtime/tsm-runtime";
 
+// Export function props adapter utilities
+export {
+  adaptFunctionWithProps,
+  createMDXFromFunctionAndProps,
+  type FunctionWithProps
+} from "./parser/function-props-adapter";
+
 export interface ParsedMDX {
   imports: string[];
   functionName: string;
@@ -21,7 +28,6 @@ export interface ParsedMDX {
 }
 
 export function parseMDX(content: string): ParsedMDX {
-  const lines = content.split("\n");
   const imports: string[] = [];
   const interpolations: Array<{ placeholder: string; expression: string }> =
     [];

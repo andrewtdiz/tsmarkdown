@@ -1,7 +1,7 @@
 import { ParsedMDX } from './parser';
 import { extractDependencies, compileTypeScript, generateTypedFunction, compileTemplate } from './compiler/compiler-utils';
 export { compileAllExportedFunctions, compileAllFunctions, type MultiFunctionCompilationResult } from './compiler/multi-function-compiler';
-export { compileFullFile, type FullFileCompilationResult } from './compiler/full-file-compiler';
+export { compileFullFile, executeFullFile, type FullFileCompilationResult, type FullFileExecutionResult } from './compiler/full-file-compiler';
 
 export interface CompiledMDX {
   id: string;
@@ -32,7 +32,7 @@ export function compile(parsed: ParsedMDX): CompiledMDX {
   return {
     id,
     typescript: compileTypeScript(parsed),
-    template: compileTemplate(parsed.markdown),
+    template: compileTemplate(parsed.markdown, parsed.jsxExpressions),
     dependencies,
     functionParams: parsed.functionParams,
     interpolations: parsed.interpolations,

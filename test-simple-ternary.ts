@@ -6,11 +6,7 @@ function TestComponent() {
 
   return (
     # Admin panel
-    {{ data.isAuthorized ? (
-      Authorized
-    ) : (
-      Not Authorized
-    )}}
+    {{ data.isAuthorized ? Authorized : Not Authorized }}
   )
 }
 `;

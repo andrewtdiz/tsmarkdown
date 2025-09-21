@@ -3,6 +3,7 @@ import { parseMDX } from './parser';
 import { compile } from './compiler';
 import { render } from './renderer';
 import { ClientRenderer } from './client-renderer';
+import { DirectRenderer } from './renderer/direct-renderer';
 
 /**
  * Generate clickable file links for different IDEs and terminals
@@ -92,6 +93,7 @@ export interface ExactMDXTestSuite {
 
 export class ExactMDXTestRunner {
     private renderer = new ClientRenderer();
+    private directRenderer = new DirectRenderer();
     private results: ExactMDXTestResult[] = [];
 
     /**
@@ -117,13 +119,16 @@ export class ExactMDXTestRunner {
                 result.details!.compiled = compiled;
 
                 if (!testCase.options?.skipExecution) {
-                    // Execute phase - pass basePath from context if available
+                    // Execute phase using DirectRenderer
                     const context = testCase.context || {};
                     const basePath = context.basePath;
-                    const executed = await render(compiled, context, {}, basePath);
-                    result.details!.executed = executed;
+                    const executed = await this.directRenderer.render(testCase.input, context);
+                    result.details!.executed = {
+                        content: executed.content,
+                        errors: executed.errors
+                    };
 
-                    // Render phase
+                    // Render phase using ClientRenderer for comparison (optional)
                     const rendered = await this.renderer.render(compiled, testCase.context || {});
                     result.details!.rendered = rendered;
 

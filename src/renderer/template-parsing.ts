@@ -1,4 +1,5 @@
 import { findMatchingBrace } from './string-helpers';
+import { parseJSXProps, propsToObjectString } from './render-utils';
 
 export function processNestedInterpolations(
     content: string,
@@ -207,42 +208,16 @@ export function processJSXElementsForParsing(
     jsxExpressions: Array<{ placeholder: string; expression: string }>,
 ): string {
     // Find JSX elements like <Component prop={value} /> and <@Component prop={value} />
-    const jsxElementRegex = /<(@?)(\w+)([^/>]*)\/>/g;
+    const jsxElementRegex = /<@(\w+)([^/>]*)\/>/g;
 
-    return content.replace(jsxElementRegex, (match, atSymbol, componentName, props) => {
-        // Parse props to extract JSX expressions within them
-        const propMatches = props.match(/(\w+)=\{([^}]+)\}/g) || [];
-        const processedProps: string[] = [];
+    return content.replace(jsxElementRegex, (match, componentName, props) => {
+        // Use the shared prop parser to handle all prop types correctly
+        const parsedProps = parseJSXProps(props, jsxExpressions);
 
-        // Handle props with ={} syntax
-        for (const propMatch of propMatches) {
-            const [, propName, propExpr] = propMatch.match(/(\w+)=\{([^}]+)\}/) || [];
-            if (propName && propExpr) {
-                // Create a JSX expression placeholder for the prop value
-                const placeholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
-                jsxExpressions.push({ placeholder, expression: propExpr.trim() });
-                processedProps.push(`${propName}=${placeholder}`);
-            }
-        }
-
-        // Handle props without ={} syntax (default to true)
-        const booleanProps = props.match(/\b(\w+)(?=\s|$)/g) || [];
-        for (const booleanProp of booleanProps) {
-            // Skip if this prop is already handled by the ={} syntax
-            const isAlreadyHandled = propMatches.some((propMatch: string) =>
-                propMatch.includes(`${booleanProp}=`)
-            );
-            if (!isAlreadyHandled) {
-                processedProps.push(booleanProp);
-            }
-        }
-
-        // Convert the entire JSX element to a placeholder
-        const processedPropsString = processedProps.length > 0 ? ' ' + processedProps.join(' ') : '';
-        const jsxElementPlaceholder = `__JSX_EXPRESSION_${jsxExpressions.length}__`;
-        const fullJsxElement = `<${atSymbol}${componentName}${processedPropsString} />`;
-        jsxExpressions.push({ placeholder: jsxElementPlaceholder, expression: fullJsxElement });
-        return jsxElementPlaceholder;
+        // Convert JSX element to function call: ComponentName({ prop1: value1, prop2: value2 })
+        const propsString = propsToObjectString(parsedProps);
+        const functionCall = `${componentName}(${propsString})`;
+        return functionCall;
     });
 }
 
@@ -250,6 +225,7 @@ export function processJSXExpressionsForParsing(
     content: string,
     jsxExpressions: Array<{ placeholder: string; expression: string }>,
 ): string {
+    console.log('DEBUG: processJSXExpressionsForParsing called with content:', content);
     // Find all {expression} patterns and process them
     let processedContent = content;
     let startIndex = 0;
@@ -271,10 +247,11 @@ export function processJSXExpressionsForParsing(
         const lastSlashAngle = beforeBrace.lastIndexOf('/>');
 
         // If we have an unclosed JSX element (last < is after last >), skip this brace
-        if (lastOpenAngle > lastCloseAngle && lastOpenAngle > lastSlashAngle) {
-            startIndex = openBraceIndex + 1;
-            continue;
-        }
+        // Temporarily disabled to debug
+        // if (lastOpenAngle > lastCloseAngle && lastOpenAngle > lastSlashAngle) {
+        //     startIndex = openBraceIndex + 1;
+        //     continue;
+        // }
 
         // Find the matching closing brace
         const endIndex = findMatchingBrace(processedContent, openBraceIndex);
@@ -285,6 +262,8 @@ export function processJSXExpressionsForParsing(
 
         const expression = processedContent.substring(openBraceIndex + 1, endIndex);
         const trimmedExpression = expression.trim();
+
+        console.log('DEBUG: Found JSX expression:', trimmedExpression);
 
         // Skip if it's a conditional block (contains &&)
         if (trimmedExpression.includes('&&')) {
@@ -328,6 +307,30 @@ export function processJSXExpressionsForParsing(
     }
 
     return processedContent;
+}
+
+/**
+ * Converts JSX expressions containing <@Component /> syntax to function calls
+ */
+export function convertJSXToFunctionCalls(
+    jsxExpression: string,
+    jsxExpressions?: Array<{ placeholder: string; expression: string }>
+): string {
+    // Match <@ComponentName props /> syntax
+    const jsxElementRegex = /<@(\w+)([^/>]*)\/>/g;
+    let convertedExpression = jsxExpression;
+
+    convertedExpression = convertedExpression.replace(jsxElementRegex, (match, componentName, props) => {
+        // Use the shared prop parser to handle all prop types correctly
+        // We pass the jsxExpressions array so that expressions within props can be tracked
+        const parsedProps = parseJSXProps(props, jsxExpressions || [], true);
+
+        // Generate function call: ComponentName({ prop1: value1, prop2: value2 })
+        const propsString = propsToObjectString(parsedProps);
+        return `${componentName}(${propsString})`;
+    });
+
+    return convertedExpression;
 }
 
 export function processTemplateContent(
