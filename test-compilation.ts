@@ -4,7 +4,7 @@ import { parseJSXExpressionToTSMComponent } from "./src/parser/interpolations";
 
 
 const completeTypeScriptSource = `
-import Dashboard from "./components/Dashboard";
+import {Dashboard} from "./components/Dashboard";
 import { getData } from "./api/getData";
 
 const VERSION_NUMBER = "1.0.0";
@@ -22,13 +22,11 @@ async function TestComponent() {
 
     <@Dashboard title="My Dashboard" showHeader={true} />
 
-
     {{ someNumber > 5 ? (
       Some number is greater than 5. It's
     ) : (
       Some number is less than 5
     )}}
-
   )
 }
 `;
@@ -46,8 +44,6 @@ console.log("TRANSPILED FILE: ", fullFileResult.transpiledFile);
 
 const fileToRun = `
 import { __tsm } from "./src/runtime/tsm-runtime";
-
-import { Dashboard } from "./components/Dashboard";
 
 ${fullFileResult.transpiledFile}
 

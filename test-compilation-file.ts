@@ -1,6 +1,4 @@
-import { execFileSync, execSync } from "node:child_process";
 import { compileFullFile } from "./src/compiler";
-
 
 const completeTypeScriptSource = `
 const VERSION_NUMBER = "1.0.0";

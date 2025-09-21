@@ -1,7 +1,9 @@
 
 import { __tsm } from "./src/runtime/tsm-runtime";
 
-import { Dashboard } from "./components/Dashboard";
+import {Dashboard} from "./components/Dashboard";
+
+import { getData } from "./api/getData";
 
 const VERSION_NUMBER = "1.0.0";
 
@@ -26,8 +28,6 @@ const currentUser = { name: "John", id: 123 };
     "",
     '\n',
     Dashboard({ title: "My Dashboard", showHeader: true }),
-    '\n',
-    "",
     '\n',
     "",
     '\n',

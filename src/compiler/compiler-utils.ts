@@ -243,6 +243,7 @@ function generateMultipleReturnStatements(parsed: ParsedMDX): string {
             // We don't need to add them separately
 
             // Generate the return statement
+            console.log("CHUNKS: ", chunks);
             const chunksString = chunks.join(',\n    ');
             const returnStatement = `return __tsm([\n    ${chunksString}\n]);`;
 

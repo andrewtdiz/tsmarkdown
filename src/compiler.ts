@@ -3,7 +3,7 @@ import { extractDependencies, compileTypeScript, generateTypedFunction, compileT
 import { TSMComponent, TSMComponentAttribute } from './parser/tsm-ast';
 import { parseJSXExpressionToTSMComponent } from './parser/interpolations';
 export { compileAllExportedFunctions, compileAllFunctions, type MultiFunctionCompilationResult } from './compiler/multi-function-compiler';
-export { compileFullFile, executeFullFile, type FullFileCompilationResult, type FullFileExecutionResult } from './compiler/full-file-compiler';
+export { compileFullFile, type FullFileCompilationResult, type FullFileExecutionResult } from './compiler/full-file-compiler';
 
 export interface CompiledMDX {
   id: string;

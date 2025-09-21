@@ -197,7 +197,7 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
         // First, process all global template syntax outside of functions
         const { processedSource, templates } = await processGlobalTemplates(sourceFile);
 
-        
+
 
         // Store the global templates
         globalTemplates.push(...templates);
@@ -222,7 +222,7 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
 
                 // Create ParsedMDX for each function
                 const markdownContent = returnStatements.length > 0 ? returnStatements[0].content : `# ${functionInfo.name} Content`;
-                
+
                 const jsxExpressionsMapped = jsxExpressions
                     .map(expr => ({ parsed: parseJSXExpressionToTSMComponent(expr.expression), ...expr }))
                     .filter(expr => expr.parsed !== null)
@@ -272,166 +272,6 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
             functions: [],
             globalTemplates: [],
             transpiledFile: '',
-            errors
-        };
-    }
-}
-
-/**
- * Executes an entire TypeScript source file, processing template syntax everywhere and returning rendered output
- */
-export async function executeFullFile(source: string, context: any = {}): Promise<FullFileExecutionResult> {
-    const errors: string[] = [];
-    const functions: Array<{
-        functionInfo: any;
-        renderedOutput: string;
-        errors: string[];
-    }> = [];
-    const globalTemplates: Array<{
-        variableName: string;
-        isExported: boolean;
-        renderedValue: string;
-        errors: string[];
-    }> = [];
-
-    try {
-        // Preprocess MDX syntax within functions first
-        const preprocessedSource = preprocessMDXInFunctions(source);
-
-        // Use TypeScript compiler API with the preprocessed source
-        const sourceFile = ts.createSourceFile(
-            'input.ts',
-            preprocessedSource,
-            ts.ScriptTarget.Latest,
-            true
-        );
-
-        // First, process all global template syntax outside of functions
-        const { processedSource, templates } = await processGlobalTemplates(sourceFile);
-
-        // Execute global templates and store rendered values
-        for (const template of templates) {
-            try {
-                const templateResult = processTemplateInExpression(template.originalValue, sourceFile);
-                if (templateResult) {
-                    // For global templates, we need to create a simple component-like structure to render them
-                    // Create a minimal ParsedMDX-like structure for rendering
-                    const mockParsed: ParsedMDX = {
-                        imports: [],
-                        functionName: template.variableName,
-                        functionParams: [],
-                        typescript: '',
-                        markdown: [templateResult.transpiled],
-                        interpolations: templateResult.interpolations,
-                        conditionalBlocks: templateResult.conditionalBlocks,
-                        ternaryExpressions: templateResult.ternaryExpressions,
-                        jsxExpressions: [], // This is handled differently for global templates
-                        returnStatements: [],
-                        componentCalls: [],
-                        propsInterface: '',
-                        parameterTypes: []
-                    };
-
-                    // Compile and render the global template
-                    const compiled = compile(mockParsed);
-
-                    // Create execution context with runtime support
-                    const executionContext = createSafeContext(context, compiled.typescript);
-                    // Add runtime functions to context
-                    executionContext.__tsm = __tsm;
-                    executionContext.Math = Math;
-
-                    const renderResult = await render(compiled, executionContext, {});
-
-                    globalTemplates.push({
-                        variableName: template.variableName,
-                        isExported: template.isExported,
-                        renderedValue: renderResult.content,
-                        errors: renderResult.errors
-                    });
-                }
-            } catch (error: any) {
-                globalTemplates.push({
-                    variableName: template.variableName,
-                    isExported: template.isExported,
-                    renderedValue: '',
-                    errors: [`Failed to render global template: ${error.message}`]
-                });
-            }
-        }
-
-        // Create a new source file with the processed global templates
-        const processedSourceFile = ts.createSourceFile(
-            'processed.ts',
-            processedSource,
-            ts.ScriptTarget.Latest,
-            true
-        );
-
-        // Now extract and execute functions from the processed source
-        const allFunctions = extractFunctions(processedSourceFile);
-
-        for (const functionInfo of allFunctions) {
-            try {
-                // Extract the actual function content from the AST
-                const { typescript, returnStatements, interpolations, conditionalBlocks, ternaryExpressions, jsxExpressions } = extractFunctionContent(processedSourceFile, functionInfo.name);
-
-                // Create ParsedMDX for each function
-                const markdownContent = returnStatements.length > 0 ? returnStatements[0].content : `# ${functionInfo.name} Content`;
-
-                const parsed: ParsedMDX = {
-                    imports: [],
-                    functionName: functionInfo.name,
-                    functionParams: functionInfo.parameters.map(p => p.name),
-                    typescript: typescript,
-                    markdown: markdownContent,
-                    interpolations: interpolations,
-                    conditionalBlocks: conditionalBlocks,
-                    ternaryExpressions: ternaryExpressions,
-                    jsxExpressions: jsxExpressions,
-                    returnStatements: returnStatements,
-                    propsInterface: functionInfo.parameters.length > 0 ?
-                        `interface ${functionInfo.name}Props {\n  ${functionInfo.parameters.map(p => `${p.name}: ${p.type}${p.required ? '' : '?'}`).join(';\n  ')}\n}` : '',
-                    parameterTypes: functionInfo.parameters
-                };
-
-                // Compile to get the CompiledMDX structure
-                const compiled = compile(parsed);
-
-                // Create execution context with runtime support
-                const executionContext = createSafeContext(context, compiled.typescript);
-                // Add runtime functions to context
-                executionContext.__tsm = __tsm;
-                executionContext.Math = Math;
-
-                // Execute the compiled component
-                const renderResult = await render(compiled, executionContext, {});
-
-                functions.push({
-                    functionInfo,
-                    renderedOutput: renderResult.content,
-                    errors: renderResult.errors
-                });
-            } catch (error: any) {
-                functions.push({
-                    functionInfo,
-                    renderedOutput: '',
-                    errors: [`Failed to execute function ${functionInfo.name}: ${error.message}`]
-                });
-            }
-        }
-
-        return {
-            functions,
-            globalTemplates,
-            errors
-        };
-
-    } catch (error: any) {
-        errors.push(`Failed to parse TypeScript source: ${error.message}`);
-        return {
-            functions: [],
-            globalTemplates: [],
             errors
         };
     }
@@ -809,6 +649,30 @@ function convertTSMComponentToFunctionCall(name: string, props: Array<{ name: st
 }
 
 /**
+ * Extracts import statements from the TypeScript source file
+ */
+function extractImportStatements(sourceFile: ts.SourceFile): Array<{ text: string; isExported: boolean }> {
+    const importStatements: Array<{ text: string; isExported: boolean }> = [];
+
+    function visit(node: ts.Node): void {
+        if (ts.isImportDeclaration(node)) {
+            const importText = node.getText(sourceFile);
+            const isExported = node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.ExportKeyword) || false;
+
+            importStatements.push({
+                text: importText,
+                isExported
+            });
+        }
+
+        ts.forEachChild(node, visit);
+    }
+
+    visit(sourceFile);
+    return importStatements;
+}
+
+/**
  * Extracts regular TypeScript variables (non-template, non-function)
  */
 function extractRegularVariables(
@@ -888,10 +752,19 @@ function generateTranspiledFile(
 ): string {
     let transpiledFile = '';
 
+    // Extract import statements first
+    const importStatements = extractImportStatements(sourceFile);
+
+    // Add import statements first
+    for (const importStmt of importStatements) {
+        const exportKeyword = importStmt.isExported ? 'export ' : '';
+        transpiledFile += `${exportKeyword}${importStmt.text}\n\n`;
+    }
+
     // Extract regular TypeScript variables (non-template, non-function)
     const regularVariables = extractRegularVariables(sourceFile, globalTemplates, functions);
 
-    // Add regular variables first
+    // Add regular variables after imports
     for (const variable of regularVariables) {
         const exportKeyword = variable.isExported ? 'export ' : '';
         transpiledFile += `${exportKeyword}${variable.text}\n\n`;

@@ -7,6 +7,6 @@ export function Dashboard(props?: { title?: string, showHeader?: boolean }) {
     title ?? 'No title', '\n', 
     showHeader ? __tsm(['No showHeader', '\n',
         "With some more content", '\n',
-    ]) : null, '\n',
+    ]) : null
     ])
 }

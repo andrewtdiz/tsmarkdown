@@ -3,7 +3,6 @@ import { CompiledMDX, compile } from '../compiler';
 import { parseMDX } from '../parser';
 import { componentRegistry, mergePropsWithDefaults, resolveComponentPath } from './render-context';
 import { processEscapeSequences, normalizeIndentation, valueToString } from './string-helpers';
-import { renderComponent } from '../renderer/render-component';
 import { parseInterpolations } from '../parser/interpolations';
 
 export function processInterpolations(
