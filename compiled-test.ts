@@ -1,30 +1,33 @@
 
 import { __tsm } from "./src/runtime/tsm-runtime";
 
-import { OlItem } from './components/OlItem'
+import {Dashboard} from "./components/Dashboard";
 
-import { UlItem } from './components/UlItem'
+import { getData } from "./api/getData";
 
-interface ListProps {
-  items: string[];
-  ordered: boolean
-}
+const VERSION_NUMBER = "1.0.0";
 
-export function List({ items, ordered }: ListProps): string {
-  
+export function TestComponent(): string {
+  const someNumber = 3;
+const names = ["John", "Jane", "Jim"];
     return __tsm([
-    "Items", '\n',
-    "", items.map((item, index) => ordered ? (
-  item
-) : (
-  UlItem({ item: item })
-))
+    "# Version", '\n',
+    "## Here i am", '\n',
+    "* ", VERSION_NUMBER, " *", '\n',
+    "Test: More content *bolded*", '\n',
+    "", '\n',
+    Dashboard(), '\n',
+    "", '\n',
+    Dashboard({ title: "My Dashboard", showHeader: true }), '\n',
+    "", '\n',
+    "", someNumber > 5 ? __tsm(["Some number is greater than 5! It's ", someNumber]) : __tsm(["Some number is less than 5, it's ", someNumber]), "", '\n',
+    "More Content"
 ]);
 }
 
 (async () => {
   try {
-    const out = await List({ items: ["Item 1", "Item 2", "Item 3"], ordered: true });
+    const out = await TestComponent();
     console.log("\n=== Runtime Output ===");
     console.log(out);
   } catch (err) {

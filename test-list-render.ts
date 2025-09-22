@@ -32,7 +32,7 @@ ${fullFileResult.transpiledFile}
 
 (async () => {
   try {
-    const out = await List({ items: ["Item 1", "Item 2", "Item 3"], ordered: true });
+    const out = List({ items: ["Item 1", "Item 2", "Item 3"], ordered: true });
     console.log("\\n=== Runtime Output ===");
     console.log(out);
   } catch (err) {
