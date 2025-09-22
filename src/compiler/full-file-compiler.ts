@@ -236,6 +236,7 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
                     imports: [],
                     functionName: functionInfo.name,
                     functionParams: functionInfo.parameters.map(p => p.name),
+                    isAsync: functionInfo.isAsync,
                     typescript: typescript,
                     markdown: markdownContent,
                     interpolations: interpolations,
@@ -504,14 +505,14 @@ function processTemplateInExpression(expression: string, sourceFile: ts.SourceFi
     // Convert chunks to string first
     const contentString = chunksToTemplateLiteral(processedContent);
 
-    // Convert TSMComponent jsxExpressions to the old format for convertToTemplateLiteral
-    const oldJSXExpressions = jsxExpressions.map((jsx, index) => ({
-        placeholder: `__JSX_EXPRESSION_${index}__`,
-        expression: convertTSMComponentToFunctionCall(jsx.name, jsx.props)
+    // Convert TSMComponent jsxExpressions to the expected format for convertToTemplateLiteral
+    const convertedJSXExpressions = jsxExpressions.map(jsx => ({
+        name: jsx.name,
+        props: jsx.props
     }));
 
     // Convert the processed content to a template literal
-    const transpiled = convertToTemplateLiteral(contentString, interpolations, conditionalBlocks, ternaryExpressions, oldJSXExpressions);
+    const transpiled = convertToTemplateLiteral(contentString, interpolations, conditionalBlocks, ternaryExpressions, convertedJSXExpressions);
 
     return {
         transpiled,

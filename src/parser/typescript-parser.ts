@@ -771,6 +771,7 @@ export function extractFunctions(ast: ts.SourceFile): Array<{
     name: string;
     isExported: boolean;
     isDefaultExport: boolean;
+    isAsync: boolean;
     parameters: Array<{ name: string; type: string; required: boolean; defaultValue?: string }>;
     returnType?: string;
     line: number;
@@ -780,6 +781,7 @@ export function extractFunctions(ast: ts.SourceFile): Array<{
         name: string;
         isExported: boolean;
         isDefaultExport: boolean;
+        isAsync: boolean;
         parameters: Array<{ name: string; type: string; required: boolean; defaultValue?: string }>;
         returnType?: string;
         line: number;
@@ -792,6 +794,7 @@ export function extractFunctions(ast: ts.SourceFile): Array<{
             const name = node.name?.text || 'anonymous';
             const isExported = hasExportModifier(node);
             const isDefaultExport = hasDefaultExportModifier(node);
+            const isAsync = hasAsyncModifier(node);
             const parameters = extractParametersFromAST(node);
             const returnType = extractReturnTypeFromAST(node);
 
@@ -802,6 +805,7 @@ export function extractFunctions(ast: ts.SourceFile): Array<{
                 name,
                 isExported,
                 isDefaultExport,
+                isAsync,
                 parameters,
                 returnType,
                 line: lineAndChar.line + 1, // TypeScript uses 0-based line numbers
@@ -829,6 +833,7 @@ export function extractFunctions(ast: ts.SourceFile): Array<{
                             name,
                             isExported,
                             isDefaultExport,
+                            isAsync: hasAsyncModifier(declaration.initializer),
                             parameters,
                             returnType,
                             line: lineAndChar.line + 1,
@@ -940,4 +945,11 @@ function extractReturnTypeFromFunctionExpression(functionNode: ts.FunctionExpres
     }
 
     return undefined;
+}
+
+/**
+ * Checks if a node has the async modifier
+ */
+function hasAsyncModifier(node: ts.Node): boolean {
+    return node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword) || false;
 }

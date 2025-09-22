@@ -12,6 +12,7 @@ import { extractFunctions } from '../parser/typescript-parser';
 import { parseContent } from '../parser/pipeline';
 import { protectCodeBlocks, restoreCodeBlocks } from '../parser/code-protection';
 import { normalizeIndentation } from '../renderer/string-helpers';
+import type { TSMComponentAttribute } from '../parser/tsm-ast';
 
 /**
  * Preprocesses MDX syntax within functions to make them parseable by TypeScript
@@ -133,7 +134,7 @@ function parseExtractedReturnContent(content: string): { content: string; interp
     const interpolations: Array<{ placeholder: string; expression: string }> = [];
     const conditionalBlocks: Array<{ condition: string; content: any }> = [];
     const ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
-    const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
+    const jsxExpressions: Array<{ placeholder: string; expression: string; name: string; props: Array<TSMComponentAttribute> }> = [];
 
     let processedContent = parseContent(normalizedMarkdown, {
         interpolations,
@@ -207,6 +208,7 @@ export async function compileAllFunctions(source: string): Promise<MultiFunction
                     imports: [],
                     functionName: functionInfo.name,
                     functionParams: functionInfo.parameters.map(p => p.name),
+                    isAsync: functionInfo.isAsync,
                     typescript: typescript,
                     markdown: markdownContent,
                     interpolations: interpolations,
@@ -497,7 +499,7 @@ function extractMarkdownFromReturnStatementWithOriginalSource(returnNode: ts.Ret
     const interpolations: Array<{ placeholder: string; expression: string }> = [];
     const conditionalBlocks: Array<{ condition: string; content: any }> = [];
     const ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
-    const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
+    const jsxExpressions: Array<{ placeholder: string; expression: string; name: string; props: Array<TSMComponentAttribute> }> = [];
 
     let processedContent = parseContent(normalizedMarkdown, {
         interpolations,
@@ -600,7 +602,7 @@ function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sour
     const interpolations: Array<{ placeholder: string; expression: string }> = [];
     const conditionalBlocks: Array<{ condition: string; content: any }> = [];
     const ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
-    const jsxExpressions: Array<{ placeholder: string; expression: string }> = [];
+    const jsxExpressions: Array<{ placeholder: string; expression: string; name: string; props: Array<TSMComponentAttribute> }> = [];
 
     let processedContent = parseContent(normalizedMarkdown, {
         interpolations,

@@ -1,4 +1,4 @@
-async function getScoreData() {
+export async function getData() {
   await new Promise((res) => setTimeout(res, 10))
   return ({
     data: {
@@ -11,5 +11,3 @@ async function getScoreData() {
     timedout: false
   })
 }
-
-export { getScoreData }

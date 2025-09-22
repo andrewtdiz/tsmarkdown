@@ -11,17 +11,15 @@
  * - Reusable codemods
  */
 
+import { execFileSync } from "child_process";
 import { compile, compileAllExportedFunctions, compileAllFunctions, compileFullFile } from "./src/compiler";
 
-
+const totalStart = performance.now();
 const completeTypeScriptSource = `
 import { Dashboard } from "./components/Dashboard";
 import { getData } from "./api/getData";
 
 const VERSION_NUMBER = "1.0.0";
-const inlineVersion = (
-    *Version: {{ VERSION_NUMBER }}!*
-);
 
 async function TestComponent() {
   const { data, error, timedout } = await getData();
@@ -41,20 +39,20 @@ async function TestComponent() {
   return (
     # Admin panel
     {{ data.isAuthorized ? Authorized : (
-        Not Authorized
+      Not Authorized
     )}}
     {{ !data.active && (
-        Account is inactive
+      Account is inactive
     )}}
     - Name: {{ data.name }}
     - Description: {{ data.description }}
       Access your information here
 
     <content>
-      <@Dashboard />
+    <@Dashboard />
     </content>
     
-    {{ inlineVersion }}
+    Version: {{ VERSION_NUMBER }}
   )
 }
 `;
@@ -89,3 +87,33 @@ if (fullFileResult.globalTemplates.length > 0) {
 
 console.log("\n=== Complete Transpiled File (Full-File) ===");
 console.log(fullFileResult.transpiledFile);
+
+const fileToRun = `
+import { __tsm } from "./src/runtime/tsm-runtime";
+
+${fullFileResult.transpiledFile}
+
+(async () => {
+  try {
+    const out = await TestComponent();
+    console.log("\\n=== Runtime Output ===");
+    console.log(out);
+  } catch (err) {
+    console.error("Runtime error:", err);
+    process.exitCode = 1;
+  }
+})();
+`;
+
+Bun.write("compiled-test.ts", fileToRun);
+
+const execStart = performance.now();
+execFileSync("bun", ["compiled-test.ts"], { stdio: "inherit" });
+const execEnd = performance.now();
+console.log(`Execution time: ${(execEnd - execStart).toFixed(2)}ms`);
+
+const file = Bun.file("compiled-test.ts");
+// await file.delete();
+
+const totalEnd = performance.now();
+console.log(`Total test time: ${(totalEnd - totalStart).toFixed(2)}ms`);

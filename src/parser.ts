@@ -1,6 +1,6 @@
 import { generatePropsInterface, parseParameters, parseParameterTypes } from "./parser/parameters";
 import { processJSXExpressions } from "./renderer/jsx-runtime";
-import { normalizeIndentation } from "./renderer/string-helpers";
+import { normalizeIndentation, parseJSXProps } from "./renderer/string-helpers";
 import { parseContent } from "./parser/pipeline";
 import { protectCodeBlocks, restoreCodeBlocks } from "./parser/code-protection";
 import type { Chunk } from "./runtime/tsm-runtime";
@@ -11,6 +11,7 @@ export interface ParsedMDX {
   imports: string[];
   functionName: string;
   functionParams: string[];
+  isAsync: boolean;
   typescript: string;
   markdown: Chunk[];
   interpolations: Array<{ placeholder: string; expression: string }>;
@@ -28,11 +29,12 @@ export function parseMDX(content: string): ParsedMDX {
     [];
   const conditionalBlocks: Array<{ condition: string; content: string }> = [];
   const ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }> = [];
-  const jsxExpressions: Array<{ name: string; props: TSMComponentAttribute[] }> = [];
+  const jsxExpressions: Array<{ placeholder: string; expression: string; name: string; props: Array<TSMComponentAttribute> }> = [];
   const returnStatements: Array<{ condition?: string; content: string; isTemplate: boolean }> = [];
 
   let functionName = "";
   let functionParams: string[] = [];
+  let isAsync = false;
   let typescript = "";
   let markdownString = "";
   let inFunction = false;
@@ -60,6 +62,7 @@ export function parseMDX(content: string): ParsedMDX {
       if (match) {
         functionName = match[1];
         rawParams = match[2].trim();
+        isAsync = Boolean(match[0].match(/(?:async|await)/));
         if (rawParams) {
           // Parse parameters - handle destructured objects like { items }
           functionParams = parseParameters(rawParams);
@@ -118,6 +121,34 @@ export function parseMDX(content: string): ParsedMDX {
   // Restore the protected code blocks in the final markdown
   markdown = restoreCodeBlocks(markdown, allCodeBlocks);
 
+  // Process JSX expressions from context to populate jsxExpressions
+  for (const jsxExpr of context.jsxExpressions) {
+    // Parse JSX elements to extract name and props
+    const jsxElementRegex = /<(@?)(\w+)([^/>]*)\/>/;
+    const match = jsxExpr.expression.match(jsxElementRegex);
+    if (match) {
+      const [, atSymbol, componentName, propsString] = match;
+      const name = atSymbol ? componentName : componentName; // Remove @ prefix for name
+
+      // Parse props using parseJSXProps
+      const parsedProps = parseJSXProps(propsString);
+      const attributes: TSMComponentAttribute[] = parsedProps.map(prop => ({
+        type: 'TSMComponentAttribute',
+        name: prop.name,
+        value: prop.isExpression
+          ? { type: 'expression', value: prop.value }
+          : { type: 'string', value: prop.value }
+      }));
+
+      jsxExpressions.push({
+        placeholder: jsxExpr.placeholder,
+        expression: jsxExpr.expression,
+        name,
+        props: attributes
+      });
+    }
+  }
+
   // Generate props interface
   const propsInterface = generatePropsInterface(functionName, parameterTypes);
 
@@ -125,6 +156,7 @@ export function parseMDX(content: string): ParsedMDX {
     imports: imports.filter(Boolean),
     functionName,
     functionParams,
+    isAsync,
     typescript: typescript.trim(),
     markdown,
     interpolations,

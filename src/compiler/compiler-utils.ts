@@ -122,74 +122,14 @@ export function generateCompleteFunction(parsed: ParsedMDX): string {
     const functionBody = `${parsed.typescript}
     ${returnStatement}`;
 
-    return `export function ${parsed.functionName}(${functionParams}): string {
+    const asyncKeyword = parsed.isAsync ? 'async ' : '';
+    const returnType = parsed.isAsync ? 'Promise<string>' : 'string';
+
+    return `export ${asyncKeyword}function ${parsed.functionName}(${functionParams}): ${returnType} {
   ${functionBody}
 }`;
 }
 
-function generateSingleReturnStatement(parsed: ParsedMDX): string {
-    // Generate chunk-based code instead of template literals
-    const chunks: string[] = [];
-
-    // Add the parsed content as chunks
-    if (parsed.markdown && parsed.markdown.length > 0) {
-        // Content is already chunks - convert them to JavaScript literals
-        for (const chunk of parsed.markdown) {
-            if (chunk === null) {
-                chunks.push('__ERASE_PREV_LINE');
-            } else if (chunk === undefined || chunk === false) {
-                chunks.push(String(chunk));
-            } else if (chunk === '\n') {
-                chunks.push('"\\n"');
-            } else if (typeof chunk === 'string') {
-                chunks.push(`"${chunk}"`);
-            } else if (Array.isArray(chunk)) {
-                // TSMInterpolations should be evaluated by TypeScript as expressions
-                // Join array elements as a single expression
-                const expression = chunk.join('');
-                chunks.push(expression);
-            } else {
-                chunks.push(String(chunk));
-            }
-        }
-    }
-
-    if (chunks.length === 0) {
-        return 'return "";';
-    }
-
-    const chunksString = chunks.join(',\n    ');
-    return `return __tsm([\n    ${chunksString}\n]);`;
-}
-
-
-export function generateTypedFunction(parsed: ParsedMDX): string {
-    if (!parsed.functionName) return '';
-
-    const interfaceName = `${parsed.functionName}Props`;
-    const hasProps = parsed.parameterTypes.length > 0;
-
-    if (!hasProps) {
-        return `export function ${parsed.functionName}(): string {
-  // Implementation will be generated here
-  return '';
-}`;
-    }
-
-    // Generate destructured parameter with types (don't include optional markers in destructuring)
-    const destructuredParams = parsed.parameterTypes.map(param => {
-        // Include default value if present
-        if (param.defaultValue) {
-            return `${param.name} = ${param.defaultValue}`;
-        }
-        return param.name;
-    }).join(', ');
-
-    return `export function ${parsed.functionName}({ ${destructuredParams} }: ${interfaceName}): string {
-  // Implementation will be generated here
-  return '';
-}`;
-}
 
 export function compileTemplate(markdown: string | Chunk[], jsxExpressions?: Array<{ placeholder: string; expression: string; name: string; props: Array<TSMComponentAttribute> }>): string {
     // For now, if markdown is chunks, convert to string
@@ -295,19 +235,3 @@ export function parseImportStatement(importLine: string): DependencyInfo {
 
     return result;
 }
-
-function isTypeScriptOrAssetImport(modulePath: string): boolean {
-    return modulePath.endsWith('.ts') ||
-        modulePath.endsWith('.tsx') ||
-        modulePath.endsWith('.cts') ||
-        modulePath.endsWith('.mts') ||
-        modulePath.endsWith('.js') ||
-        modulePath.endsWith('.jsx') ||
-        modulePath.endsWith('.json') ||
-        modulePath.endsWith('.yaml') ||
-        modulePath.endsWith('.yml') ||
-        modulePath.endsWith('.css') ||
-        modulePath.endsWith('.md') ||
-        modulePath.endsWith('.txt');
-}
-

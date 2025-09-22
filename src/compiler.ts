@@ -1,5 +1,5 @@
 import { ParsedMDX } from './parser';
-import { extractDependencies, compileTypeScript, generateTypedFunction, compileTemplate, compileJSXExpression } from './compiler/compiler-utils';
+import { extractDependencies, compileTypeScript, compileTemplate, compileJSXExpression } from './compiler/compiler-utils';
 import { TSMComponent, TSMComponentAttribute } from './parser/tsm-ast';
 import { parseJSXExpressionToTSMComponent } from './parser/interpolations';
 export { compileAllExportedFunctions, compileAllFunctions, type MultiFunctionCompilationResult } from './compiler/multi-function-compiler';
