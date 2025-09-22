@@ -4,30 +4,9 @@ import { parseJSXExpressionToTSMComponent } from "./src/parser/interpolations";
 
 
 const completeTypeScriptSource = `
-import {Dashboard} from "./components/Dashboard";
-import { getData } from "./api/getData";
-
-const VERSION_NUMBER = "1.0.0";
-
-async function TestComponent() {
-   const someNumber = 3;
-   const names = ["John", "Jane", "Jim"];
+function UlItem({ item }: { item: string }) {
   return (
-    # Version
-    ## Here i am
-    * {{ VERSION_NUMBER }} *
-    Test: More content *bolded*
-
-    <@Dashboard />
-
-    <@Dashboard title="My Dashboard" showHeader={true} />
-
-    {{ someNumber > 5 ? (
-      Some number is greater than 5! It's {{ someNumber }}
-    ) : (
-      Some number is less than 5, it's {{ someNumber }}
-    )}}
-    More Content
+    - {{ item }}
   )
 }
 `;
@@ -44,7 +23,7 @@ ${fullFileResult.transpiledFile}
 
 (async () => {
   try {
-    const out = await TestComponent();
+    const out = await UlItem({ item: "Item 1" });
     console.log("\\n=== Runtime Output ===");
     console.log(out);
   } catch (err) {

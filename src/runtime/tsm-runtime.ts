@@ -94,7 +94,7 @@ export function __tsm(chunks: Array<Chunk>): string {
             buffer.push(String(chunk));
         }
     }
-    console.log("BUFFER: ", buffer);
+
     return buffer.join('');
 }
 
@@ -134,7 +134,7 @@ export function __tsmJoin(parts: Array<Chunk>): Array<Chunk> {
             // Recursively flatten iterable chunks
             const flattened = __tsmJoin(Array.from(part));
             result.push(...flattened);
-        } else {
+        } else if (typeof part === 'object' && part !== null) {
             // Handle objects by converting to string
             result.push(String(part));
         }
