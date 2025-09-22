@@ -131,21 +131,24 @@ function classifyExpression(expression: string): 'conditional' | 'ternary' | 'js
         }
     }
 
+    // Check for JSX pattern: contains < and > or JSX elements
+    if (trimmed.includes('<') && trimmed.includes('>')) {
+        console.log('DEBUG: Classified as jsx:', trimmed);
+        return 'jsx';
+    }
+
     // Check for ternary pattern: condition ? trueValue : falseValue
     // Must have at least one ? and one : in the right order
     if (trimmed.includes('?') && trimmed.includes(':')) {
         const questionIndex = trimmed.indexOf('?');
         const colonIndex = trimmed.lastIndexOf(':');
         if (colonIndex > questionIndex) {
+            console.log('DEBUG: Classified as ternary:', trimmed);
             return 'ternary';
         }
     }
 
-    // Check for JSX pattern: contains < and > or JSX elements
-    if (trimmed.includes('<') && trimmed.includes('>')) {
-        return 'jsx';
-    }
-
+    console.log('DEBUG: Classified as interpolation:', trimmed);
     return 'interpolation';
 }
 
@@ -175,6 +178,7 @@ export function parseInterpolations(content: string, context: ParseContext): str
         if (expression) {
             // Classify the expression type
             const expressionType = classifyExpression(expression);
+            console.log('DEBUG: Expression type for:', expression, 'is:', expressionType);
 
             let placeholder: string = '';
 
@@ -322,6 +326,15 @@ function cleanParenthesesAndWhitespace(value: string): string {
 
 // Helper function to parse nested ternary expressions
 function parseNestedTernary(expression: string): { condition: string; trueValue: string; falseValue: string } {
+    console.log('DEBUG: parseNestedTernary input:', expression);
+
+    // For complex expressions with function calls, arrow functions, etc.,
+    // don't try to parse as ternary - let it be handled as regular interpolation
+    if (expression.includes('=>') || expression.includes('.map(') || expression.includes('.filter(')) {
+        console.log('DEBUG: Complex expression detected, skipping ternary parsing');
+        return { condition: '', trueValue: '', falseValue: '' };
+    }
+
     let parenCount = 0;
     let questionIndex = -1;
     let colonIndex = -1;
@@ -552,14 +565,20 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
 
                 case 'ternary':
                     // Parse ternary logic with proper nesting support
+                    console.log('DEBUG: Ternary expression:', expression);
                     const { condition, trueValue, falseValue } = parseNestedTernary(expression);
+                    console.log('DEBUG: Ternary parsed - condition:', condition, 'trueValue:', trueValue, 'falseValue:', falseValue);
                     if (condition && trueValue && falseValue) {
+                        console.log('DEBUG: Processing ternary with condition:', condition);
                         // Process the true and false values through the parsing pipeline
                         const processValue = (value: string): Chunk[] => {
+                            console.log('DEBUG: Processing ternary value:', value);
                             if (value.trim()) {
                                 const { protectedContent, codeBlocks } = protectCodeBlocks(value);
                                 const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
+                                console.log('DEBUG: Normalized ternary value:', normalizedMarkdown);
                                 const chunks = parseContent(normalizedMarkdown, context);
+                                console.log('DEBUG: Ternary value chunks:', chunks);
                                 return restoreCodeBlocks(chunks, codeBlocks);
                             }
                             return [];
@@ -577,6 +596,7 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
                         // Add the ternary expression as TSMInterpolation
                         chunks.push(createTSMInterpolation(expression, false, true));
                     } else {
+                        console.log('DEBUG: Invalid ternary syntax, treating as regular interpolation');
                         // Invalid ternary syntax, treat as regular interpolation
                         chunks.push(createTSMInterpolation(expression, false, false));
                     }
@@ -584,15 +604,99 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
 
                 case 'jsx':
                     // Handle JSX expressions
-                    chunks.push(createTSMInterpolation(expression, false, false));
+                    // Parse JSX expressions within the expression
+                    const jsxRegex = /<@(\w+)([^/>]*)\/>/g;
+                    let jsxMatch;
+                    let jsxProcessedExpression = expression;
+
+                    while ((jsxMatch = jsxRegex.exec(expression)) !== null) {
+                        const fullMatch = jsxMatch[0];
+                        const componentName = jsxMatch[1];
+                        const props = jsxMatch[2] || '';
+
+                        // Create a unique placeholder for this JSX expression
+                        const jsxPlaceholder = `__JSX_EXPRESSION_${context.jsxExpressions.length}__`;
+                        context.jsxExpressions.push({
+                            placeholder: jsxPlaceholder,
+                            expression: fullMatch
+                        });
+
+                        // Replace the JSX in the expression with the placeholder
+                        jsxProcessedExpression = jsxProcessedExpression.replace(fullMatch, jsxPlaceholder);
+                    }
+
+                    // Check if the processed expression contains ternary syntax
+                    if (jsxProcessedExpression.includes('?') && jsxProcessedExpression.includes(':')) {
+                        // Parse ternary logic
+                        const { condition, trueValue, falseValue } = parseNestedTernary(jsxProcessedExpression);
+                        if (condition && trueValue && falseValue) {
+                            // Process the ternary
+                            const processValue = (value: string): any => {
+                                console.log('DEBUG: Processing ternary value:', value);
+                                if (value.trim()) {
+                                    const { protectedContent, codeBlocks } = protectCodeBlocks(value);
+                                    const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
+                                    console.log('DEBUG: Normalized ternary value:', normalizedMarkdown);
+                                    const chunks = parseContent(normalizedMarkdown, context);
+                                    console.log('DEBUG: Ternary value chunks:', chunks);
+                                    return restoreCodeBlocks(chunks, codeBlocks);
+                                }
+                                return [];
+                            };
+
+                            const processedTrueValue = processValue(trueValue);
+                            const processedFalseValue = processValue(falseValue);
+
+                            context.ternaryExpressions.push({
+                                condition: condition,
+                                trueValue: processedTrueValue,
+                                falseValue: processedFalseValue,
+                            });
+
+                            // Add the ternary expression as TSMInterpolation
+                            chunks.push(createTSMInterpolation(jsxProcessedExpression, false, true));
+                        } else {
+                            // Use the processed expression for the interpolation
+                            chunks.push(createTSMInterpolation(jsxProcessedExpression, false, false));
+                        }
+                    } else {
+                        // Use the processed expression for the interpolation
+                        chunks.push(createTSMInterpolation(jsxProcessedExpression, false, false));
+                    }
                     break;
 
                 case 'interpolation':
                 default:
+                    console.log('DEBUG: Processing as interpolation:', expression);
+                    // Check if this interpolation contains JSX
+                    let processedExpression = expression;
+                    if (processedExpression.includes('<@') && processedExpression.includes('/>')) {
+                        console.log('DEBUG: Found JSX in interpolation, processing...');
+                        // Parse JSX expressions within the interpolation
+                        const jsxRegex = /<@(\w+)([^/>]*)\/>/g;
+                        let jsxMatch;
+
+                        while ((jsxMatch = jsxRegex.exec(processedExpression)) !== null) {
+                            const fullMatch = jsxMatch[0];
+                            const componentName = jsxMatch[1];
+                            const props = jsxMatch[2] || '';
+
+                            // Create a unique placeholder for this JSX expression
+                            const jsxPlaceholder = `__JSX_EXPRESSION_${context.jsxExpressions.length}__`;
+                            context.jsxExpressions.push({
+                                placeholder: jsxPlaceholder,
+                                expression: fullMatch
+                            });
+
+                            // Replace the JSX in the expression with the placeholder
+                            processedExpression = processedExpression.replace(fullMatch, jsxPlaceholder);
+                        }
+                    }
+
                     // Regular interpolation - add to context and create chunk
                     const placeholder = `__INTERPOLATION_${context.interpolations.length}__`;
-                    context.interpolations.push({ placeholder, expression });
-                    chunks.push(createTSMInterpolation(expression, false, false));
+                    context.interpolations.push({ placeholder, processedExpression });
+                    chunks.push(createTSMInterpolation(processedExpression, false, false));
                     break;
             }
 
@@ -1010,7 +1114,26 @@ export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[]
                     }
                 } else {
                     // Regular interpolation - check if it's a variable reference that can be resolved
-                    const expression = interpolation.expression.trim();
+                    let expression = interpolation.expression.trim();
+
+                    // Check if the expression contains JSX placeholders
+                    const jsxRegex = /__JSX_EXPRESSION_(\d+)__/g;
+                    let jsxMatch;
+                    let hasJsx = false;
+
+                    while ((jsxMatch = jsxRegex.exec(expression)) !== null) {
+                        hasJsx = true;
+                        const jsxIndex = parseInt(jsxMatch[1]);
+                        const jsxExpr = context.jsxExpressions[jsxIndex];
+                        if (jsxExpr && jsxExpr.expression) {
+                            // Parse the JSX expression to get component name and props
+                            const parsedJSX = parseJSXExpressionToTSMComponent(jsxExpr.expression);
+                            if (parsedJSX) {
+                                // Replace the placeholder with the actual JSX component call
+                                expression = expression.replace(jsxMatch[0], `${parsedJSX.name}(${propsToObjectString(parsedJSX.attributes)})`);
+                            }
+                        }
+                    }
 
                     // Check if this is a simple variable reference (no dots, no function calls, etc.)
                     if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(expression) && context.variableValues?.has(expression)) {
@@ -1019,7 +1142,7 @@ export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[]
                         chunks.push(resolvedValue);
                     } else {
                         // Regular interpolation that can't be resolved
-                        chunks.push([interpolation.expression] as Chunk);
+                        chunks.push([expression] as Chunk);
                     }
                 }
             } else if (chunk.type === 'TSMComponent') {

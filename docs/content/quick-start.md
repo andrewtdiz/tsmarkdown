@@ -84,22 +84,6 @@ root.render(<div>{result}</div>)
 
 ### Step 4: Create HTML Template
 
-Create `index.html`:
-
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Better-MDX Quick Start</title>
-</head>
-<body>
-    <div id="root"></div>
-    <script type="module" src="./index.tsx"></script>
-</body>
-</html>
-```
-
-### Step 5: Run Your App
 
 ```bash
 bun run --bun index.tsx

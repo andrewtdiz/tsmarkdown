@@ -137,6 +137,8 @@ export function __tsmJoin(parts: Array<Chunk>): Array<Chunk> {
         } else if (typeof part === 'object' && part !== null) {
             // Handle objects by converting to string
             result.push(String(part));
+        } else if (typeof part === 'number') {
+            result.push(String(part));
         }
     }
 

@@ -45,11 +45,11 @@ export function LandingPage() {
             <div className="w-screen px-4 py-16">
                 <div className="text-center max-w-4xl mx-auto">
                     <h1 className="text-5xl font-bold tracking-tight mb-6">
-                        TS Markdown Documentation
+                        TS Markdown
                     </h1>
                     <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-                        The enhanced TS Markdown experience with dynamic content, conditional rendering, and seamless React integration.
-                        Build faster, more interactive documentation and content.
+                        A better markdown experience. <br />
+                        Type-safe, component-based, and fast.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
                         <Button asChild size="lg" className="text-lg px-8">

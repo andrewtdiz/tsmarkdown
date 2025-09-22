@@ -15,16 +15,16 @@ export function List({ items, ordered }: ListProps): string {
     return __tsm([
     "Items", '\n',
     "", items.map((item, index) => ordered ? (
-  <@OlItem item={item} index={index} />
+  item
 ) : (
-  <@UlItem item={item} />
+  UlItem({ item: item })
 ))
 ]);
 }
 
 (async () => {
   try {
-    const out = await List({ items: ["Item 1"] });
+    const out = await List({ items: ["Item 1", "Item 2", "Item 3"], ordered: true });
     console.log("\n=== Runtime Output ===");
     console.log(out);
   } catch (err) {

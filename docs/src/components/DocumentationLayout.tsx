@@ -1,15 +1,29 @@
-import React from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useEffect, useRef } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { Header } from './Header';
 import { DynamicSidebar } from './DynamicSidebar';
 import { PageActions } from './PageActions';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { sidebar } from '../sidebar';
 import { loadMarkdownContentSync } from '../lib/content-loader';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { ArrowRight } from 'lucide-react';
+import { Separator } from './ui/separator';
 
 export function DocumentationLayout() {
     const location = useLocation();
     const currentPath = location.pathname;
+    const currentPathSection = sidebar.find(section => section.links.find(link => link.href === currentPath));
+    const currentPathLinkIndex = currentPathSection?.links.findIndex(link => link.href === currentPath) ?? -1;
+    const nextPath = currentPathSection?.links[currentPathLinkIndex + 1];
+    const nextPathHref = nextPath?.href || '/';
+    const divRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (divRef.current) {
+            divRef.current.scrollTo({ top: 0 });
+        }
+    }, [currentPath]);
 
     const renderContent = () => {
         if (currentPath === '/') {
@@ -83,10 +97,24 @@ export function DocumentationLayout() {
                     <DynamicSidebar sections={sidebar} />
 
                     {/* Main Content */}
-                    <main className="flex-1 overflow-y-auto">
+                    <main className="flex-1 overflow-y-auto" ref={divRef}>
                         <div className="w-[90%]">
                             {renderContent()}
                         </div>
+                        <div className="w-[90%] mt-20 mb-16">
+                            {nextPathHref !== '/' && <Link to={nextPathHref}>
+                                <Card className="p-4! bg-transparent hover:bg-muted/25">
+                                    <CardContent className="p-0! flex items-center justify-between">
+                                        <div className="flex flex-col">
+                                            <p className="text-sm text-muted-foreground">Next</p>
+                                            <p>{nextPath?.children}</p>
+                                        </div>
+                                        <ArrowRight className="h-6 w-6" />
+                                    </CardContent>
+                                </Card>
+                            </Link>}
+                        </div>
+                        <Separator className='mb-16' />
                     </main>
                 </div>
             </div>

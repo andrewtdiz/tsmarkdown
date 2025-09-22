@@ -12,8 +12,6 @@ Instead of writing messy string concatenation or template literals, write **Reus
 
 The output is clean Markdown, but writing it feels like JSX.
 
-Since there's no render cycle, components are just pure functions.
-
 ### Example:
 
 ```typescript
@@ -30,8 +28,6 @@ function UserProfile({ user }: UserProfileProps) {
     {{ skills.map(skill => (
       - {{skill}}
     ))}}
-
-    {{ yearsOfExperience > 5 ? '🏆 **Senior Engineer**' : '🌱 **Growing Professional**' }}
   )
 }
 ```
@@ -48,9 +44,9 @@ function UserProfile({ user }: UserProfileProps) {
 - React
 - Typescript
 - Bun
-
-🏆 **Senior Engineer**
 ```
+
+Since there's no render cycle, components are just pure functions.
 
 TS Markdown also includes a complete toolkit with a component parser, type system, runtime engine, and Markdown generator, all designed to make your development experience faster, and more intuitive than dealing with strings.
 
