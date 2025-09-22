@@ -14,7 +14,11 @@ export function List({ items, ordered }: ListProps): string {
   
     return __tsm([
     "Items", '\n',
-    "", items.length > 0 && __tsm(["__JSX_EXPRESSION_0__"])
+    "", items.map((item, index) => ordered ? (
+  <@OlItem item={item} index={index} />
+) : (
+  <@UlItem item={item} />
+))
 ]);
 }
 

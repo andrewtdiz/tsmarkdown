@@ -11,9 +11,11 @@ function List({ items, ordered }: { items: string[]; ordered: boolean }) {
 
   return (
     Items
-    {{ items.length > 0 && (
-      <@UlItem item={items[0]} />
-    )}}
+    {{items.map((item, index) => ordered ? (
+      <@OlItem item={item} index={index} />
+    ) : (
+      <@UlItem item={item} />
+    ))}}
   )
 }
 `;

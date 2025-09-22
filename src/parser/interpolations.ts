@@ -746,13 +746,48 @@ export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[]
                             // For arrays, process through chunks to ensure TSM rendering
                             // Always process through TSM runtime for any array content
                             if (content.length === 1 && typeof content[0] === 'string') {
-                                content = `__tsm(["${content[0]}"])`;
+                                // Check if this is a JSX placeholder
+                                const jsxMatch = content[0].match(/^__JSX_EXPRESSION_(\d+)__$/);
+                                if (jsxMatch) {
+                                    const jsxIndex = parseInt(jsxMatch[1]);
+                                    const jsxExpr = context.jsxExpressions[jsxIndex];
+                                    if (jsxExpr && jsxExpr.expression) {
+                                        // Parse the JSX expression to get component name and props
+                                        const parsedJSX = parseJSXExpressionToTSMComponent(jsxExpr.expression);
+                                        if (parsedJSX) {
+                                            // Replace with actual JSX component call
+                                            content = `${parsedJSX.name}(${propsToObjectString(parsedJSX.attributes)})`;
+                                        } else {
+                                            // Fallback to placeholder if JSX parsing fails
+                                            content = `__tsm(["${content[0]}"])`;
+                                        }
+                                    } else {
+                                        // Fallback to placeholder if JSX expression not found
+                                        content = `__tsm(["${content[0]}"])`;
+                                    }
+                                } else {
+                                    content = `__tsm(["${content[0]}"])`;
+                                }
                             } else {
                                 // For mixed content or multiple elements, manually construct TSM call
                                 const tsmArgs: string[] = [];
                                 for (const chunk of content) {
                                     if (typeof chunk === 'string') {
-                                        tsmArgs.push(`"${chunk}"`);
+                                        // Check if this is a JSX placeholder
+                                        const jsxMatch = chunk.match(/^__JSX_EXPRESSION_(\d+)__$/);
+                                        if (jsxMatch) {
+                                            const jsxIndex = parseInt(jsxMatch[1]);
+                                            const jsxExpr = context.jsxExpressions[jsxIndex];
+                                            if (jsxExpr) {
+                                                // Replace with actual JSX component call
+                                                tsmArgs.push(`${jsxExpr.name}(${propsToObjectString(jsxExpr.props)})`);
+                                            } else {
+                                                // Fallback to placeholder if JSX expression not found
+                                                tsmArgs.push(`"${chunk}"`);
+                                            }
+                                        } else {
+                                            tsmArgs.push(`"${chunk}"`);
+                                        }
                                     } else if (Array.isArray(chunk)) {
                                         if (chunk.length === 1 && typeof chunk[0] === 'string') {
                                             // This is a runtime interpolation - treat as variable reference
@@ -922,7 +957,28 @@ export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[]
                                         const tsmArgs: string[] = [];
                                         for (const chunk of restoredChunks) {
                                             if (typeof chunk === 'string') {
-                                                tsmArgs.push(`"${chunk}"`);
+                                                // Check if this is a JSX placeholder
+                                                const jsxMatch = chunk.match(/^__JSX_EXPRESSION_(\d+)__$/);
+                                                if (jsxMatch) {
+                                                    const jsxIndex = parseInt(jsxMatch[1]);
+                                                    const jsxExpr = context.jsxExpressions[jsxIndex];
+                                                    if (jsxExpr && jsxExpr.expression) {
+                                                        // Parse the JSX expression to get component name and props
+                                                        const parsedJSX = parseJSXExpressionToTSMComponent(jsxExpr.expression);
+                                                        if (parsedJSX) {
+                                                            // Replace with actual JSX component call
+                                                            tsmArgs.push(`${parsedJSX.name}(${propsToObjectString(parsedJSX.attributes)})`);
+                                                        } else {
+                                                            // Fallback to placeholder if JSX parsing fails
+                                                            tsmArgs.push(`"${chunk}"`);
+                                                        }
+                                                    } else {
+                                                        // Fallback to placeholder if JSX expression not found
+                                                        tsmArgs.push(`"${chunk}"`);
+                                                    }
+                                                } else {
+                                                    tsmArgs.push(`"${chunk}"`);
+                                                }
                                             } else if (Array.isArray(chunk)) {
                                                 if (chunk.length === 1 && typeof chunk[0] === 'string') {
                                                     // This is a runtime interpolation - treat as variable reference

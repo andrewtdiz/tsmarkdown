@@ -8,15 +8,15 @@ tags: [overview, introduction, typescript, markdown, beginner]
 
 TS Markdown is a file format and runtime for writing type-safe, component-based markdown.
 
-Instead of writing messy string concatenation or template literals, you write **React-style components** with full **type checking** and **auto-completion**. 
+Instead of writing messy string concatenation or template literals, write **Reusable**, **type-safe** React-style markdown components.
 
-The output is clean Markdown, but writing it feels like building a React app.
+The output is clean Markdown, but writing it feels like JSX.
 
 Since there's no render cycle, components are just pure functions.
 
 ### Example:
 
-```tsx
+```typescript
 function UserProfile({ user }: UserProfileProps) {
   const { name, role, yearsOfExperience, skills } = user;
 
