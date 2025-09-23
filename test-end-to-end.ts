@@ -20,6 +20,7 @@ import { Dashboard } from "./components/Dashboard";
 import { getData } from "./api/getData";
 
 const VERSION_NUMBER = "1.0.0";
+const someBool = false;
 
 async function TestComponent() {
   const { data, error, timedout } = await getData();

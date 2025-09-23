@@ -130,10 +130,8 @@ function classifyExpression(expression: string): 'conditional' | 'ternary' | 'js
             return 'conditional';
         }
     }
-
     // Check for JSX pattern: contains < and > or JSX elements
-    if (trimmed.includes('<') && trimmed.includes('>')) {
-        console.log('DEBUG: Classified as jsx:', trimmed);
+    if (trimmed.includes('<@') && trimmed.includes('>')) {
         return 'jsx';
     }
 
@@ -143,12 +141,10 @@ function classifyExpression(expression: string): 'conditional' | 'ternary' | 'js
         const questionIndex = trimmed.indexOf('?');
         const colonIndex = trimmed.lastIndexOf(':');
         if (colonIndex > questionIndex) {
-            console.log('DEBUG: Classified as ternary:', trimmed);
             return 'ternary';
         }
     }
 
-    console.log('DEBUG: Classified as interpolation:', trimmed);
     return 'interpolation';
 }
 
@@ -326,12 +322,10 @@ function cleanParenthesesAndWhitespace(value: string): string {
 
 // Helper function to parse nested ternary expressions
 function parseNestedTernary(expression: string): { condition: string; trueValue: string; falseValue: string } {
-    console.log('DEBUG: parseNestedTernary input:', expression);
 
     // For complex expressions with function calls, arrow functions, etc.,
     // don't try to parse as ternary - let it be handled as regular interpolation
     if (expression.includes('=>') || expression.includes('.map(') || expression.includes('.filter(')) {
-        console.log('DEBUG: Complex expression detected, skipping ternary parsing');
         return { condition: '', trueValue: '', falseValue: '' };
     }
 
@@ -565,20 +559,14 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
 
                 case 'ternary':
                     // Parse ternary logic with proper nesting support
-                    console.log('DEBUG: Ternary expression:', expression);
                     const { condition, trueValue, falseValue } = parseNestedTernary(expression);
-                    console.log('DEBUG: Ternary parsed - condition:', condition, 'trueValue:', trueValue, 'falseValue:', falseValue);
                     if (condition && trueValue && falseValue) {
-                        console.log('DEBUG: Processing ternary with condition:', condition);
                         // Process the true and false values through the parsing pipeline
                         const processValue = (value: string): Chunk[] => {
-                            console.log('DEBUG: Processing ternary value:', value);
                             if (value.trim()) {
                                 const { protectedContent, codeBlocks } = protectCodeBlocks(value);
                                 const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
-                                console.log('DEBUG: Normalized ternary value:', normalizedMarkdown);
                                 const chunks = parseContent(normalizedMarkdown, context);
-                                console.log('DEBUG: Ternary value chunks:', chunks);
                                 return restoreCodeBlocks(chunks, codeBlocks);
                             }
                             return [];
@@ -636,9 +624,7 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
                                 if (value.trim()) {
                                     const { protectedContent, codeBlocks } = protectCodeBlocks(value);
                                     const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
-                                    console.log('DEBUG: Normalized ternary value:', normalizedMarkdown);
                                     const chunks = parseContent(normalizedMarkdown, context);
-                                    console.log('DEBUG: Ternary value chunks:', chunks);
                                     return restoreCodeBlocks(chunks, codeBlocks);
                                 }
                                 return [];
@@ -667,11 +653,9 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
 
                 case 'interpolation':
                 default:
-                    console.log('DEBUG: Processing as interpolation:', expression);
                     // Check if this interpolation contains JSX
                     let processedExpression = expression;
                     if (processedExpression.includes('<@') && processedExpression.includes('/>')) {
-                        console.log('DEBUG: Found JSX in interpolation, processing...');
                         // Parse JSX expressions within the interpolation
                         const jsxRegex = /<@(\w+)([^/>]*)\/>/g;
                         let jsxMatch;

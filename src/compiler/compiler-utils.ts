@@ -122,10 +122,12 @@ export function generateCompleteFunction(parsed: ParsedMDX): string {
     const functionBody = `${parsed.typescript}
     ${returnStatement}`;
 
-    const asyncKeyword = parsed.isAsync ? 'async ' : '';
-    const returnType = parsed.isAsync ? 'Promise<string>' : 'string';
+    const asyncKeyword = parsed.isAsync ? "async " : "";
+    const returnType = parsed.isAsync ? "Promise<string>" : "string";
+    const exportedKeyword = parsed.functionInfo.isExported ? "export " : "";
+    const defaultExportKeyword = parsed.functionInfo.isDefaultExport ? "default " : "";
 
-    return `export ${asyncKeyword}function ${parsed.functionName}(${functionParams}): ${returnType} {
+    return `${exportedKeyword}${defaultExportKeyword}${asyncKeyword}function ${parsed.functionName}(${functionParams}): ${returnType} {
   ${functionBody}
 }`;
 }

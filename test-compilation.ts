@@ -1,7 +1,5 @@
 import { execFileSync, execSync } from "node:child_process";
 import { compileFullFile } from "./src/compiler";
-import { parseJSXExpressionToTSMComponent } from "./src/parser/interpolations";
-
 
 const completeTypeScriptSource = `
 import {Dashboard} from "./components/Dashboard";
@@ -9,24 +7,41 @@ import { getData } from "./api/getData";
 
 const VERSION_NUMBER = "1.0.0";
 
-async function TestComponent() {
-   const someNumber = 3;
-   const names = ["John", "Jane", "Jim"];
+function LocalComponent() {
+  const someNumber = 30;
+
+  return <@Dashboard />
+}
+
+export function TestComponent() {
+  const someNumber = 3;
+  const names = ["John", "Jane", "Jim"];
+  const lowerCaseNames = names.map(name => name.toLowerCase());
+  const anotherVariable = "Another Variable";
+  const someBool = someNumber > 5;
+
   return (
     # Version
     ## Here i am
     * {{ VERSION_NUMBER }} *
     Test: More content *bolded*
 
-    <@Dashboard />
+    <@LocalComponent />
 
     <@Dashboard title="My Dashboard" showHeader={true} />
+    
+    {{ names.length > 0 ? (
+      Names: {{ names.join(", ") }}
+    ) : (
+      No names
+    )}}
 
-    {{ someNumber > 5 ? (
+    {{ someBool ? (
       Some number is greater than 5! It's {{ someNumber }}
     ) : (
       Some number is less than 5, it's {{ someNumber }}
     )}}
+    {{ someNumber > 10 ? Some number is greater than 10! : Some number is less than 10, it's {{ someNumber }} }}
     More Content
   )
 }

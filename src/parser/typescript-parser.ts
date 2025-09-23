@@ -3,6 +3,7 @@
 import * as ts from 'typescript';
 import { locateComponent, splitComponent, type ComponentSplit, type ReturnStatement, extractMultipleReturnContent } from './component-scanner';
 import type { ParseContext } from './types';
+import { FunctionInfo } from '../parser';
 
 // Shared compiler infrastructure for better performance
 const sharedCompilerHost = ts.createCompilerHost({});
@@ -767,27 +768,9 @@ function extractTypesFromAST(node: ts.Node, types: string[], interfaces: string[
 /**
  * Extracts exported functions from the TypeScript AST
  */
-export function extractFunctions(ast: ts.SourceFile): Array<{
-    name: string;
-    isExported: boolean;
-    isDefaultExport: boolean;
-    isAsync: boolean;
-    parameters: Array<{ name: string; type: string; required: boolean; defaultValue?: string }>;
-    returnType?: string;
-    line: number;
-    column: number;
-}> {
-    const exportedFunctions: Array<{
-        name: string;
-        isExported: boolean;
-        isDefaultExport: boolean;
-        isAsync: boolean;
-        parameters: Array<{ name: string; type: string; required: boolean; defaultValue?: string }>;
-        returnType?: string;
-        line: number;
-        column: number;
-    }> = [];
-
+export function extractFunctions(ast: ts.SourceFile): FunctionInfo[] {
+    const exportedFunctions: FunctionInfo[] = []
+    
     function visit(node: ts.Node): void {
         // Check for function declarations
         if (ts.isFunctionDeclaration(node)) {

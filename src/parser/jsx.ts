@@ -20,6 +20,7 @@ export function processJSXElements(
     let processedContent = content;
     const jsxElementRegex = /<(@?)(\w+)([^/>]*)\/>/g;
 
+    console.log('DEBUG: processedContent:', processedContent);
     processedContent = processedContent.replace(jsxElementRegex, (match, atSymbol, componentName, props) => {
         // Parse props to extract JSX expressions within them
         const propMatches = props.match(/(\w+)=\{([^}]+)\}/g) || [];

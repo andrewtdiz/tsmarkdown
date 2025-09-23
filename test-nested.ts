@@ -1,6 +1,5 @@
 import { execFileSync, execSync } from "node:child_process";
 import { compileFullFile } from "./src/compiler";
-import { parseJSXExpressionToTSMComponent } from "./src/parser/interpolations";
 
 
 const completeTypeScriptSource = `

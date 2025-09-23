@@ -64,17 +64,13 @@ function reconstructTernary(arr: any[]): string {
 }
 
 function processNestedArrays(chunk: any[]): string {
-    console.log("PROCESSING NESTED: ", chunk);
-
     // First, check if this is a ternary expression pattern
     if (isTernaryArray(chunk)) {
-        console.log("DETECTED TERNARY PATTERN: ", chunk);
         return reconstructTernary(chunk);
     }
 
     // Check if any element is an array (nested)
     const hasNestedArrays = chunk.some(c => Array.isArray(c));
-    console.log("HAS NESTED ARRAYS: ", hasNestedArrays);
 
     if (!hasNestedArrays) {
         // No nested arrays, just join with empty string

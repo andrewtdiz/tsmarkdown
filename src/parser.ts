@@ -6,9 +6,20 @@ import { protectCodeBlocks, restoreCodeBlocks } from "./parser/code-protection";
 import type { Chunk } from "./runtime/tsm-runtime";
 import { TSMComponentAttribute } from "./parser/tsm-ast";
 
+export interface FunctionInfo {
+    name: string;
+    isExported: boolean;
+    isDefaultExport: boolean;
+    isAsync: boolean;
+    parameters: Array<{ name: string; type: string; required: boolean; defaultValue?: string }>;
+    returnType?: string;
+    line: number;
+    column: number;
+}
 
 export interface ParsedMDX {
   imports: string[];
+  functionInfo: FunctionInfo;
   functionName: string;
   functionParams: string[];
   isAsync: boolean;

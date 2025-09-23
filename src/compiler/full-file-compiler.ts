@@ -183,10 +183,8 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
     const globalTemplates: Array<any> = [];
 
     try {
-        // Preprocess MDX syntax within functions first
         const preprocessedSource = preprocessMDXInFunctions(source);
 
-        // Use TypeScript compiler API with the preprocessed source
         const sourceFile = ts.createSourceFile(
             'input.ts',
             preprocessedSource,
@@ -194,14 +192,11 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
             true
         );
 
-        // First, process all global template syntax outside of functions
         const { processedSource, templates } = await processGlobalTemplates(sourceFile);
-
 
         // Store the global templates
         globalTemplates.push(...templates);
 
-        // Extract variable values from the processed source for use in function processing
         const processedSourceFile = ts.createSourceFile(
             'processed.ts',
             processedSource,
@@ -234,6 +229,7 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
 
                 const parsed: ParsedMDX = {
                     imports: [],
+                    functionInfo: functionInfo,
                     functionName: functionInfo.name,
                     functionParams: functionInfo.parameters.map(p => p.name),
                     isAsync: functionInfo.isAsync,
@@ -278,6 +274,11 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
             errors
         };
     }
+}
+
+function isBooleanLiteral(node: ts.Node): node is ts.BooleanLiteral {
+    return node.kind === ts.SyntaxKind.TrueKeyword ||
+           node.kind === ts.SyntaxKind.FalseKeyword;
 }
 
 /**
@@ -331,7 +332,7 @@ function extractVariableValues(sourceFile: ts.SourceFile): Map<string, any> {
                             } else if (ts.isNumericLiteral(declaration.initializer)) {
                                 const value = parseFloat(declaration.initializer.text);
                                 variableValues.set(variableName, value);
-                            } else if (ts.isBooleanLiteral(declaration.initializer)) {
+                            } else if (isBooleanLiteral(declaration.initializer)) {
                                 const value = declaration.initializer.kind === ts.SyntaxKind.TrueKeyword;
                                 variableValues.set(variableName, value);
                             } else if (ts.isObjectLiteralExpression(declaration.initializer)) {
@@ -344,7 +345,7 @@ function extractVariableValues(sourceFile: ts.SourceFile): Map<string, any> {
                                             obj[propName] = prop.initializer.text;
                                         } else if (ts.isNumericLiteral(prop.initializer)) {
                                             obj[propName] = parseFloat(prop.initializer.text);
-                                        } else if (ts.isBooleanLiteral(prop.initializer)) {
+                                        } else if (isBooleanLiteral(prop.initializer)) {
                                             obj[propName] = prop.initializer.kind === ts.SyntaxKind.TrueKeyword;
                                         }
                                     }

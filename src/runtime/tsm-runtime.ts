@@ -13,7 +13,7 @@
 export const __ERASE_PREV_LINE = Symbol('__ERASE_PREV_LINE');
 
 // Core chunk type that can be processed by the TSM runtime
-export type Chunk = string | null | undefined | false | Iterable<Chunk> | typeof __ERASE_PREV_LINE | '\n';
+export type Chunk = string | number | null | undefined | false | Iterable<Chunk> | typeof __ERASE_PREV_LINE | '\n';
 
 /**
  * Main TSM runtime function that processes an array of chunks and returns a string
@@ -22,7 +22,6 @@ export type Chunk = string | null | undefined | false | Iterable<Chunk> | typeof
  * @returns Processed string with proper whitespace handling
  */
 export function __tsm(chunks: Array<Chunk>): string {
-    console.log("TSM CHUNKS: ", chunks);
     const buffer: string[] = [];
     const flattenedChunks = __tsmJoin(chunks);
 
