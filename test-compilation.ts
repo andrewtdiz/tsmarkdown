@@ -13,6 +13,26 @@ function LocalComponent() {
   return <@Dashboard />
 }
 
+function OlItem({ item, index }: { item: string, index: number }) {
+  return (
+    {{ index + 1 }}. {{ item }}
+  )
+}
+
+function List({ items, withAnd, separator }: { items: string[]; withAnd: boolean, separator: string }) {
+  const beginningItems = items.slice(0, -1);
+  const lastItem = items[items.length - 1];
+  const sep = separator || ',';
+  const separatorString = sep + ' '
+  const someStr = beginningItems.join(separatorString) + (withAnd ? ' and ' : separatorString) + lastItem
+  
+  return (
+    {{ items.length === 0 ? Empty : (
+      <@OlItem item={item} index={index} />
+    )}}
+  )
+}
+
 export function TestComponent() {
   const someNumber = 3;
   const names = ["John", "Jane", "Jim"];
@@ -22,22 +42,21 @@ export function TestComponent() {
 
   return (
     # Version
-    ## Here i am
+    ## Here is some content
     * {{ VERSION_NUMBER }} *
-    Test: More content *bolded*
+    Test: More content *bolded* and **italicized** or __underlined__
 
     <@LocalComponent />
 
     <@Dashboard title="My Dashboard" showHeader={true} />
-    
-    {{ names.length > 0 ? (
-      Names: {{ names.join(", ") }}
-    ) : (
-      No names
-    )}}
+
+    ## Users
+    <@List items={names} separator=" |" />
+
+    Some number x 5: {{ someNumber * 5 }}
 
     {{ someBool ? (
-      Some number is greater than 5! It's {{ someNumber }}
+      Some number is greater than 5! Here it is: {{ someNumber }}
     ) : (
       Some number is less than 5, it's {{ someNumber }}
     )}}
@@ -50,18 +69,17 @@ export function TestComponent() {
 const totalStart = performance.now();
 const fullFileResult = await compileFullFile(completeTypeScriptSource);
 
-console.log("FULL FILE RESULT: ", fullFileResult.transpiledFile);
 
 const fileToRun = `
 import { __tsm } from "./src/runtime/tsm-runtime";
 
 ${fullFileResult.transpiledFile}
 
-(async () => {
+(() => {
   try {
-    const out = await TestComponent();
-    console.log("\\n=== Runtime Output ===");
-    console.log(out);
+    const out = TestComponent();
+    Bun.write("compiled-test.md", out);
+
   } catch (err) {
     console.error("Runtime error:", err);
     process.exitCode = 1;
@@ -71,13 +89,8 @@ ${fullFileResult.transpiledFile}
 
 Bun.write("compiled-test.ts", fileToRun);
 
-const execStart = performance.now();
 execFileSync("bun", ["compiled-test.ts"], { stdio: "inherit" });
-const execEnd = performance.now();
-console.log(`Execution time: ${(execEnd - execStart).toFixed(2)}ms`);
-
-const file = Bun.file("compiled-test.ts");
-// await file.delete();
 
 const totalEnd = performance.now();
-console.log(`Total test time: ${(totalEnd - totalStart).toFixed(2)}ms`);
+console.log(`Compiled in: ${(totalEnd - totalStart).toFixed(2)}ms`);
+

@@ -183,10 +183,13 @@ export function generateReturnStatements(parsed: ParsedMDX): string {
             const processedChunks: Chunk[][] = [];
             let currentChunk: Chunk[] = [];
             for (const chunk of chunks) {
-                if (chunk === "'\\n'") {
+                const isCurrentChunkEmptyString = currentChunk.length === 1 && currentChunk.join('') === '""';
+                if (chunk === "'\\n'" && !isCurrentChunkEmptyString) {
                     currentChunk.push(chunk);
                     processedChunks.push(currentChunk);
                     currentChunk = [];
+                } else if (chunk === '""') {
+                    currentChunk.push(chunk);
                 } else {
                     currentChunk.push(chunk);
                 }

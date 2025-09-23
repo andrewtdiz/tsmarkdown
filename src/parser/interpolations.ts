@@ -624,7 +624,10 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
                                 if (value.trim()) {
                                     const { protectedContent, codeBlocks } = protectCodeBlocks(value);
                                     const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
+                                    console.log('DEBUG: Normalized markdown:', normalizedMarkdown);
+                                    console.log('DEBUG: Context:', context);
                                     const chunks = parseContent(normalizedMarkdown, context);
+                                    console.log('DEBUG: Processed ternary value:', chunks);
                                     return restoreCodeBlocks(chunks, codeBlocks);
                                 }
                                 return [];
