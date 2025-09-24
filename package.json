@@ -2,16 +2,12 @@
   "name": "tsmarkdown",
   "version": "0.1.0",
   "description": "A type-safe, component-based markdown engine with TypeScript integration",
-  "main": "dist/index.js",
+  "main": "src/index.ts",
   "type": "module",
   "exports": {
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    },
-    "./testing": {
-      "import": "./dist/testing-utilities.js",
-      "types": "./dist/testing-utilities.d.ts"
     }
   },
   "files": [
@@ -20,8 +16,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "bun run build:tsc",
-    "build:tsc": "tsc",
+    "build": "bun tsc",
     "prepublishOnly": "bun run build",
     "test": "bun test",
     "dev": "bun run build:tsc --watch",

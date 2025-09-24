@@ -1,6 +1,7 @@
 import { resolve } from 'path';
 import { CompiledTSmd, compile } from '../compiler';
 import { parseTSmd } from '../parser';
+import { readFileSync } from 'fs';
 
 export interface RenderContext {
     [key: string]: any;
@@ -24,7 +25,7 @@ export async function loadDependencies(dependencies: string[], basePath: string,
                 // Try to find the component file
                 const componentPath = await resolveComponentPath(componentName, basePath);
                 if (componentPath) {
-                    const componentContent = await Bun.file(componentPath).text();
+                    const componentContent = readFileSync(componentPath, 'utf8');
                     const parsed = parseTSmd(componentContent);
                     const compiled = compile(parsed);
                     componentRegistry[componentName] = compiled;
@@ -41,7 +42,7 @@ export async function loadDependencies(dependencies: string[], basePath: string,
     }
 }
 
-export async function resolveComponentPath(componentName: string, basePath: string): Promise<string | null> {
+export function resolveComponentPath(componentName: string, basePath: string): string | null {
     // Try different possible paths for the component
     const possiblePaths = [
         resolve(basePath, `${componentName}.tsmd`),
@@ -54,7 +55,7 @@ export async function resolveComponentPath(componentName: string, basePath: stri
 
     for (const path of possiblePaths) {
         try {
-            await Bun.file(path).exists(); // Test if file exists
+            readFileSync(path);
             return path;
         } catch (error) {
             // Continue to next path
