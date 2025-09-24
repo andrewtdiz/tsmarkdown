@@ -12,10 +12,7 @@ import { extractFunctions } from '../parser/typescript-parser';
 import { parseContent } from '../parser/pipeline';
 import { protectCodeBlocks, restoreCodeBlocks } from '../parser/code-protection';
 import { normalizeIndentation } from '../renderer/string-helpers';
-import { convertJSXToFunctionCalls } from '../renderer/template-parsing';
 import { Chunk, __tsm } from '../runtime/tsm-runtime';
-import { render } from '../renderer';
-import { createSafeContext } from '../renderer/typescript-runtime';
 import { TSMComponentAttribute } from '../parser/tsm-ast';
 import { parseJSXExpressionToTSMComponent } from '../parser/interpolations';
 
@@ -244,7 +241,6 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
                         `interface ${functionInfo.name}Props {\n  ${functionInfo.parameters.map(p => `${p.name}: ${p.type}${p.required ? '' : '?'}`).join(';\n  ')}\n}` : '',
                     parameterTypes: functionInfo.parameters
                 };
-
                 const compiled = compile(parsed);
                 functions.push({ functionInfo, compiled });
             } catch (error: any) {
@@ -275,7 +271,7 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
 
 function isBooleanLiteral(node: ts.Node): node is ts.BooleanLiteral {
     return node.kind === ts.SyntaxKind.TrueKeyword ||
-           node.kind === ts.SyntaxKind.FalseKeyword;
+        node.kind === ts.SyntaxKind.FalseKeyword;
 }
 
 /**
@@ -871,7 +867,8 @@ function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sour
     const sourceText = sourceFile.getFullText();
     let rawContent = '';
 
-    if (ts.isParenthesizedExpression(returnNode.expression)) {
+    if (ts.isParenthesizedExpression(returnNode.expression) || returnNode.expression.getText(sourceFile).trim().startsWith("(") ) {
+    // if (ts.isParenthesizedExpression(returnNode.expression) ) {
         const start = returnNode.expression.getStart();
 
         let parenCount = 0;
@@ -921,8 +918,6 @@ function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sour
         rawContent = sourceText.slice(returnNode.expression.getStart(), returnNode.expression.getEnd());
     }
 
-    rawContent = rawContent.trim();
-
     const lines = rawContent.split('\n');
     if (lines.length > 1) {
         let minIndent = Infinity;
@@ -941,7 +936,21 @@ function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sour
     }
 
     const { protectedContent, codeBlocks } = protectCodeBlocks(rawContent);
-    const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
+
+    // Count leading and trailing newlines in the protected content
+    const leadingMatch = protectedContent.match(/^(\s*\n+)/);
+    const trailingMatch = protectedContent.match(/(\n+\s*)$/);
+
+    const leadingNewlines = leadingMatch ? (leadingMatch[1].match(/\n/g) || []).length : 0;
+    const trailingNewlines = trailingMatch ? (trailingMatch[1].match(/\n/g) || []).length : 0;
+
+    // Normalize indentation and trim, but preserve (n-1) newlines
+    const normalized = normalizeIndentation(protectedContent);
+    const trimmed = normalized.trim();
+    const leadingNewlineString = '\n'.repeat(Math.max(0, leadingNewlines - 1));
+    const trailingNewlineString = '\n'.repeat(Math.max(0, trailingNewlines - 1));
+
+    const normalizedMarkdown = leadingNewlineString + trimmed + trailingNewlineString;
 
     const interpolations: Array<{ placeholder: string; expression: string }> = [];
     const conditionalBlocks: Array<{ condition: string; content: any }> = [];

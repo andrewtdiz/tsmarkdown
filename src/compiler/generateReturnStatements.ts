@@ -113,6 +113,72 @@ function processNestedArrays(chunk: any[]): string {
     return joinedExpression;
 }
 
+type QuoteStyle = "auto" | "double" | "single" | "backtick";
+
+interface EncodeOpts {
+    style?: QuoteStyle;          // "auto" tries to avoid escaping
+    allowTemplate?: boolean;     // if false, avoid backticks or escape ${}
+    multilineOK?: boolean;       // if false and not backtick, \n will be escaped
+}
+
+function encodeStringLiteral(text: string, {
+    style = "auto",
+    allowTemplate = false,
+    multilineOK = true,
+}: EncodeOpts = {}): string {
+    const hasDouble = text.includes('"');
+    const hasSingle = text.includes("'");
+    const hasBacktick = text.includes("`");
+    const hasInterp = text.includes("${");
+
+    // Choose wrapper
+    let wrapper: '"' | "'" | "`";
+    if (style === "double") wrapper = '"';
+    else if (style === "single") wrapper = "'";
+    else if (style === "backtick") wrapper = "`";
+    else {
+        // auto: prefer a wrapper that requires the least escaping
+        // 1) prefer double if no "
+        // 2) else prefer single if no '
+        // 3) else prefer backtick if allowed and safe
+        // 4) else fall back to double and escape
+        if (!hasDouble) wrapper = '"';
+        else if (!hasSingle) wrapper = "'";
+        else if (!hasBacktick && allowTemplate && !hasInterp) wrapper = "`";
+        else wrapper = '"';
+    }
+
+    // If we picked backticks but template interpolation is present and we don't allow it, force escape or switch
+    if (wrapper === "`" && (!allowTemplate || hasInterp)) {
+        // Safer to switch to a quote and escape
+        wrapper = hasDouble ? "'" : '"';
+    }
+
+    // Escape content
+    let body = text
+        .replace(/\\/g, "\\\\")      // backslashes first
+        .replace(/\r/g, "\\r")
+        .replace(/\t/g, "\\t");
+
+    if (wrapper !== "`" || !multilineOK) {
+        body = body.replace(/\n/g, "\\n");
+    }
+
+    if (wrapper === '"') {
+        body = body.replace(/"/g, '\\"');
+    } else if (wrapper === "'") {
+        body = body.replace(/'/g, "\\'");
+    } else {
+        // backtick: escape backticks; optionally neutralize ${}
+        body = body.replace(/`/g, "\\`");
+        if (!allowTemplate) {
+            body = body.replace(/\$\{/g, "\\${");
+        }
+    }
+
+    return `${wrapper}${body}${wrapper}`;
+}
+
 export function generateReturnStatements(parsed: ParsedMDX): string {
     const conditionalReturns: string[] = [];
     let defaultReturn: string | null = null;
@@ -134,7 +200,8 @@ export function generateReturnStatements(parsed: ParsedMDX): string {
                         } else if (chunk === '\n') {
                             chunks.push("'\\n'");
                         } else if (typeof chunk === 'string') {
-                            let includeQuotes = true;
+                            let includeQuotes = true
+
                             // Replace JSX expression placeholders with actual expressions
                             let processedChunk = chunk;
                             if (chunk.includes('__JSX_EXPRESSION_')) {
@@ -146,7 +213,11 @@ export function generateReturnStatements(parsed: ParsedMDX): string {
                                 });
                                 includeQuotes = false;
                             }
-                            chunks.push(includeQuotes ? `"${processedChunk}"` : processedChunk);
+                            const literal = includeQuotes
+                                ? encodeStringLiteral(processedChunk, { style: "auto", allowTemplate: false })
+                                : processedChunk;
+
+                            chunks.push(literal);
                         } else if (Array.isArray(chunk)) {
                             // TSMInterpolations should be evaluated by TypeScript as expressions
                             // Process nested arrays with proper ternary handling

@@ -1,5 +1,0 @@
-function OlItem({ item, index }: { item: string, index: number }) {
-  return (
-    {{ index + 1 }}. {{ item }}
-  )
-}

@@ -37,6 +37,8 @@ export function __tsm(chunks: Array<Chunk>): string {
             buffer.push('\n');
         } else if (typeof chunk === 'string') {
             buffer.push(chunk);
+        } else if (typeof chunk === "number") {
+            buffer.push(String(chunk));
         } else if (chunk && typeof chunk[Symbol.iterator] === 'function') {
             // Check if this is a runtime interpolation array [ "expression" ]
             const chunkArray = Array.from(chunk);
@@ -67,6 +69,8 @@ export function __tsm(chunks: Array<Chunk>): string {
                         buffer.push('\n');
                     } else if (typeof item === 'string') {
                         buffer.push(item);
+                    } else if (typeof item === 'number') {
+                        
                     } else if (item && typeof item[Symbol.iterator] === 'function') {
                         // Handle nested iterables recursively
                         for (const nestedItem of item) {
@@ -129,6 +133,8 @@ export function __tsmJoin(parts: Array<Chunk>): Array<Chunk> {
             }
         } else if (part === __ERASE_PREV_LINE) {
             result.push(part);
+        } else if (typeof part === 'number') {
+            result.push(String(part));
         } else if (part && typeof part[Symbol.iterator] === 'function') {
             // Recursively flatten iterable chunks
             const flattened = __tsmJoin(Array.from(part));
