@@ -6,10 +6,7 @@
 
 // Core exports
 export { transpile } from './compiler/full-file-compiler';
-import { watch } from './utils/watch';
 export { watch } from './utils/watch';
 export * from './runtime/tsm-runtime';
 
 export * from './utils/index';
-
-watch();

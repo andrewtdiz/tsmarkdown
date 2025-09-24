@@ -10,8 +10,12 @@
       "types": "./dist/index.d.ts"
     }
   },
+  "bin": {
+    "tsmarkdown": "./dist/bin/tsmarkdown.js"
+  },
   "files": [
     "dist/**/*",
+    "bin/**/*",
     "README.md",
     "LICENSE"
   ],
@@ -23,7 +27,8 @@
     "clean": "rm -rf dist",
     "lint": "bun run build:tsc --noEmit",
     "version": "bun run build && git add -A dist",
-    "postversion": "git push && git push --tags"
+    "postversion": "git push && git push --tags",
+    "tsmarkdown": "bun run bin/tsmarkdown.ts"
   },
   "keywords": [
     "tsmd",

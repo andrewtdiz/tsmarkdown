@@ -8,7 +8,6 @@
 
 import { parseTSmd, ParsedTSmd } from '../parser';
 import { compile, CompiledTSmd } from '../compiler';
-import { render } from '../renderer';
 import { createSafeContext } from './typescript-runtime';
 import { __tsm } from '../runtime/tsm-runtime';
 import { processInterpolations } from './render-utils';
@@ -278,29 +277,4 @@ export class DirectRenderer {
 export async function renderDirect(functionString: string, props: Record<string, any> = {}, options: DirectRenderOptions = {}): Promise<DirectRenderResult> {
     const renderer = new DirectRenderer(options);
     return renderer.render(functionString, props);
-}
-
-/**
- * Convenience function for direct rendering without TypeScript execution
- * This creates a minimal execution context that skips TypeScript entirely
- */
-export async function renderDirectSimple(functionString: string, props: Record<string, any> = {}): Promise<string> {
-    try {
-        const parsed = parseTSmd(functionString);
-
-        // Create a minimal context with just the props
-        const context = {
-            ...props,
-            __tsm,
-            Math
-        };
-
-        // Compile and render
-        const compiled = compile(parsed);
-        const renderResult = await render(compiled, context, props);
-
-        return renderResult.content;
-    } catch (error) {
-        throw new Error(`Direct rendering failed: ${error}`);
-    }
 }
