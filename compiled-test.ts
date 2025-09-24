@@ -1,6 +1,8 @@
 
 import { __tsm } from "./src/runtime/tsm-runtime";
 
+
+    
 function Test(): string {
   const name = 'Test';
     return __tsm([
@@ -11,10 +13,6 @@ function Test(): string {
 (async () => {
   try {
     const props = {};
-    const context = {};
-    
-    // Make context available globally
-    Object.assign(globalThis, context);
     
     const out = await Test(props);
     Bun.write("compiled-test.md", out);

@@ -11,7 +11,7 @@ export interface TSMDTestCase {
   name: string;
   source: string;
   props?: Record<string, any>;
-  context?: Record<string, any>;
+  context?: string;
   expectedOutput?: string;
   expectedLines?: string[];
   expectedErrors?: string[];
@@ -30,20 +30,18 @@ export class TSMDTestRunner {
       }
 
       const props = testCase.props || {};
-      const context = testCase.context || {};
+      const context = testCase?.context || "";
 
       const fileToRun = `
 import { __tsm } from "./src/runtime/tsm-runtime";
 
+${context}
+    
 ${fullFileResult.transpiledFile}
 
 (async () => {
   try {
     const props = ${JSON.stringify(props)};
-    const context = ${JSON.stringify(context)};
-    
-    // Make context available globally
-    Object.assign(globalThis, context);
     
     const out = await Test(props);
     Bun.write("compiled-test.md", out);
@@ -144,7 +142,7 @@ export class TSMDTestCaseBuilder {
       name,
       source,
       props: {},
-      context: {}
+      context: ""
     };
   }
 
@@ -153,8 +151,8 @@ export class TSMDTestCaseBuilder {
     return this;
   }
 
-  withContext(context: Record<string, any>): this {
-    this.testCase.context = { ...this.testCase.context, ...context };
+  withContext(context: string): this {
+    this.testCase.context = context;
     return this;
   }
 

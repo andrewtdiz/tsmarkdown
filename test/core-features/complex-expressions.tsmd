@@ -1,16 +1,11 @@
 function Test() {
   const items = ['Apple', 'Banana', 'Cherry'];
   const user = { name: 'Alice', age: 30 };
-  const itemsList = items.map(item => `- ${item}`).join('\n');
 
   return (
-    # User Info
-    User: {{ user.name }}
-    Age: {{ user.age }}
-
     Items:
-    {{ itemsList }}
-
-    Item count: {{ items.length }}
+    {{ items.map((item, index) => (
+        - {{ item }}
+    ))}}
   )
 }

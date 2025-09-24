@@ -23,8 +23,8 @@ export async function loadAsset(modulePath: string, basePath?: string): Promise<
         }
 
         // Check if file exists
-        const file = Bun.file(fullPath);
-        if (!(await file.exists())) {
+        const file = readFileSync(fullPath);
+        if (!file) {
             return {
                 success: false,
                 error: `File not found: ${fullPath}`

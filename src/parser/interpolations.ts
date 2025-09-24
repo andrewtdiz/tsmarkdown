@@ -747,10 +747,7 @@ export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[]
                     // Handle conditional expressions like {{ cond && (content) }}
                     // Extract condition by finding the && pattern and getting text before it
                     const andMatch = interpolation.expression.match(/(.+?)\s*&&\s*\(/);
-                    console.log('DEBUG: andMatch:', andMatch);
-                    console.log('DEBUG: context.conditionalBlocks:', context.conditionalBlocks);
                     const conditionalIndex = andMatch ? context.conditionalBlocks.findIndex(cb => cb.condition === andMatch[1].trim()) : -1;
-                    console.log('DEBUG: conditionalIndex:', conditionalIndex);
                     if (conditionalIndex !== -1) {
                         const conditional = context.conditionalBlocks[conditionalIndex];
                         // Convert chunks to TSM runtime calls

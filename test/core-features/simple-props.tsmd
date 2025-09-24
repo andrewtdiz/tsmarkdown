@@ -1,7 +1,13 @@
 function Test({ items, withAnd }: { items: string[]; withAnd: boolean }) {
-  return (
-    {{ items.length === 0 ? (
+  
+  if (items.length === 0) {
+    return (
       Empty
-    ) : items.length === 1 ? items[0] : items.slice(0, -1).join(', ') + (withAnd ? ' and ' : ', ') + items[items.length - 1] }}
+    )
+  }
+  const itemsStr = items.length === 1 ? items[0] : items.slice(0, -1).join(', ') + (withAnd ? ' and ' : ', ') + items[items.length - 1]
+
+  return (
+    {{ itemsStr }}
   )
 }
