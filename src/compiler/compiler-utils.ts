@@ -1,4 +1,4 @@
-import { ParsedMDX } from "../parser";
+import { ParsedTSmd } from "../parser";
 import type { Chunk } from "../runtime/tsm-runtime";
 import { parseJSXProps, propsToObjectString } from "../renderer/string-helpers";
 import { TSMComponent, TSMComponentAttribute } from "../parser/tsm-ast";
@@ -25,23 +25,20 @@ export function extractDependencies(imports: string[]): string[] {
 
             // Skip TypeScript/JavaScript module imports - these are handled by the TypeScript runtime
             if (modulePath.endsWith('.ts') || modulePath.endsWith('.tsx') ||
-                modulePath.endsWith('.js') || modulePath.endsWith('.jsx') ||
-                modulePath.endsWith('.json') || modulePath.endsWith('.yaml') ||
-                modulePath.endsWith('.yml') || modulePath.endsWith('.css') ||
-                modulePath.endsWith('.md') || modulePath.endsWith('.txt')) {
+                modulePath.endsWith('.js') || modulePath.endsWith('.jsx')) {
                 continue; // Skip TypeScript/asset imports
             }
 
-            // Prohibit MDX imports
-            if (modulePath.endsWith('.mdx')) {
-                throw new Error('Cannot import MDX files directly. Use TypeScript entry points instead.');
+            // Prohibit TSmd imports
+            if (modulePath.endsWith('.tsmd')) {
+                throw new Error('Cannot import TSmd files directly. Use TypeScript entry points instead.');
             }
 
-            // For imports without extensions, we need to check if they're MDX components
+            // For imports without extensions, we need to check if they're TSmd components
             // Check if the path doesn't end with a file extension
             const hasFileExtension = /\.\w+$/.test(modulePath);
             if (!hasFileExtension) {
-                // This could be an MDX component import, so we'll extract the dependencies
+                // This could be an TSmd component import, so we'll extract the dependencies
                 // The component loading system will handle resolving the actual file
                 // Extract default and named imports as dependencies
                 const defaultMatch = importLine.match(/import\s+(\w+)\s+from/);
@@ -82,7 +79,7 @@ export function extractDependencies(imports: string[]): string[] {
     return dependencies;
 }
 
-export function compileTypeScript(parsed: ParsedMDX): string {
+export function compileTypeScript(parsed: ParsedTSmd): string {
     // Combine imports, props interface, and generate complete function
     const imports = parsed.imports.join('\n');
     const propsInterface = parsed.propsInterface || '';
@@ -94,7 +91,7 @@ export function compileTypeScript(parsed: ParsedMDX): string {
     return parts.join('\n\n').trim();
 }
 
-export function generateCompleteFunction(parsed: ParsedMDX): string {
+export function generateCompleteFunction(parsed: ParsedTSmd): string {
     if (!parsed.functionName) {
         return parsed.typescript; // Fallback to just the typescript code
     }

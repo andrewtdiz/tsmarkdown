@@ -13,7 +13,7 @@ const legacyWarnings = new Set<string>();
 function warnLegacySyntax(expression: string, line: number): void {
     const warning = `Legacy single-brace syntax detected at line ${line}: {${expression}}. Please migrate to double-brace syntax: {{${expression}}}`;
     if (!legacyWarnings.has(warning)) {
-        console.warn(`[Better MDX] ${warning}`);
+        console.warn(`[TSmd] ${warning}`);
         legacyWarnings.add(warning);
     }
 }

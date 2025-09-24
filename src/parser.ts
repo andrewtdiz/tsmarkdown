@@ -7,17 +7,17 @@ import type { Chunk } from "./runtime/tsm-runtime";
 import { TSMComponentAttribute } from "./parser/tsm-ast";
 
 export interface FunctionInfo {
-    name: string;
-    isExported: boolean;
-    isDefaultExport: boolean;
-    isAsync: boolean;
-    parameters: Array<{ name: string; type: string; required: boolean; defaultValue?: string }>;
-    returnType?: string;
-    line: number;
-    column: number;
+  name: string;
+  isExported: boolean;
+  isDefaultExport: boolean;
+  isAsync: boolean;
+  parameters: Array<{ name: string; type: string; required: boolean; defaultValue?: string }>;
+  returnType?: string;
+  line: number;
+  column: number;
 }
 
-export interface ParsedMDX {
+export interface ParsedTSmd {
   imports: string[];
   functionInfo: FunctionInfo;
   functionName: string;
@@ -34,7 +34,7 @@ export interface ParsedMDX {
   parameterTypes: Array<{ name: string; type: string; required: boolean; defaultValue?: string }>;
 }
 
-export function parseMDX(content: string): ParsedMDX {
+export function parseTSmd(content: string): ParsedTSmd {
   const imports: string[] = [];
   const interpolations: Array<{ placeholder: string; expression: string }> =
     [];

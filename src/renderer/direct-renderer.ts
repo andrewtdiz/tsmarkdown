@@ -6,8 +6,8 @@
  * of a provided function with props using the existing parser and renderer components.
  */
 
-import { parseMDX, ParsedMDX } from '../parser';
-import { compile, CompiledMDX } from '../compiler';
+import { parseTSmd, ParsedTSmd } from '../parser';
+import { compile, CompiledTSmd } from '../compiler';
 import { render } from '../renderer';
 import { createSafeContext } from './typescript-runtime';
 import { __tsm } from '../runtime/tsm-runtime';
@@ -36,11 +36,11 @@ export interface DirectRenderResult {
 }
 
 /**
- * Converts a function string and props directly to a ParsedMDX structure
+ * Converts a function string and props directly to a ParsedTSmd structure
  */
-export function functionToParsedMDX(functionString: string, props: Record<string, any> = {}): ParsedMDX {
+export function functionToParsedTSmd(functionString: string, props: Record<string, any> = {}): ParsedTSmd {
     // Parse the function content using the existing parser
-    return parseMDX(functionString);
+    return parseTSmd(functionString);
 }
 
 /**
@@ -65,11 +65,11 @@ export class DirectRenderer {
 
         try {
             // Step 1: Parse the function using existing parser
-            const parsed = parseMDX(functionString);
+            const parsed = parseTSmd(functionString);
             console.log('DEBUG: parsed.typescript:', JSON.stringify(parsed.typescript));
             console.log('DEBUG: parsed.markdown:', JSON.stringify(parsed.markdown));
 
-            // Step 2: Compile to CompiledMDX (this still generates TypeScript but we won't execute it)
+            // Step 2: Compile to CompiledTSmd (this still generates TypeScript but we won't execute it)
             const compiled = compile(parsed);
             console.log('DEBUG: compiled.template:', JSON.stringify(compiled.template));
             console.log('DEBUG: compiled.interpolations:', compiled.interpolations);
@@ -215,7 +215,7 @@ export class DirectRenderer {
     /**
      * Render template directly with context (without TypeScript execution)
      */
-    private async renderTemplate(compiled: CompiledMDX, context: Record<string, any>, props: Record<string, any>): Promise<{ content: string; errors: string[] }> {
+    private async renderTemplate(compiled: CompiledTSmd, context: Record<string, any>, props: Record<string, any>): Promise<{ content: string; errors: string[] }> {
         try {
             console.log('DEBUG: renderTemplate - template:', compiled.template);
             console.log('DEBUG: renderTemplate - context:', context);
@@ -286,7 +286,7 @@ export async function renderDirect(functionString: string, props: Record<string,
  */
 export async function renderDirectSimple(functionString: string, props: Record<string, any> = {}): Promise<string> {
     try {
-        const parsed = parseMDX(functionString);
+        const parsed = parseTSmd(functionString);
 
         // Create a minimal context with just the props
         const context = {

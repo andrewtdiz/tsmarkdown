@@ -6,7 +6,7 @@
  */
 
 import * as ts from 'typescript';
-import { ParsedMDX } from '../parser';
+import { ParsedTSmd } from '../parser';
 import { compile } from '../compiler';
 import { extractFunctions } from '../parser/typescript-parser';
 import { parseContent } from '../parser/pipeline';
@@ -17,10 +17,10 @@ import { TSMComponentAttribute } from '../parser/tsm-ast';
 import { parseJSXExpressionToTSMComponent } from '../parser/interpolations';
 
 /**
- * Preprocesses MDX syntax within functions to make them parseable by TypeScript
+ * Preprocesses TSmd syntax within functions to make them parseable by TypeScript
  */
-function preprocessMDXInFunctions(source: string): string {
-    // Find all return statements with MDX syntax and convert them to template literals
+function preprocessTSmdInFunctions(source: string): string {
+    // Find all return statements with TSmd syntax and convert them to template literals
     // This handles patterns like: return (content with {{ interpolation }})
 
     let processedSource = source;
@@ -84,15 +84,15 @@ function preprocessMDXInFunctions(source: string): string {
             // Extract the content between the parentheses
             const content = processedSource.slice(openParenIndex + 1, closeParenIndex);
 
-            // Check if the content contains MDX syntax AND hasn't already been converted to template literal
+            // Check if the content contains TSmd syntax AND hasn't already been converted to template literal
             // Exclude {{...}} syntax which should be handled by the new parsing system
-            const hasMDXSyntax = /(^#{1,6}\s)/m.test(content);
+            const hasTSmdSyntax = /(^#{1,6}\s)/m.test(content);
             const sourceBeforeReturn = processedSource.slice(returnStart, openParenIndex);
             const alreadyConvertedToTemplate = sourceBeforeReturn.includes('return `');
 
 
-            if (hasMDXSyntax && !alreadyConvertedToTemplate) {
-                // Convert MDX syntax to valid TypeScript template literal
+            if (hasTSmdSyntax && !alreadyConvertedToTemplate) {
+                // Convert TSmd syntax to valid TypeScript template literal
                 let templateContent = content
                     .trim()
                     // Escape backticks for template literals
@@ -180,7 +180,7 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
     const globalTemplates: Array<any> = [];
 
     try {
-        const preprocessedSource = preprocessMDXInFunctions(source);
+        const preprocessedSource = preprocessTSmdInFunctions(source);
 
         const sourceFile = ts.createSourceFile(
             'input.ts',
@@ -211,7 +211,7 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
                 // Extract the actual function content from the AST
                 const { typescript, returnStatements, interpolations, conditionalBlocks, ternaryExpressions, jsxExpressions } = extractFunctionContent(processedSourceFile, functionInfo.name);
 
-                // Create ParsedMDX for each function
+                // Create ParsedTSmd for each function
                 const markdownContent = returnStatements.length > 0 ? returnStatements[0].content : `# ${functionInfo.name} Content`;
 
                 const jsxExpressionsMapped = jsxExpressions
@@ -224,7 +224,7 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
                         props: expr.parsed.attributes
                     }));
 
-                const parsed: ParsedMDX = {
+                const parsed: ParsedTSmd = {
                     imports: [],
                     functionInfo: functionInfo,
                     functionName: functionInfo.name,
@@ -383,7 +383,7 @@ async function processGlobalTemplates(sourceFile: ts.SourceFile): Promise<{ proc
                     const variableName = declaration.name.text;
                     const isExported = node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.ExportKeyword) || false;
 
-                    // Get the raw source text for the initializer, since TypeScript parser may truncate MDX syntax
+                    // Get the raw source text for the initializer, since TypeScript parser may truncate TSmd syntax
                     const sourceText = sourceFile.getFullText();
                     const initializerStart = declaration.initializer.getStart();
                     const initializerEnd = declaration.initializer.getEnd();
@@ -867,8 +867,8 @@ function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sour
     const sourceText = sourceFile.getFullText();
     let rawContent = '';
 
-    if (ts.isParenthesizedExpression(returnNode.expression) || returnNode.expression.getText(sourceFile).trim().startsWith("(") ) {
-    // if (ts.isParenthesizedExpression(returnNode.expression) ) {
+    if (ts.isParenthesizedExpression(returnNode.expression) || returnNode.expression.getText(sourceFile).trim().startsWith("(")) {
+        // if (ts.isParenthesizedExpression(returnNode.expression) ) {
         const start = returnNode.expression.getStart();
 
         let parenCount = 0;

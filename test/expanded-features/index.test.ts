@@ -1,15 +1,15 @@
 import { test, expect, describe } from 'bun:test';
-import { createExactMDXTest, ExactMDXTestRunner } from '../../src/exact-testing-utilities';
+import { createTSmdTest, ExactTSMDTestRunner } from '../../src/testing';
 
 describe('Expanded Features', () => {
-    const runner = new ExactMDXTestRunner();
+    const runner = new ExactTSMDTestRunner();
     describe('Template Interpolation', () => {
         test('should parse simple interpolations', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/simple-interpolation.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/simple-interpolation.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Simple interpolation parsing',
-                mdx
+                contents
             )
                 .expectExactLines(
                     'Hello World!'
@@ -17,19 +17,19 @@ describe('Expanded Features', () => {
                 .build();
 
             // For parsing tests, we'll just verify the structure exists
-            const { parseMDX } = await import('../../src/parser');
-            const result = parseMDX(mdx);
+            const { parseTSmd } = await import('../../src/parser');
+            const result = parseTSmd(contents);
             expect(result.interpolations).toHaveLength(1);
             expect(result.interpolations[0].expression).toBe('name');
             expect(result.markdown).toContain('__INTERPOLATION_0__');
         });
 
         test('should parse complex interpolations', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/complex-interpolation.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/complex-interpolation.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Complex interpolation parsing',
-                mdx
+                contents
             )
                 .expectExactLines(
                     'Items: apple, banana, cherry',
@@ -38,19 +38,19 @@ describe('Expanded Features', () => {
                 .build();
 
             // For parsing tests, we'll just verify the structure exists
-            const { parseMDX } = await import('../../src/parser');
-            const result = parseMDX(mdx);
+            const { parseTSmd } = await import('../../src/parser');
+            const result = parseTSmd(contents);
             expect(result.interpolations).toHaveLength(2);
             expect(result.interpolations[0].expression).toBe('items.join(\', \')');
             expect(result.interpolations[1].expression).toBe('user.name.toUpperCase()');
         });
 
         test('should execute interpolations correctly', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/interpolation-execution.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/interpolation-execution.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Interpolation execution',
-                mdx
+                contents
             )
                 .expectExactLines(
                     'Hello World!'
@@ -65,11 +65,11 @@ describe('Expanded Features', () => {
 
     describe('Conditional Rendering', () => {
         test('should parse conditional blocks', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/simple-conditional.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/simple-conditional.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Simple conditional parsing',
-                mdx
+                contents
             )
                 .expectExactLines(
                     'This message is shown!'
@@ -77,19 +77,19 @@ describe('Expanded Features', () => {
                 .build();
 
             // For parsing tests, we'll just verify the structure exists
-            const { parseMDX } = await import('../../src/parser');
-            const result = parseMDX(mdx);
+            const { parseTSmd } = await import('../../src/parser');
+            const result = parseTSmd(contents);
             expect(result.conditionalBlocks).toHaveLength(1);
             expect(result.conditionalBlocks[0].condition).toBe('showMessage');
             expect(result.conditionalBlocks[0].content).toBe('This message is shown!');
         });
 
         test('should parse nested conditional blocks', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/nested-conditional.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/nested-conditional.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Nested conditional parsing',
-                mdx
+                contents
             )
                 .expectExactLines(
                     'Welcome back!',
@@ -98,19 +98,19 @@ describe('Expanded Features', () => {
                 .build();
 
             // For parsing tests, we'll just verify the structure exists
-            const { parseMDX } = await import('../../src/parser');
-            const result = parseMDX(mdx);
+            const { parseTSmd } = await import('../../src/parser');
+            const result = parseTSmd(contents);
             expect(result.conditionalBlocks).toHaveLength(2);
             expect(result.conditionalBlocks[0].condition).toBe('isLoggedIn');
             expect(result.conditionalBlocks[1].condition).toBe('hasPermission');
         });
 
         test('should execute conditional blocks correctly', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/conditional-execution.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/conditional-execution.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Conditional execution',
-                mdx
+                contents
             )
                 .expectExactLines(
                     'Hello there!'
@@ -122,11 +122,11 @@ describe('Expanded Features', () => {
         });
 
         test('should handle complex conditions', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/complex-conditions.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/complex-conditions.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Complex conditions',
-                mdx
+                contents
             )
                 .expectExactLines(
                     'Admin panel access'
@@ -140,11 +140,11 @@ describe('Expanded Features', () => {
 
     describe('Combined Interpolation and Conditionals', () => {
         test('should handle interpolations within conditional blocks', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/combined-interpolation-conditional.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/combined-interpolation-conditional.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Combined interpolation and conditional',
-                mdx
+                contents
             )
                 .expectExactLines(
                     'Welcome VIP member Alice!'
@@ -156,11 +156,11 @@ describe('Expanded Features', () => {
         });
 
         test('should handle multiple interpolations and conditionals', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/multiple-interpolations-conditionals.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/multiple-interpolations-conditionals.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Multiple interpolations and conditionals',
-                mdx
+                contents
             )
                 .expectExactLines(
                     '# User Profile',
@@ -178,11 +178,11 @@ describe('Expanded Features', () => {
 
     describe('List Rendering', () => {
         test('should render unordered lists correctly', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/list-rendering.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/list-rendering.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Unordered list rendering',
-                mdx
+                contents
             )
                 .withContext({
                     basePath: import.meta.dir,
@@ -201,11 +201,11 @@ describe('Expanded Features', () => {
         });
 
         test('should render empty lists correctly', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/list-rendering.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/list-rendering.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Empty list rendering',
-                mdx
+                contents
             )
                 .withContext({
                     basePath: import.meta.dir,
@@ -222,11 +222,11 @@ describe('Expanded Features', () => {
         });
 
         test('should render comma lists correctly', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/comma-list-rendering.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/comma-list-rendering.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Comma list rendering',
-                mdx
+                contents
             )
                 .withContext({
                     basePath: import.meta.dir,
@@ -239,17 +239,17 @@ describe('Expanded Features', () => {
                 .build();
 
             // Run the exact test
-            const runner = new ExactMDXTestRunner();
+            const runner = new ExactTSMDTestRunner();
             const result = await runner.runTestCase(testCase);
             expect(result.passed).toBe(true);
         });
 
         test('should render empty comma lists correctly', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/comma-list-rendering.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/comma-list-rendering.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Empty comma list rendering',
-                mdx
+                contents
             )
                 .withContext({
                     basePath: import.meta.dir,
@@ -266,11 +266,11 @@ describe('Expanded Features', () => {
         });
 
         test('should render single item comma lists correctly', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/comma-list-rendering.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/comma-list-rendering.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Single item comma list rendering',
-                mdx
+                contents
             )
                 .withContext({
                     basePath: import.meta.dir,
@@ -287,11 +287,11 @@ describe('Expanded Features', () => {
         });
 
         test('should render internal comma list with and', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/InternalCommaList.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/InternalCommaList.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Internal comma list rendering',
-                mdx
+                contents
             )
                 .withContext({
                     basePath: import.meta.dir,
@@ -308,11 +308,11 @@ describe('Expanded Features', () => {
         });
 
         test('should handle undefined props gracefully', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/InternalCommaList.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/InternalCommaList.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Internal comma list rendering',
-                mdx
+                contents
             )
                 .withContext({
                     basePath: import.meta.dir,
@@ -330,11 +330,11 @@ describe('Expanded Features', () => {
 
     describe('Error Handling', () => {
         test('should handle undefined variable interpolations gracefully', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/undefined-variable-interpolation.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/undefined-variable-interpolation.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Undefined variable interpolation',
-                mdx
+                contents
             )
                 .expectExactLines(
                     'Hello Alice!',
@@ -344,17 +344,17 @@ describe('Expanded Features', () => {
                 .build();
 
             // Run the exact test
-            const runner = new ExactMDXTestRunner();
+            const runner = new ExactTSMDTestRunner();
             const result = await runner.runTestCase(testCase);
             expect(result.passed).toBe(true);
         });
 
         test('should handle invalid condition expressions', async () => {
-            const mdx = await Bun.file(import.meta.dir + '/invalid-condition-expression.mdx').text();
+            const contents = await Bun.file(import.meta.dir + '/invalid-condition-expression.tsmd').text();
 
-            const testCase = createExactMDXTest(
+            const testCase = createTSmdTest(
                 'Invalid condition expression',
-                mdx
+                contents
             )
                 .expectExactLines(
                     'Valid content here'
@@ -363,7 +363,7 @@ describe('Expanded Features', () => {
                 .build();
 
             // Run the exact test
-            const runner = new ExactMDXTestRunner();
+            const runner = new ExactTSMDTestRunner();
             const result = await runner.runTestCase(testCase);
             expect(result.passed).toBe(true);
         });

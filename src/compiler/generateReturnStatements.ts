@@ -1,4 +1,4 @@
-import { ParsedMDX } from "../parser";
+import { ParsedTSmd } from "../parser";
 import { propsToObjectString } from "../renderer/string-helpers";
 import { Chunk } from "../runtime/tsm-runtime";
 
@@ -179,7 +179,7 @@ function encodeStringLiteral(text: string, {
     return `${wrapper}${body}${wrapper}`;
 }
 
-export function generateReturnStatements(parsed: ParsedMDX): string {
+export function generateReturnStatements(parsed: ParsedTSmd): string {
     const conditionalReturns: string[] = [];
     let defaultReturn: string | null = null;
 

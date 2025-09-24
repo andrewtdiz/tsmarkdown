@@ -1,6 +1,6 @@
 // Using Bun.file() for file operations instead of fs
-import { CompiledMDX, compile } from '../compiler';
-import { parseMDX } from '../parser';
+import { CompiledTSmd, compile } from '../compiler';
+import { parseTSmd } from '../parser';
 import { componentRegistry, mergePropsWithDefaults, resolveComponentPath } from './render-context';
 import { processEscapeSequences, normalizeIndentation, valueToString } from './string-helpers';
 import { parseInterpolations } from '../parser/interpolations';
@@ -1018,9 +1018,9 @@ export async function renderJSXElement(
         }
     }
 
-    // Handle @ syntax for imported MDX components
+    // Handle @ syntax for imported TSmd components
     if (atSymbol === '@') {
-        // Check if we have the component in our registry (imported MDX components)
+        // Check if we have the component in our registry (imported TSmd components)
         if (componentRegistry[componentName]) {
             try {
                 // Merge JSX props with default values from component metadata
@@ -1052,7 +1052,7 @@ export async function renderJSXElement(
             const componentPath = await resolveComponentPath(componentName, basePath);
             if (componentPath) {
                 const componentContent = await Bun.file(componentPath).text();
-                const parsed = parseMDX(componentContent);
+                const parsed = parseTSmd(componentContent);
                 const compiled = compile(parsed);
 
                 // Register the component for future use
@@ -1205,12 +1205,12 @@ export async function renderJSXComponent(jsxElement: string, context: any, jsxEx
         }
     }
 
-    // Handle @ and @_ syntax for imported MDX components
+    // Handle @ and @_ syntax for imported TSmd components
     if (atSymbol === '@' || atSymbol === '@_') {
         // Remove underscore prefix for component lookup
         const lookupName = componentName.startsWith('_') ? componentName.substring(1) : componentName;
 
-        // Check if we have the component in our registry (imported MDX components)
+        // Check if we have the component in our registry (imported TSmd components)
         if (componentRegistry[lookupName]) {
             try {
                 // Merge JSX props with default values from component metadata
@@ -1228,7 +1228,7 @@ export async function renderJSXComponent(jsxElement: string, context: any, jsxEx
             const componentPath = await resolveComponentPath(lookupName, basePath);
             if (componentPath) {
                 const componentContent = await Bun.file(componentPath).text();
-                const parsed = parseMDX(componentContent);
+                const parsed = parseTSmd(componentContent);
                 const compiled = compile(parsed);
 
                 // Register the component for future use

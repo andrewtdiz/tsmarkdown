@@ -60,9 +60,9 @@ function CodeSyntaxHighlighting() {
     You can mix `inline code` with regular text and code blocks:
 
     ```bash
-    npm install better-mdx
+    bun add tsmarkdown
     ```
 
-    Then use it in your project with `import { parseMDX } from 'better-mdx'`.
+    Then use it in your project with `import { compile } from 'tsmarkdown'`.
   )
 }

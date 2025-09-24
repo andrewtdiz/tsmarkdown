@@ -1,18 +1,18 @@
 import { test, expect, describe } from 'bun:test';
 import {
-    ExactMDXTestRunner,
-    createExactMDXTest,
-    createExactMDXTestSuite
-} from '../../src/exact-testing-utilities';
+    ExactTSMDTestRunner,
+    createTSmdTest,
+    createTSmdTestSuite
+} from '../../src/testing';
 
-describe('Better-MDX Exact Core Features', () => {
-    const runner = new ExactMDXTestRunner();
+describe('TSmd Exact Core Features', () => {
+    const runner = new ExactTSMDTestRunner();
 
     test('Basic interpolation - exact match', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/basic-interpolation.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/basic-interpolation.tsmd').text();
+        const testCase = createTSmdTest(
             'Basic interpolation - exact match',
-            mdxContent
+            contents
         )
             .expectExactContent('# Hello World!')
             .build();
@@ -22,10 +22,10 @@ describe('Better-MDX Exact Core Features', () => {
     });
 
     test('Conditional rendering - truthy exact match', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/conditional-truthy.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/conditional-truthy.tsmd').text();
+        const testCase = createTSmdTest(
             'Conditional rendering - truthy exact match',
-            mdxContent
+            contents
         )
             .expectExactLines(
                 '# Test',
@@ -39,10 +39,10 @@ describe('Better-MDX Exact Core Features', () => {
     });
 
     test('Conditional rendering - falsy exact match', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/conditional-falsy.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/conditional-falsy.tsmd').text();
+        const testCase = createTSmdTest(
             'Conditional rendering - falsy exact match',
-            mdxContent
+            contents
         )
             .expectExactLines(
                 '# Test'
@@ -54,10 +54,10 @@ describe('Better-MDX Exact Core Features', () => {
     });
 
     test('Complex expressions - exact match', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/complex-expressions.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/complex-expressions.tsmd').text();
+        const testCase = createTSmdTest(
             'Complex expressions - exact match',
-            mdxContent
+            contents
         )
             .expectExactLines(
                 '# User: Alice',
@@ -77,10 +77,10 @@ describe('Better-MDX Exact Core Features', () => {
     });
 
     test('Context integration - exact match', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/context-integration.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/context-integration.tsmd').text();
+        const testCase = createTSmdTest(
             'Context integration - exact match',
-            mdxContent
+            contents
         )
             .withContext({
                 useAuth: () => ({
@@ -96,10 +96,10 @@ describe('Better-MDX Exact Core Features', () => {
     });
 
     test('Error handling - exact match', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/error-handling.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/error-handling.tsmd').text();
+        const testCase = createTSmdTest(
             'Error handling - exact match',
-            mdxContent
+            contents
         )
             .expectErrors(['Interpolation error'])
             .build();
@@ -109,14 +109,14 @@ describe('Better-MDX Exact Core Features', () => {
     });
 });
 
-describe('Better-MDX Complex Nested Conditionals - Exact Tests', () => {
-    const runner = new ExactMDXTestRunner();
+describe('TSmd Complex Nested Conditionals - Exact Tests', () => {
+    const runner = new ExactTSMDTestRunner();
 
     test('Complex nested conditionals - exact match', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/complex-nested-conditionals.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/complex-nested-conditionals.tsmd').text();
+        const testCase = createTSmdTest(
             'Complex nested conditionals - exact match',
-            mdxContent
+            contents
         )
             .expectExactLines(
                 '# Admin Dashboard',
@@ -132,10 +132,10 @@ describe('Better-MDX Complex Nested Conditionals - Exact Tests', () => {
     });
 
     test('Simple props', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/simple-props.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/simple-props.tsmd').text();
+        const testCase = createTSmdTest(
             'Simple props',
-            mdxContent
+            contents
         )
             .withContext({
                 withAnd: true,
@@ -151,10 +151,10 @@ describe('Better-MDX Complex Nested Conditionals - Exact Tests', () => {
     });
 
     test('Simple conditional - exact match', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/simple-conditional.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/simple-conditional.tsmd').text();
+        const testCase = createTSmdTest(
             'Simple conditional - exact match',
-            mdxContent
+            contents
         )
             .expectExactLines(
                 '# Header',
@@ -168,10 +168,10 @@ describe('Better-MDX Complex Nested Conditionals - Exact Tests', () => {
     });
 
     test('Nested conditional - two levels - exact match', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/two-level-nested.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/two-level-nested.tsmd').text();
+        const testCase = createTSmdTest(
             'Nested conditional - two levels - exact match',
-            mdxContent
+            contents
         )
             .expectExactContent('# Nested Content')
             .build();
@@ -182,23 +182,23 @@ describe('Better-MDX Complex Nested Conditionals - Exact Tests', () => {
     });
 });
 
-describe('Better-MDX Exact Test Suite Integration', () => {
-    const runner = new ExactMDXTestRunner();
+describe('TSmd Exact Test Suite Integration', () => {
+    const runner = new ExactTSMDTestRunner();
 
     test('Run exact test suite', async () => {
-        const suite = createExactMDXTestSuite('Exact Features Suite')
+        const suite = createTSmdTestSuite('Exact Features Suite')
             .addTest(
-                createExactMDXTest(
+                createTSmdTest(
                     'Simple text exact',
-                    await Bun.file(import.meta.dir + '/simple-text.mdx').text()
+                    await Bun.file(import.meta.dir + '/simple-text.tsmd').text()
                 )
                     .expectExactContent('# Hello World')
                     .build()
             )
             .addTest(
-                createExactMDXTest(
+                createTSmdTest(
                     'With variable exact',
-                    await Bun.file(import.meta.dir + '/with-variable.mdx').text()
+                    await Bun.file(import.meta.dir + '/with-variable.tsmd').text()
                 )
                     .expectExactContent('# Test')
                     .build()

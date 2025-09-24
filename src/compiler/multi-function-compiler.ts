@@ -6,7 +6,7 @@
  */
 
 import * as ts from 'typescript';
-import { ParsedMDX } from '../parser';
+import { ParsedTSmd } from '../parser';
 import { compile } from '../compiler';
 import { extractFunctions } from '../parser/typescript-parser';
 import { parseContent } from '../parser/pipeline';
@@ -15,19 +15,19 @@ import { normalizeIndentation } from '../renderer/string-helpers';
 import type { TSMComponentAttribute } from '../parser/tsm-ast';
 
 /**
- * Preprocesses MDX syntax within functions to make them parseable by TypeScript
+ * Preprocesses TSmd syntax within functions to make them parseable by TypeScript
  */
-function preprocessMDXInFunctions(source: string): string {
-    // Find all return statements with MDX syntax and convert them to template literals
+function preprocessTSmdInFunctions(source: string): string {
+    // Find all return statements with TSmd syntax and convert them to template literals
     // This handles patterns like: return (content with {{ interpolation }})
 
     let processedSource = source;
 
-    // Find return statements with parentheses that contain MDX syntax
+    // Find return statements with parentheses that contain TSmd syntax
     const returnWithParensRegex = /return\s*\(\s*([^)]*\{\{[^}]+\}\}[^)]*)\s*\)/g;
 
     processedSource = processedSource.replace(returnWithParensRegex, (match, content) => {
-        // Convert MDX interpolations to template literal syntax
+        // Convert TSmd interpolations to template literal syntax
         let templateContent = content
             .replace(/\{\{([^}]+)\}\}/g, '${$1}')  // Convert {{ var }} to ${var}
             .replace(/#\s+/g, '# ')  // Ensure proper spacing for headers
@@ -40,7 +40,7 @@ function preprocessMDXInFunctions(source: string): string {
     const returnWithHashRegex = /return\s*\(\s*(#[^)]*)\s*\)/g;
 
     processedSource = processedSource.replace(returnWithHashRegex, (match, content) => {
-        // Convert MDX interpolations to template literal syntax
+        // Convert TSmd interpolations to template literal syntax
         let templateContent = content
             .replace(/\{\{([^}]+)\}\}/g, '${$1}')  // Convert {{ var }} to ${var}
             .trim();
@@ -76,8 +76,8 @@ export async function compileAllFunctions(source: string): Promise<MultiFunction
     const functions: Array<{ functionInfo: any; compiled: any }> = [];
 
     try {
-        // Preprocess the source to handle MDX syntax within functions
-        const processedSource = preprocessMDXInFunctions(source);
+        // Preprocess the source to handle TSmd syntax within functions
+        const processedSource = preprocessTSmdInFunctions(source);
 
         // Use TypeScript compiler API with the processed source
         const sourceFile = ts.createSourceFile(
@@ -99,10 +99,10 @@ export async function compileAllFunctions(source: string): Promise<MultiFunction
                 // Extract the actual function content from the AST using the processed source
                 const { typescript, returnStatements, interpolations, conditionalBlocks, ternaryExpressions, jsxExpressions } = extractFunctionContentWithOriginalSource(sourceFile, functionInfo.name, processedSource);
 
-                // Create ParsedMDX for each function
+                // Create ParsedTSmd for each function
                 const markdownContent = returnStatements.length > 0 ? returnStatements[0].content : `# ${functionInfo.name} Content`;
 
-                const parsed: ParsedMDX = {
+                const parsed: ParsedTSmd = {
                     imports: [],
                     functionName: functionInfo.name,
                     functionParams: functionInfo.parameters.map(p => p.name),
@@ -330,7 +330,7 @@ function extractMarkdownFromReturnStatementWithOriginalSource(returnNode: ts.Ret
     if (ts.isParenthesizedExpression(returnNode.expression)) {
         const start = returnNode.expression.getStart();
 
-        // Find the matching closing parenthesis manually since TypeScript parser fails on MDX syntax
+        // Find the matching closing parenthesis manually since TypeScript parser fails on TSmd syntax
         let parenCount = 0;
         let endPos = start;
         let foundStart = false;
@@ -390,7 +390,7 @@ function extractMarkdownFromReturnStatementWithOriginalSource(returnNode: ts.Ret
         }
     }
 
-    // Now parse the markdown content using the MDX parsing pipeline
+    // Now parse the markdown content using the TSmd parsing pipeline
     const { protectedContent, codeBlocks } = protectCodeBlocks(rawContent);
     const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
 
@@ -429,10 +429,10 @@ function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sour
     // Handle different types of return expressions
     if (ts.isParenthesizedExpression(returnNode.expression)) {
         // For parenthesized expressions, we need to manually extract the content
-        // because the TypeScript parser can't handle MDX syntax inside parentheses
+        // because the TypeScript parser can't handle TSmd syntax inside parentheses
         const start = returnNode.expression.getStart();
 
-        // Find the matching closing parenthesis manually since TypeScript parser fails on MDX syntax
+        // Find the matching closing parenthesis manually since TypeScript parser fails on TSmd syntax
         let parenCount = 0;
         let endPos = start;
         let foundStart = false;
@@ -493,7 +493,7 @@ function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sour
         }
     }
 
-    // Now parse the markdown content using the MDX parsing pipeline
+    // Now parse the markdown content using the TSmd parsing pipeline
     const { protectedContent, codeBlocks } = protectCodeBlocks(rawContent);
     const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
 
@@ -524,7 +524,7 @@ function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sour
  * Extracts function body and return statements from AST
  */
 /**
- * Extracts function content using the original source text for accurate MDX parsing
+ * Extracts function content using the original source text for accurate TSmd parsing
  */
 function extractFunctionContentWithOriginalSource(ast: ts.SourceFile, functionName: string, originalSource: string): { typescript: string; returnStatements: any[]; interpolations: any[]; conditionalBlocks: any[]; ternaryExpressions: any[]; jsxExpressions: any[] } {
     let functionNode: ts.Node | null = null;

@@ -1,22 +1,22 @@
 import { test, expect, describe } from 'bun:test';
 import {
-    ExactMDXTestRunner,
-    createExactMDXTest,
-    createExactMDXTestSuite
-} from '../../src/exact-testing-utilities';
+    ExactTSMDTestRunner,
+    createTSmdTest,
+    createTSmdTestSuite
+} from '../../src/testing';
 
-describe('Better-MDX Markdown Features', () => {
-    const runner = new ExactMDXTestRunner();
+describe('TS Markdown Features', () => {
+    const runner = new ExactTSMDTestRunner();
 
     describe('Code and Syntax Highlighting', () => {
         test('should render inline code correctly', async () => {
-            const mdxContent = await Bun.file(import.meta.dir + '/code-syntax-highlighting.mdx').text();
-            const testCase = createExactMDXTest(
+            const contents = await Bun.file(import.meta.dir + '/code-syntax-highlighting.tsmd').text();
+            const testCase = createTSmdTest(
                 'Code and syntax highlighting - inline code',
-                mdxContent
+                contents
             )
                 .withContext({ basePath: import.meta.dir })
-                .withSourceFile(import.meta.dir + '/code-syntax-highlighting.mdx')
+                .withSourceFile(import.meta.dir + '/code-syntax-highlighting.tsmd')
                 .expectExactLines(
                     '# Code and Syntax Highlighting',
                     '',
@@ -78,10 +78,10 @@ describe('Better-MDX Markdown Features', () => {
                     'You can mix `inline code` with regular text and code blocks:',
                     '',
                     '```bash',
-                    'npm install better-mdx',
+                    'npm install tsmarkdown',
                     '```',
                     '',
-                    'Then use it in your project with `import { parseMDX } from \'better-mdx\'`.'
+                    'Then use it in your project with `import { parseTSmd } from \'tsmarkdown\'`.'
                 )
                 .build();
 
@@ -92,13 +92,13 @@ describe('Better-MDX Markdown Features', () => {
 
     describe('Text Formatting', () => {
         test('should render bold, italic, and strikethrough text correctly', async () => {
-            const mdxContent = await Bun.file(import.meta.dir + '/text-formatting.mdx').text();
-            const testCase = createExactMDXTest(
+            const contents = await Bun.file(import.meta.dir + '/text-formatting.tsmd').text();
+            const testCase = createTSmdTest(
                 'Text formatting - bold, italic, strikethrough',
-                mdxContent
+                contents
             )
                 .withContext({ basePath: import.meta.dir })
-                .withSourceFile(import.meta.dir + '/text-formatting.mdx')
+                .withSourceFile(import.meta.dir + '/text-formatting.tsmd')
                 .expectExactLines(
                     '# Text Formatting',
                     '',
@@ -151,10 +151,10 @@ describe('Better-MDX Markdown Features', () => {
 
     describe('Simple Tables', () => {
         test('should render tables correctly', async () => {
-            const mdxContent = await Bun.file(import.meta.dir + '/simple-tables.mdx').text();
-            const testCase = createExactMDXTest(
+            const contents = await Bun.file(import.meta.dir + '/simple-tables.tsmd').text();
+            const testCase = createTSmdTest(
                 'Simple tables - basic and formatted',
-                mdxContent
+                contents
             )
                 .withContext({ basePath: import.meta.dir })
                 .expectExactLines(
@@ -217,10 +217,10 @@ describe('Better-MDX Markdown Features', () => {
 
     describe('Links', () => {
         test('should render various link types correctly', async () => {
-            const mdxContent = await Bun.file(import.meta.dir + '/links.mdx').text();
-            const testCase = createExactMDXTest(
+            const contents = await Bun.file(import.meta.dir + '/links.tsmd').text();
+            const testCase = createTSmdTest(
                 'Links - basic, reference, and formatted',
-                mdxContent
+                contents
             )
                 .withContext({ basePath: import.meta.dir })
                 .expectExactLines(
@@ -289,10 +289,10 @@ describe('Better-MDX Markdown Features', () => {
 
     describe('Block Quotes', () => {
         test('should render block quotes correctly', async () => {
-            const mdxContent = await Bun.file(import.meta.dir + '/block-quotes.mdx').text();
-            const testCase = createExactMDXTest(
+            const contents = await Bun.file(import.meta.dir + '/block-quotes.tsmd').text();
+            const testCase = createTSmdTest(
                 'Block quotes - simple, nested, and formatted',
-                mdxContent
+                contents
             )
                 .withContext({ basePath: import.meta.dir })
                 .expectExactLines(
@@ -358,10 +358,10 @@ describe('Better-MDX Markdown Features', () => {
 
     describe('Task Lists (Checkboxes)', () => {
         test('should render task lists correctly', async () => {
-            const mdxContent = await Bun.file(import.meta.dir + '/task-lists.mdx').text();
-            const testCase = createExactMDXTest(
+            const contents = await Bun.file(import.meta.dir + '/task-lists.tsmd').text();
+            const testCase = createTSmdTest(
                 'Task lists - checkboxes and nested',
-                mdxContent
+                contents
             )
                 .withContext({ basePath: import.meta.dir })
                 .expectExactLines(
@@ -430,17 +430,17 @@ describe('Better-MDX Markdown Features', () => {
     });
 
     describe('Markdown Feature Integration', () => {
-        test('should handle markdown features without interfering with Better MDX syntax', async () => {
-            const mdxContent = await Bun.file(import.meta.dir + '/markdown-integration.mdx').text();
-            const testCase = createExactMDXTest(
-                'Markdown integration with Better MDX features',
-                mdxContent
+        test('should handle markdown features without interfering with TS Markdown syntax', async () => {
+            const contents = await Bun.file(import.meta.dir + '/markdown-integration.tsmd').text();
+            const testCase = createTSmdTest(
+                'Markdown integration with TS Markdown features',
+                contents
             )
                 .withContext({ basePath: import.meta.dir, userName: 'Developer' })
                 .expectExactLines(
                     '# Welcome Developer!',
                     '',
-                    'This document demonstrates that **markdown formatting** works alongside Better MDX features.',
+                    'This document demonstrates that **markdown formatting** works alongside TS Markdown features.',
                     '',
                     '## Code Examples',
                     '',
@@ -454,7 +454,7 @@ describe('Better-MDX Markdown Features', () => {
                     '',
                     '## Links and Tables',
                     '',
-                    'Visit [Better MDX](https://github.com/better-mdx) for more information.',
+                    'Visit [TS Markdown](https://tsmarkdown.dev) for more information.',
                     '',
                     '| Feature | Status |',
                     '|---------|--------|',

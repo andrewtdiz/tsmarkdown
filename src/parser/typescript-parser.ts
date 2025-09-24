@@ -1,4 +1,4 @@
-// TypeScript compiler API parser for Better MDX components
+// TypeScript compiler API parser for TSmd components
 
 import * as ts from 'typescript';
 import { locateComponent, splitComponent, type ComponentSplit, type ReturnStatement, extractMultipleReturnContent } from './component-scanner';
@@ -86,7 +86,7 @@ export interface TypeScriptParseOptions {
 }
 
 /**
- * Parses a Better MDX component using TypeScript compiler API
+ * Parses a TSmd component using TypeScript compiler API
  * Returns a TypeScript AST for the TypeScript portion and optionally includes
  * a stub for the markdown portion
  */
@@ -97,7 +97,7 @@ export function parseWithTypeScript(
     const {
         includeMarkdownStub = true,
         preserveSource = false,
-        fileName = 'component.bmdx'
+        fileName = 'component.tsmd'
     } = options;
 
     const diagnostics: string[] = [];
@@ -125,7 +125,7 @@ export function parseWithTypeScript(
         });
 
         // Parse the TypeScript portion using TypeScript compiler API
-        const sourceFile = getOrCreateSourceFile(fileName, tsSource, false); // Don't cache to avoid interfering with MDX compilation
+        const sourceFile = getOrCreateSourceFile(fileName, tsSource, false); // Don't cache to avoid interfering with TSmd compilation
         const host = ts.createCompilerHost({});
         const program = ts.createProgram({
             rootNames: [fileName],
@@ -249,7 +249,7 @@ function createTypeScriptSource(
  */
 function createMarkdownStub(markdownBody: string): string {
     // Create a simple JSX element that TypeScript can parse
-    return `<div>Markdown content processed by Better MDX</div>`;
+    return `<div>Markdown content processed by TSmd</div>`;
 }
 
 /**
@@ -281,7 +281,7 @@ export function validateWithTypeScript(source: string): {
         });
 
         const sourceFile = ts.createSourceFile(
-            'validation.bmdx',
+            'validation.tsmd',
             tsSource,
             ts.ScriptTarget.Latest,
             true // setParentNodes
@@ -401,12 +401,12 @@ export function analyzeReturnStatements(source: string): {
     }> = [];
 
     try {
-        // Create a TypeScript-compatible source by converting MDX syntax to valid TypeScript
-        const tsSource = convertMDXToTypeScriptForAnalysis(source);
+        // Create a TypeScript-compatible source by converting TSmd syntax to valid TypeScript
+        const tsSource = convertTSmdToTypeScriptForAnalysis(source);
 
         // Parse the TypeScript source with JSX support
         const fileName = 'return-analysis.tsx';
-        const sourceFile = getOrCreateSourceFile(fileName, tsSource, false); // Don't cache to avoid interfering with MDX compilation
+        const sourceFile = getOrCreateSourceFile(fileName, tsSource, false); // Don't cache to avoid interfering with TSmd compilation
         const host = ts.createCompilerHost({});
         const program = ts.createProgram({
             rootNames: [fileName],
@@ -454,14 +454,14 @@ export function analyzeReturnStatements(source: string): {
 }
 
 /**
- * Converts MDX syntax to valid TypeScript for return statement analysis
- * Replaces MDX-specific syntax with TypeScript-compatible equivalents
+ * Converts TSmd syntax to valid TypeScript for return statement analysis
+ * Replaces TSmd-specific syntax with TypeScript-compatible equivalents
  * Now handles multiple return statements with conditions
  */
-function convertMDXToTypeScriptForAnalysis(source: string): string {
+function convertTSmdToTypeScriptForAnalysis(source: string): string {
     let converted = source;
 
-    // Convert MDX interpolation syntax {{ }} to valid JSX expressions
+    // Convert TSmd interpolation syntax {{ }} to valid JSX expressions
     converted = converted.replace(INTERPOLATION_REGEX, '{$1}');
 
     // Convert markdown headers to JSX elements
@@ -770,7 +770,7 @@ function extractTypesFromAST(node: ts.Node, types: string[], interfaces: string[
  */
 export function extractFunctions(ast: ts.SourceFile): FunctionInfo[] {
     const exportedFunctions: FunctionInfo[] = []
-    
+
     function visit(node: ts.Node): void {
         // Check for function declarations
         if (ts.isFunctionDeclaration(node)) {

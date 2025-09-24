@@ -1,4 +1,4 @@
-// Component Scanner - identifies TypeScript prelude and markdown body in Better MDX components
+// Component Scanner - identifies TypeScript prelude and markdown body in TSmd components
 
 import { findMatchingBrace, findMatchingParen } from './string-helpers';
 import * as ts from 'typescript';
@@ -197,10 +197,10 @@ export function splitComponent(source: string): ComponentSplit {
 }
 
 /**
- * Checks if content contains MDX tokens
+ * Checks if content contains TSmd tokens
  */
-function containsMDXTokens(content: string): boolean {
-    // Check for common MDX patterns: {{ interpolation }}, <@ component />, ** markdown **
+function containsTSmdTokens(content: string): boolean {
+    // Check for common TSmd patterns: {{ interpolation }}, <@ component />, ** markdown **
     return /\{\{.*?\}\}/s.test(content) ||
         /<\@.*?>.*?<\/@>/s.test(content) ||
         /\*\*.*?\*\*/s.test(content) ||
@@ -235,7 +235,7 @@ function containsParenthesesWithContent(content: string): boolean {
 }
 
 /**
- * Determines if a return statement contains markdown/MDX content
+ * Determines if a return statement contains markdown/TSmd content
  * Uses TypeScript AST parsing to make a more accurate determination
  */
 function isMarkdownReturn(content: string): boolean {
@@ -270,8 +270,8 @@ function isMarkdownReturn(content: string): boolean {
         }
     }
 
-    // Check for MDX tokens that indicate markdown content
-    if (containsMDXTokens(trimmed)) {
+    // Check for TSmd tokens that indicate markdown content
+    if (containsTSmdTokens(trimmed)) {
         return true;
     }
 

@@ -1,18 +1,18 @@
 import { test, expect, describe } from 'bun:test';
 import {
-    ExactMDXTestRunner,
-    createExactMDXTest,
-    createExactMDXTestSuite
-} from '../../src/exact-testing-utilities';
+    ExactTSMDTestRunner,
+    createTSmdTest,
+    createTSmdTestSuite
+} from '../../src/testing';
 
-describe('Better-MDX Component Import Features', () => {
-    const runner = new ExactMDXTestRunner();
+describe('TSmd Component Import Features', () => {
+    const runner = new ExactTSMDTestRunner();
 
     test('Simple component import - exact match', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/simple-import.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/simple-import.tsmd').text();
+        const testCase = createTSmdTest(
             'Simple component import - exact match',
-            mdxContent
+            contents
         )
             .withContext({ basePath: import.meta.dir })
             .expectExactLines(
@@ -26,10 +26,10 @@ describe('Better-MDX Component Import Features', () => {
     });
 
     test('Component import - contains check', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/simple-import.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/simple-import.tsmd').text();
+        const testCase = createTSmdTest(
             'Component import - contains check',
-            mdxContent
+            contents
         )
             .withContext({ basePath: import.meta.dir })
             .expectExactContent('# Hello, Bob!\nWelcome to markdown!')
@@ -40,10 +40,10 @@ describe('Better-MDX Component Import Features', () => {
     });
 
     test('Component vs string interpolation', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/component-vs-string.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/component-vs-string.tsmd').text();
+        const testCase = createTSmdTest(
             'Component vs string interpolation',
-            mdxContent
+            contents
         )
             .withContext({ basePath: import.meta.dir })
             .expectExactLines(
@@ -63,10 +63,10 @@ describe('Better-MDX Component Import Features', () => {
     });
 
     test('Multiple components without spacing', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/multiple-components-no-spacing.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/multiple-components-no-spacing.tsmd').text();
+        const testCase = createTSmdTest(
             'Multiple components without spacing',
-            mdxContent
+            contents
         )
             .withContext({ basePath: import.meta.dir })
             .expectExactLines(
@@ -84,10 +84,10 @@ describe('Better-MDX Component Import Features', () => {
     });
 
     test('Multiple components with spacing', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/multiple-components-with-spacing.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/multiple-components-with-spacing.tsmd').text();
+        const testCase = createTSmdTest(
             'Multiple components with spacing',
-            mdxContent
+            contents
         )
             .withContext({ basePath: import.meta.dir })
             .expectExactLines(
@@ -107,10 +107,10 @@ describe('Better-MDX Component Import Features', () => {
     });
 
     test('Components wrapped in XML tags', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/wrapped-components.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/wrapped-components.tsmd').text();
+        const testCase = createTSmdTest(
             'Components wrapped in XML tags',
-            mdxContent
+            contents
         )
             .withContext({ basePath: import.meta.dir })
             .expectExactLines(
@@ -130,10 +130,10 @@ describe('Better-MDX Component Import Features', () => {
     });
 
     test('Single line XML tags', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/single-line-xml.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/single-line-xml.tsmd').text();
+        const testCase = createTSmdTest(
             'Single line XML tags',
-            mdxContent
+            contents
         )
             .withContext({ basePath: import.meta.dir })
             .expectExactLines(
@@ -146,10 +146,10 @@ describe('Better-MDX Component Import Features', () => {
     });
 
     test('Single line XML tags with component', async () => {
-        const mdxContent = await Bun.file(import.meta.dir + '/single-line-xml-component.mdx').text();
-        const testCase = createExactMDXTest(
+        const contents = await Bun.file(import.meta.dir + '/single-line-xml-component.tsmd').text();
+        const testCase = createTSmdTest(
             'Single line XML tags with component',
-            mdxContent
+            contents
         )
             .withContext({ basePath: import.meta.dir })
             .expectExactLines(

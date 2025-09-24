@@ -2,7 +2,7 @@ function MarkdownIntegration({ userName }: { userName: string }) {
   return (
     # Welcome {{ userName }}!
 
-    This document demonstrates that **markdown formatting** works alongside Better MDX features.
+    This document demonstrates that **markdown formatting** works alongside TS Markdown features.
 
     ## Code Examples
 
@@ -16,7 +16,7 @@ function MarkdownIntegration({ userName }: { userName: string }) {
 
     ## Links and Tables
 
-    Visit [Better MDX](https://github.com/better-mdx) for more information.
+    Visit [TS Markdown](https://www.tsmarkdown.dev) for more information.
 
     | Feature | Status |
     |---------|--------|

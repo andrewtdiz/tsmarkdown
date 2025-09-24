@@ -1,13 +1,13 @@
 import { resolve } from 'path';
-import { CompiledMDX, compile } from '../compiler';
-import { parseMDX } from '../parser';
+import { CompiledTSmd, compile } from '../compiler';
+import { parseTSmd } from '../parser';
 
 export interface RenderContext {
     [key: string]: any;
 }
 
 export interface ComponentRegistry {
-    [componentName: string]: CompiledMDX;
+    [componentName: string]: CompiledTSmd;
 }
 
 export interface RenderResult {
@@ -25,7 +25,7 @@ export async function loadDependencies(dependencies: string[], basePath: string,
                 const componentPath = await resolveComponentPath(componentName, basePath);
                 if (componentPath) {
                     const componentContent = await Bun.file(componentPath).text();
-                    const parsed = parseMDX(componentContent);
+                    const parsed = parseTSmd(componentContent);
                     const compiled = compile(parsed);
                     componentRegistry[componentName] = compiled;
 
@@ -44,10 +44,10 @@ export async function loadDependencies(dependencies: string[], basePath: string,
 export async function resolveComponentPath(componentName: string, basePath: string): Promise<string | null> {
     // Try different possible paths for the component
     const possiblePaths = [
-        resolve(basePath, `${componentName}.mdx`),
+        resolve(basePath, `${componentName}.tsmd`),
         resolve(basePath, `${componentName}.tsx`),
         resolve(basePath, `${componentName}.ts`),
-        resolve(basePath, componentName, 'index.mdx'),
+        resolve(basePath, componentName, 'index.tsmd'),
         resolve(basePath, componentName, 'index.tsx'),
         resolve(basePath, componentName, 'index.ts'),
     ];
@@ -118,7 +118,7 @@ export function createPropsContext(functionParams: string[], props: any, paramet
     return context;
 }
 
-export function mergePropsWithDefaults(jsxProps: any, compiledComponent: CompiledMDX): any {
+export function mergePropsWithDefaults(jsxProps: any, compiledComponent: CompiledTSmd): any {
     const mergedProps = { ...jsxProps };
     const parameterTypes = compiledComponent.metadata?.parameterTypes;
 

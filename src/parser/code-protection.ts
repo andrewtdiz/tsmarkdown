@@ -1,4 +1,4 @@
-// Code Protection - protects code blocks and inline code from Better MDX parsing
+// Code Protection - protects code blocks and inline code from TSmd parsing
 
 import { Chunk } from "../runtime/tsm-runtime";
 
@@ -8,7 +8,7 @@ export interface CodeProtection {
 }
 
 /**
- * Protects code blocks and inline code from Better MDX parsing
+ * Protects code blocks and inline code from TSmd parsing
  * This prevents { } syntax inside code from being treated as JavaScript expressions
  */
 export function protectCodeBlocks(content: string): { protectedContent: string; codeBlocks: CodeProtection[] } {
@@ -41,7 +41,7 @@ export function protectCodeBlocks(content: string): { protectedContent: string; 
 }
 
 /**
- * Restores code blocks and inline code after Better MDX parsing
+ * Restores code blocks and inline code after TSmd parsing
  */
 export function restoreCodeBlocks(content: Chunk[], codeBlocks: CodeProtection[]): Chunk[] {
     // If there are no code blocks to restore, return the content as-is

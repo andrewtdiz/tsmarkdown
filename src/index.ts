@@ -1,7 +1,7 @@
 /**
- * Better MDX - Main Entry Point
+ * TS Markdown - Main Entry Point
  *
- * This module exports all the core functionality of Better-MDX.
+ * This module exports all the core functionality of TS Markdown.
  */
 
 // Core exports

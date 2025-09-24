@@ -1,19 +1,16 @@
 import { test, expect, describe } from 'bun:test';
 import {
-    ExactMDXTestRunner,
-    createExactMDXTest,
-    createExactMDXTestSuite
-} from '../../src/exact-testing-utilities';
+    ExactTSMDTestRunner,
+    createTSmdTest,
+} from '../../src/testing';
 
 describe('TypeScript and External Asset Import Features', () => {
-    const runner = new ExactMDXTestRunner();
-
     describe('Module Resolution', () => {
         test('should resolve relative TypeScript imports with explicit extension', async () => {
-            const mdxContent = await Bun.file(import.meta.dir + '/relative-ts-import.mdx').text();
-            const testCase = createExactMDXTest(
+            const contents = await Bun.file(import.meta.dir + '/relative-ts-import.tsmd').text();
+            const testCase = createTSmdTest(
                 'Relative TypeScript import with explicit extension',
-                mdxContent
+                contents
             )
                 .withContext({ basePath: import.meta.dir })
                 .expectExactLines(
@@ -28,10 +25,10 @@ describe('TypeScript and External Asset Import Features', () => {
         });
 
         test('should resolve relative imports without extension (default search order)', async () => {
-            const mdxContent = await Bun.file(import.meta.dir + '/relative-no-extension.mdx').text();
-            const testCase = createExactMDXTest(
+            const contents = await Bun.file(import.meta.dir + '/relative-no-extension.tsmd').text();
+            const testCase = createTSmdTest(
                 'Relative import without extension',
-                mdxContent
+                contents
             )
                 .withContext({ basePath: import.meta.dir })
                 .expectExactLines(
@@ -46,10 +43,10 @@ describe('TypeScript and External Asset Import Features', () => {
         });
 
         test('should honor alias maps before falling back to Node resolution', async () => {
-            const mdxContent = await Bun.file(import.meta.dir + '/alias-import.mdx').text();
-            const testCase = createExactMDXTest(
+            const contents = await Bun.file(import.meta.dir + '/alias-import.tsmd').text();
+            const testCase = createTSmdTest(
                 'Alias import resolution',
-                mdxContent
+                contents
             )
                 .withContext({
                     basePath: import.meta.dir,

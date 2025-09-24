@@ -190,9 +190,9 @@ export function createSafeContext(context: RenderContext, typescript?: string, r
         JSON,
         // Utility functions
         console: {
-            log: (...args: any[]) => console.log('[MDX]', ...args),
-            warn: (...args: any[]) => console.warn('[MDX]', ...args),
-            error: (...args: any[]) => console.error('[MDX]', ...args)
+            log: (...args: any[]) => console.log('[TSmd]', ...args),
+            warn: (...args: any[]) => console.warn('[TSmd]', ...args),
+            error: (...args: any[]) => console.error('[TSmd]', ...args)
         }
     };
 }

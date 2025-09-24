@@ -1,10 +1,10 @@
-import { ParsedMDX } from './parser';
+import { ParsedTSmd } from './parser';
 import { extractDependencies, compileTypeScript, compileTemplate, compileJSXExpression } from './compiler/compiler-utils';
 import { TSMComponent, TSMComponentAttribute } from './parser/tsm-ast';
 export { compileAllExportedFunctions, compileAllFunctions, type MultiFunctionCompilationResult } from './compiler/multi-function-compiler';
 export { compileFullFile, type FullFileCompilationResult, type FullFileExecutionResult } from './compiler/full-file-compiler';
 
-export interface CompiledMDX {
+export interface CompiledTSmd {
   id: string;
   typescript: string;
   template: string;
@@ -23,7 +23,7 @@ export interface CompiledMDX {
   };
 }
 
-export function compile(parsed: ParsedMDX): CompiledMDX {
+export function compile(parsed: ParsedTSmd): CompiledTSmd {
   // Extract dependencies from imports
   const dependencies = extractDependencies(parsed.imports);
 
@@ -58,4 +58,4 @@ export function compile(parsed: ParsedMDX): CompiledMDX {
 }
 
 // Backward compatibility alias
-export const compileMDX = compile;
+export const compileTSmd = compile;

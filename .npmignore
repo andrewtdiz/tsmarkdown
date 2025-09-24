@@ -3,12 +3,6 @@ src/
 test/
 test-compilation.ts
 
-# Development files
-*.mdx
-mdx/
-components/
-api/
-
 # Build artifacts
 *.tsbuildinfo
 
