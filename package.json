@@ -1,7 +1,7 @@
 {
   "name": "tsmarkdown",
   "version": "0.1.0",
-  "description": "A type-safe, component based markdown engine",
+  "description": "A type-safe, component-based markdown engine with TypeScript integration",
   "main": "dist/index.js",
   "type": "module",
   "exports": {
@@ -24,7 +24,11 @@
     "build:tsc": "tsc",
     "prepublishOnly": "bun run build",
     "test": "bun test",
-    "dev": "bun run build:tsc --watch"
+    "dev": "bun run build:tsc --watch",
+    "clean": "rm -rf dist",
+    "lint": "bun run build:tsc --noEmit",
+    "version": "bun run build && git add -A dist",
+    "postversion": "git push && git push --tags"
   },
   "keywords": [
     "tsmd",
@@ -35,25 +39,59 @@
     "compiler",
     "framework",
     "react",
-    "jsx"
+    "jsx",
+    "typescript-markdown",
+    "template-engine",
+    "static-site-generator",
+    "documentation",
+    "content-management"
   ],
-  "author": "andrewtdiz",
+  "author": {
+    "name": "andrewtdiz",
+    "url": "https://github.com/andrewtdiz"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/andrewtdiz/tsmarkdown.git"
+    "url": "https://github.com/andrewtdiz/tsmarkdown.git",
+    "directory": "packages/core"
   },
   "bugs": {
     "url": "https://github.com/andrewtdiz/tsmarkdown/issues"
   },
   "homepage": "https://github.com/andrewtdiz/tsmarkdown#readme",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/andrewtdiz"
+  },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "devDependencies": {
     "@types/bun": "^1.2.22",
     "@types/node": "^20.0.0",
     "typescript": "^5.9.2"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "peerDependencies": {
+    "typescript": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  }
 }
