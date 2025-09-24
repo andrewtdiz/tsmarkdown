@@ -1,7 +1,7 @@
 {
   "name": "tsmarkdown",
   "version": "0.1.0",
-  "description": "A type-safe, component-based markdown engine with TypeScript integration",
+  "description": "A type-safe, component-based markdown engine for TypeScript",
   "main": "src/index.ts",
   "type": "module",
   "exports": {
