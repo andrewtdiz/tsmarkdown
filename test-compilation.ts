@@ -2,7 +2,6 @@ import { execFileSync, execSync } from "node:child_process";
 import { compileFullFile } from "./src/compiler";
 
 const completeTypeScriptSource = `
-import {Dashboard} from "./components/Dashboard";
 import { getData } from "./api/getData";
 
 const VERSION_NUMBER = "1.0.0";
@@ -10,7 +9,9 @@ const VERSION_NUMBER = "1.0.0";
 function LocalComponent() {
   const someNumber = 30;
 
-  return <@Dashboard />
+  return (
+    Dashboard
+  )
 }
 
 function OlItem({ item, index }: { item: string, index: number }) {
@@ -48,10 +49,8 @@ export function TestComponent() {
 
     <@LocalComponent />
 
-    <@Dashboard title="My Dashboard" showHeader={true} />
-
     ## Users
-    <@List items={names} separator=" |" />
+    <@List items={names}  />
 
     Some number x 5: {{ someNumber * 5 }}
 

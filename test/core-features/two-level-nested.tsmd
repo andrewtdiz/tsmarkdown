@@ -1,4 +1,4 @@
-function TwoLevelNestedTest() {
+function Test() {
   const outer = true;
   const inner = true;
 

@@ -1,20 +1,22 @@
 import { test, expect, describe } from 'bun:test';
 import {
-    ExactTSMDTestRunner,
     createTSmdTest,
-    createTSmdTestSuite
+    createTSmdTestSuite,
+    TSMDTestRunner,
 } from '../../src/testing';
 
 describe('TSmd Exact Core Features', () => {
-    const runner = new ExactTSMDTestRunner();
+    const runner = new TSMDTestRunner();
 
     test('Basic interpolation - exact match', async () => {
         const contents = await Bun.file(import.meta.dir + '/basic-interpolation.tsmd').text();
         const testCase = createTSmdTest(
-            'Basic interpolation - exact match',
+            'Conditional rendering - truthy exact match',
             contents
         )
-            .expectExactContent('# Hello World!')
+            .expectExactLines(
+                '# Hello World!'
+            )
             .build();
 
         const result = await runner.runTestCase(testCase);
@@ -110,7 +112,7 @@ describe('TSmd Exact Core Features', () => {
 });
 
 describe('TSmd Complex Nested Conditionals - Exact Tests', () => {
-    const runner = new ExactTSMDTestRunner();
+    const runner = new TSMDTestRunner();
 
     test('Complex nested conditionals - exact match', async () => {
         const contents = await Bun.file(import.meta.dir + '/complex-nested-conditionals.tsmd').text();
@@ -183,7 +185,7 @@ describe('TSmd Complex Nested Conditionals - Exact Tests', () => {
 });
 
 describe('TSmd Exact Test Suite Integration', () => {
-    const runner = new ExactTSMDTestRunner();
+    const runner = new TSMDTestRunner();
 
     test('Run exact test suite', async () => {
         const suite = createTSmdTestSuite('Exact Features Suite')

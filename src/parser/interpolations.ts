@@ -174,7 +174,6 @@ export function parseInterpolations(content: string, context: ParseContext): str
         if (expression) {
             // Classify the expression type
             const expressionType = classifyExpression(expression);
-            console.log('DEBUG: Expression type for:', expression, 'is:', expressionType);
 
             let placeholder: string = '';
 
@@ -528,10 +527,6 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
                             const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
                             const content = parseContent(normalizedMarkdown, context);
                             const restoredContent = restoreCodeBlocks(content, codeBlocks);
-
-                            console.log('DEBUG: Conditional blockContent:', blockContent);
-                            console.log('DEBUG: Conditional content type:', typeof content);
-                            console.log('DEBUG: Conditional content:', content);
 
                             // Store the conditional block
                             const currentIndex = context.conditionalBlocks.length;

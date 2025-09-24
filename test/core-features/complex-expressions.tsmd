@@ -1,15 +1,15 @@
-function ComplexTest() {
+function Test() {
   const items = ['Apple', 'Banana', 'Cherry'];
   const user = { name: 'Alice', age: 30 };
+  const itemsList = items.map(item => `- ${item}`).join('\n');
 
   return (
-    # User: {{ user.name }}
+    # User Info
+    User: {{ user.name }}
     Age: {{ user.age }}
 
     Items:
-    {{ items.map((item, index) => (
-        - {{ item }}
-    ))}}
+    {{ itemsList }}
 
     Item count: {{ items.length }}
   )

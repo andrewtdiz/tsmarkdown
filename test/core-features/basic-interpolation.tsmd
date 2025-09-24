@@ -1,4 +1,4 @@
-function BasicTest() {
+function Test() {
   const greeting = 'Hello';
   const name = 'World';
 

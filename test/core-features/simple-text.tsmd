@@ -1,4 +1,4 @@
-function SimpleTest() {
+function Test() {
   return (
     # Hello World
   )

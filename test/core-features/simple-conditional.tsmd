@@ -1,4 +1,4 @@
-function SimpleConditionalTest() {
+function Test() {
   const showContent = true;
 
   return (

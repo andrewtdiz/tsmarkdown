@@ -1,4 +1,4 @@
-function VarTest() {
+function Test() {
   const name = 'Test';
   return (
     # {{ name }}

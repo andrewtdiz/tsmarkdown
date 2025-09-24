@@ -1,4 +1,4 @@
-function NestedTest() {
+function Test() {
   const user = { role: 'admin', permissions: ['read', 'write', 'delete'] };
   const isActive = true;
 

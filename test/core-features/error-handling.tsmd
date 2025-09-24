@@ -1,4 +1,4 @@
-function ErrorTest() {
+function Test() {
   const data = undefined;
 
   return (

@@ -1,4 +1,4 @@
-function SimpleProps({ items, withAnd }: { items: string[]; withAnd: boolean }) {
+function Test({ items, withAnd }: { items: string[]; withAnd: boolean }) {
   return (
     {{ items.length === 0 ? (
       Empty

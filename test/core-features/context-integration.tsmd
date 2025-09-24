@@ -1,4 +1,4 @@
-function ContextTest() {
+function Test() {
   const { user, isLoggedIn } = useAuth();
 
   return (
