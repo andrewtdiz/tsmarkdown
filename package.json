@@ -1,20 +1,55 @@
 {
   "name": "tsmarkdown",
   "version": "0.1.0",
-  "description": "Hybrid TypeScript + Markdown Framework",
+  "description": "A type-safe, component based markdown engine",
   "main": "dist/index.js",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./testing": {
+      "import": "./dist/testing-utilities.js",
+      "types": "./dist/testing-utilities.d.ts"
+    }
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "test": "bun test"
+    "build": "bun run build:tsc",
+    "build:tsc": "tsc",
+    "prepublishOnly": "bun run build",
+    "test": "bun test",
+    "dev": "bun run build:tsc --watch"
   },
   "keywords": [
     "tsmd",
     "typescript",
     "markdown",
-    "mdx"
+    "mdx",
+    "template",
+    "compiler",
+    "framework",
+    "react",
+    "jsx"
   ],
   "author": "andrewtdiz",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andrewtdiz/tsmarkdown.git"
+  },
+  "bugs": {
+    "url": "https://github.com/andrewtdiz/tsmarkdown/issues"
+  },
+  "homepage": "https://github.com/andrewtdiz/tsmarkdown#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "devDependencies": {
     "@types/bun": "^1.2.22",
     "@types/node": "^20.0.0",
