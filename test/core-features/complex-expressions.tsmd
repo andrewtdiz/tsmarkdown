@@ -1,11 +1,18 @@
+function ListItem({ item, index }: { item: string, index: number }) {
+  return (
+    - {{ item }}
+
+  )
+}
+
 function Test() {
   const items = ['Apple', 'Banana', 'Cherry'];
   const user = { name: 'Alice', age: 30 };
-
+  
   return (
-    Items:
+    Here's a list of items:
     {{ items.map((item, index) => (
-        - {{ item }}
+      <@ListItem item={item} index={index} />
     ))}}
   )
 }

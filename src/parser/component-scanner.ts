@@ -331,6 +331,7 @@ function isValidTypeScriptExpression(content: string): boolean {
         );
 
         // Check for syntax errors
+        //@ts-ignore
         const diagnostics = ts.getSyntacticDiagnostics(sourceFile);
 
         // If there are no syntax errors, it's likely valid TypeScript

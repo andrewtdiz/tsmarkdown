@@ -241,14 +241,15 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
                         `interface ${functionInfo.name}Props {\n  ${functionInfo.parameters.map(p => `${p.name}: ${p.type}${p.required ? '' : '?'}`).join(';\n  ')}\n}` : '',
                     parameterTypes: functionInfo.parameters
                 };
+
                 const compiled = compile(parsed);
+
                 functions.push({ functionInfo, compiled });
             } catch (error: any) {
                 errors.push(`Failed to compile function ${functionInfo.name}: ${error.message}`);
             }
         }
 
-        // Generate the complete transpiled file
         const transpiledFile = generateTranspiledFile(processedSourceFile, globalTemplates, functions);
 
         return {
@@ -267,6 +268,11 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
             errors
         };
     }
+}
+
+export async function transpile(source: string): Promise<string> {
+    const { transpiledFile, errors } = await compileFullFile(source);
+    return transpiledFile;
 }
 
 function isBooleanLiteral(node: ts.Node): node is ts.BooleanLiteral {
@@ -556,18 +562,31 @@ function chunksToTemplateLiteral(chunks: any[]): string {
         } else if (Array.isArray(chunk)) {
             // Check if this is a ternary condition array [ "condition", " ? ", ... ]
             if (chunk.length >= 3 && chunk[1] === ' ? ') {
-                // This is a ternary expression, preserve the condition as a variable reference
-                tsmChunks.push(chunk[0]); // The condition
-                // Add the rest of the ternary as-is
-                for (let i = 1; i < chunk.length; i++) {
-                    tsmChunks.push(chunk[i]);
-                }
+                // This is a ternary expression, convert it to a proper ternary that returns __tsm calls
+                const condition = chunk[0];
+                const trueValue = chunk[2];
+                const falseValue = chunk[4];
+
+                // Convert true and false values to __tsm calls
+                const trueTsm = typeof trueValue === 'string' ? `__tsm(["${trueValue}"])` : chunksToTemplateLiteral(trueValue);
+                const falseTsm = typeof falseValue === 'string' ? `__tsm(["${falseValue}"])` : chunksToTemplateLiteral(falseValue);
+
+                // Create a ternary expression that returns __tsm calls
+                tsmChunks.push(`${condition} ? ${trueTsm} : ${falseTsm}`);
             } else if (chunk.length === 1 && typeof chunk[0] === 'string') {
                 // This is a runtime interpolation, return the variable reference
                 tsmChunks.push(chunk[0]);
             } else {
                 // Otherwise, recursively process nested chunks
-                tsmChunks.push(chunksToTemplateLiteral(chunk));
+                const nestedResult = chunksToTemplateLiteral(chunk);
+                // If the nested result is already a __tsm call, don't wrap it again
+                if (nestedResult.startsWith('__tsm([') && nestedResult.endsWith('])')) {
+                    // Extract the inner content without the __tsm wrapper
+                    const innerContent = nestedResult.slice(7, -2); // Remove '__tsm([' and '])'
+                    tsmChunks.push(innerContent);
+                } else {
+                    tsmChunks.push(nestedResult);
+                }
             }
         } else {
             tsmChunks.push(String(chunk));

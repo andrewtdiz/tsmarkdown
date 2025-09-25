@@ -3,7 +3,6 @@ import { compileFullFile } from "./src/compiler";
 
 import content from "./test/core-features/complex-expressions.tsmd"
 
-
 const totalStart = performance.now();
 const file = await Bun.file(content).text();
 const fullFileResult = await compileFullFile(file);
@@ -25,6 +24,13 @@ ${fullFileResult.transpiledFile}
     process.exitCode = 1;
   }
 })();
+`;
+
+const expectedOutput = `
+Items:
+- Apple
+- Banana
+- Cherry
 `;
 
 Bun.write("compiled-test.ts", fileToRun);

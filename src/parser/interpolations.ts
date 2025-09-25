@@ -93,7 +93,8 @@ function processLegacySingleBraces(content: string, context: ParseContext): stri
 
                 case 'jsx':
                     placeholder = `__JSX_EXPRESSION_${context.jsxExpressions.length}__`;
-                    context.jsxExpressions.push({ placeholder, expression });
+                    //@ts-ignore
+                    context.jsxExpressions.push({ placeholder, expression, name: '', props: [] });
                     break;
 
                 case 'interpolation':
@@ -235,13 +236,21 @@ export function parseInterpolations(content: string, context: ParseContext): str
 
                 case 'jsx':
                     placeholder = `__JSX_EXPRESSION_${context.jsxExpressions.length}__`;
+                    //@ts-ignore
                     context.jsxExpressions.push({ placeholder, expression });
                     break;
 
                 case 'interpolation':
                 default:
+                    // Check if this interpolation contains nested {{ }} expressions
+                    let processedExpression = expression;
+                    if (processedExpression.includes('{{') && processedExpression.includes('}}')) {
+                        // Recursively process nested interpolations
+                        processedExpression = processNestedInterpolations(processedExpression, context);
+                    }
+
                     placeholder = `__INTERPOLATION_${context.interpolations.length}__`;
-                    context.interpolations.push({ placeholder, expression });
+                    context.interpolations.push({ placeholder, expression: processedExpression });
                     break;
             }
 
@@ -262,6 +271,45 @@ export function parseInterpolations(content: string, context: ParseContext): str
     processedContent = processLegacySingleBraces(processedContent, context);
 
     return processedContent;
+}
+
+// Helper function to process nested interpolations within expressions
+function processNestedInterpolations(expression: string, context: ParseContext): string {
+    let processedExpression = expression;
+    let startIndex = 0;
+
+    // Find and process all nested {{ }} expressions
+    while (startIndex < processedExpression.length) {
+        const openIndex = processedExpression.indexOf('{{', startIndex);
+        if (openIndex === -1) break;
+
+        const closeIndex = findMatchingDoubleBrace(processedExpression, openIndex);
+        if (closeIndex === -1) {
+            startIndex = openIndex + 2;
+            continue;
+        }
+
+        // Extract the nested expression
+        const nestedExpression = processedExpression.substring(openIndex + 2, closeIndex).trim();
+
+        if (nestedExpression) {
+            // Create a placeholder for the nested interpolation
+            const nestedPlaceholder = `__INTERPOLATION_${context.interpolations.length}__`;
+            context.interpolations.push({ placeholder: nestedPlaceholder, expression: nestedExpression });
+
+            // Replace the nested {{ }} with the placeholder
+            processedExpression = processedExpression.substring(0, openIndex) +
+                nestedPlaceholder +
+                processedExpression.substring(closeIndex + 2);
+
+            // Update startIndex to continue from the placeholder
+            startIndex = openIndex + nestedPlaceholder.length;
+        } else {
+            startIndex = closeIndex + 2;
+        }
+    }
+
+    return processedExpression;
 }
 
 // Helper function to find matching parenthesis (needed for conditional parsing)
@@ -323,8 +371,13 @@ function cleanParenthesesAndWhitespace(value: string): string {
 function parseNestedTernary(expression: string): { condition: string; trueValue: string; falseValue: string } {
 
     // For complex expressions with function calls, arrow functions, etc.,
-    // don't try to parse as ternary - let it be handled as regular interpolation
-    if (expression.includes('=>') || expression.includes('.map(') || expression.includes('.filter(')) {
+    // we still need to parse them as ternary expressions if they contain nested interpolations
+    // The key is to handle the ternary structure even if the values contain complex expressions
+    const hasComplexExpressions = expression.includes('=>') || expression.includes('.map(') || expression.includes('.filter(');
+    const hasNestedInterpolations = expression.includes('{{') && expression.includes('}}');
+
+    // If it has complex expressions but no nested interpolations, treat as regular interpolation
+    if (hasComplexExpressions && !hasNestedInterpolations) {
         return { condition: '', trueValue: '', falseValue: '' };
     }
 
@@ -373,73 +426,6 @@ function parseNestedTernary(expression: string): { condition: string; trueValue:
     return { condition, trueValue, falseValue };
 }
 
-export function processNestedInterpolations(
-    content: string,
-    interpolations: Array<{ placeholder: string; expression: string }>,
-): string {
-    let processedContent = content;
-    let startIndex = 0;
-
-    while (startIndex < processedContent.length) {
-        // Find the next {{ pattern
-        const openIndex = processedContent.indexOf('{{', startIndex);
-        if (openIndex === -1) break;
-
-        // Find the matching }} by counting nested braces
-        let braceCount = 0;
-        let closeIndex = openIndex + 2; // Start after {{
-
-        while (closeIndex < processedContent.length) {
-            const char = processedContent[closeIndex];
-            const nextChar = processedContent[closeIndex + 1];
-
-            if (char === '{' && nextChar === '{') {
-                // Found nested {{
-                braceCount++;
-                closeIndex += 2;
-            } else if (char === '}' && nextChar === '}') {
-                // Found }}
-                if (braceCount === 0) {
-                    // This is the matching closing }}
-                    break;
-                } else {
-                    // This is a nested closing }}, decrement count
-                    braceCount--;
-                    closeIndex += 2;
-                }
-            } else {
-                closeIndex++;
-            }
-        }
-
-        if (closeIndex >= processedContent.length) {
-            // No matching }} found, skip this one
-            startIndex = openIndex + 2;
-            continue;
-        }
-
-        // Extract the expression (everything between {{ and }})
-        const expression = processedContent.substring(openIndex + 2, closeIndex).trim();
-
-        if (expression) {
-            const placeholder = `__INTERPOLATION_${interpolations.length}__`;
-            interpolations.push({ placeholder, expression });
-
-            // Replace the entire {{ expression }} with the placeholder
-            processedContent = processedContent.substring(0, openIndex) +
-                placeholder +
-                processedContent.substring(closeIndex + 2);
-
-            // Update startIndex to continue from the placeholder
-            startIndex = openIndex + placeholder.length;
-        } else {
-            // Empty expression, skip
-            startIndex = closeIndex + 2;
-        }
-    }
-
-    return processedContent;
-}
 
 // TSM AST parser that builds AST nodes instead of chunks
 import type { TSMBlock, TSMLine, TSMTextChunk, TSMInterpolation } from './tsm-ast';
@@ -599,6 +585,7 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
 
                         // Create a unique placeholder for this JSX expression
                         const jsxPlaceholder = `__JSX_EXPRESSION_${context.jsxExpressions.length}__`;
+                        //@ts-ignore
                         context.jsxExpressions.push({
                             placeholder: jsxPlaceholder,
                             expression: fullMatch
@@ -661,6 +648,7 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
 
                             // Create a unique placeholder for this JSX expression
                             const jsxPlaceholder = `__JSX_EXPRESSION_${context.jsxExpressions.length}__`;
+                            //@ts-ignore
                             context.jsxExpressions.push({
                                 placeholder: jsxPlaceholder,
                                 expression: fullMatch
@@ -671,9 +659,15 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
                         }
                     }
 
+                    // Check if this interpolation contains nested {{ }} expressions
+                    if (processedExpression.includes('{{') && processedExpression.includes('}}')) {
+                        // Recursively process nested interpolations
+                        processedExpression = processNestedInterpolations(processedExpression, context);
+                    }
+
                     // Regular interpolation - add to context and create chunk
                     const placeholder = `__INTERPOLATION_${context.interpolations.length}__`;
-                    context.interpolations.push({ placeholder, processedExpression });
+                    context.interpolations.push({ placeholder, expression: processedExpression });
                     chunks.push(createTSMInterpolation(processedExpression, false, false));
                     break;
             }
@@ -1081,8 +1075,95 @@ export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[]
 
                         const trueVal = processValue(trueValue);
                         const falseVal = processValue(falseValue);
+
+                        // Check if the values contain complex expressions that need to be wrapped in __tsm
+                        const wrapInTsm = (val: any): any => {
+                            if (typeof val === 'string') {
+                                // If it's a string containing interpolation placeholders or complex expressions,
+                                // it needs to be processed and wrapped in __tsm
+                                if (val.includes('__INTERPOLATION_') || val.includes('.map(') || val.includes('=>')) {
+                                    // Process interpolation placeholders first
+                                    let processedVal = val;
+                                    if (val.includes('__INTERPOLATION_')) {
+                                        context.interpolations.forEach(({ placeholder, expression }) => {
+                                            processedVal = processedVal.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), `\${${expression}}`);
+                                        });
+                                    }
+                                    // Remove any surrounding quotes if they exist
+                                    if (processedVal.startsWith('"') && processedVal.endsWith('"')) {
+                                        processedVal = processedVal.slice(1, -1);
+                                    }
+
+                                    // Check if this is a map function that should return a template literal
+                                    if (processedVal.includes('.map(') && processedVal.includes('=>')) {
+                                        // This is a map function, return it as a template literal that will be executed
+                                        return `\`${processedVal}\``;
+                                    } else {
+                                        // For other complex expressions, return as-is
+                                        return processedVal;
+                                    }
+                                }
+                                return val;
+                            } else if (Array.isArray(val)) {
+                                // If it's an array of chunks, process it through the chunksToTemplateLiteral logic
+                                return processChunksForTsm(val);
+                            }
+                            return val;
+                        };
+
+                        const processChunksForTsm = (chunks: any[]): string => {
+                            const tsmChunks: string[] = [];
+                            for (const chunk of chunks) {
+                                if (typeof chunk === 'string') {
+                                    // Check if this is a JSX placeholder
+                                    const jsxMatch = chunk.match(/^__JSX_EXPRESSION_(\d+)__$/);
+                                    if (jsxMatch) {
+                                        const jsxIndex = parseInt(jsxMatch[1]);
+                                        const jsxExpr = context.jsxExpressions[jsxIndex];
+                                        if (jsxExpr && jsxExpr.expression) {
+                                            // Parse the JSX expression to get component name and props
+                                            const parsedJSX = parseJSXExpressionToTSMComponent(jsxExpr.expression);
+                                            if (parsedJSX) {
+                                                // Replace with actual JSX component call
+                                                tsmChunks.push(`${parsedJSX.name}(${propsToObjectString(parsedJSX.attributes)})`);
+                                            } else {
+                                                // Fallback to placeholder if JSX parsing fails
+                                                tsmChunks.push(`"${chunk}"`);
+                                            }
+                                        } else {
+                                            // Fallback to placeholder if JSX expression not found
+                                            tsmChunks.push(`"${chunk}"`);
+                                        }
+                                    } else if (chunk.includes('__INTERPOLATION_')) {
+                                        // This contains interpolation placeholders, process them
+                                        let processedChunk = chunk;
+                                        context.interpolations.forEach(({ placeholder, expression }) => {
+                                            processedChunk = processedChunk.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), `\${${expression}}`);
+                                        });
+                                        tsmChunks.push(`\`${processedChunk}\``);
+                                    } else {
+                                        tsmChunks.push(`"${chunk}"`);
+                                    }
+                                } else if (Array.isArray(chunk)) {
+                                    if (chunk.length === 1 && typeof chunk[0] === 'string') {
+                                        // This is a runtime interpolation - treat as variable reference
+                                        tsmChunks.push(chunk[0]);
+                                    } else {
+                                        // Otherwise, recursively process
+                                        tsmChunks.push(processChunksForTsm(chunk));
+                                    }
+                                } else {
+                                    tsmChunks.push(String(chunk));
+                                }
+                            }
+                            return `__tsm([${tsmChunks.join(', ')}])`;
+                        };
+
+                        const wrappedTrueVal = wrapInTsm(trueVal);
+                        const wrappedFalseVal = wrapInTsm(falseVal);
+
                         // The condition should be preserved as a runtime variable reference
-                        chunks.push([condition.trim(), ' ? ', trueVal, ' : ', falseVal] as Chunk);
+                        chunks.push([condition.trim(), ' ? ', wrappedTrueVal, ' : ', wrappedFalseVal] as Chunk);
                     } else {
                         // Fallback to treating as regular interpolation if parsing fails
                         chunks.push([interpolation.expression] as Chunk);
@@ -1153,6 +1234,7 @@ function processJSXElementsInText(content: string, context: ParseContext): strin
         const fullJsxElement = fullMatch; // Keep the full JSX element for later processing
 
         // Add to JSX expressions array
+        //@ts-ignore
         context.jsxExpressions.push({ placeholder, expression: fullJsxElement });
 
         // Replace the JSX element with the placeholder

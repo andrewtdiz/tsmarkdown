@@ -13,6 +13,7 @@ import { parseContent } from '../parser/pipeline';
 import { protectCodeBlocks, restoreCodeBlocks } from '../parser/code-protection';
 import { normalizeIndentation } from '../renderer/string-helpers';
 import type { TSMComponentAttribute } from '../parser/tsm-ast';
+import { Chunk } from '../runtime/tsm-runtime';
 
 /**
  * Preprocesses TSmd syntax within functions to make them parseable by TypeScript
@@ -105,6 +106,7 @@ export async function compileAllFunctions(source: string): Promise<MultiFunction
                 const parsed: ParsedTSmd = {
                     imports: [],
                     functionName: functionInfo.name,
+                    functionInfo: functionInfo,
                     functionParams: functionInfo.parameters.map(p => p.name),
                     isAsync: functionInfo.isAsync,
                     typescript: typescript,
@@ -319,9 +321,9 @@ function extractConditionBeforeReturn(source: string, returnIndex: number, funct
 /**
  * Extracts markdown content from a return statement using original source text
  */
-function extractMarkdownFromReturnStatementWithOriginalSource(returnNode: ts.ReturnStatement, originalSource: string): { content: string; interpolations: any[]; conditionalBlocks: any[]; ternaryExpressions: any[]; jsxExpressions: any[] } {
+function extractMarkdownFromReturnStatementWithOriginalSource(returnNode: ts.ReturnStatement, originalSource: string): { content: Chunk[]; interpolations: any[]; conditionalBlocks: any[]; ternaryExpressions: any[]; jsxExpressions: any[] } {
     if (!returnNode.expression) {
-        return { content: '', interpolations: [], conditionalBlocks: [], ternaryExpressions: [], jsxExpressions: [] };
+        return { content: [], interpolations: [], conditionalBlocks: [], ternaryExpressions: [], jsxExpressions: [] };
     }
 
     let rawContent = '';
@@ -417,9 +419,9 @@ function extractMarkdownFromReturnStatementWithOriginalSource(returnNode: ts.Ret
     };
 }
 
-function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sourceFile: ts.SourceFile): { content: string; interpolations: any[]; conditionalBlocks: any[]; ternaryExpressions: any[]; jsxExpressions: any[] } {
+function extractMarkdownFromReturnStatement(returnNode: ts.ReturnStatement, sourceFile: ts.SourceFile): { content: Chunk[]; interpolations: any[]; conditionalBlocks: any[]; ternaryExpressions: any[]; jsxExpressions: any[] } {
     if (!returnNode.expression) {
-        return { content: '', interpolations: [], conditionalBlocks: [], ternaryExpressions: [], jsxExpressions: [] };
+        return { content: [], interpolations: [], conditionalBlocks: [], ternaryExpressions: [], jsxExpressions: [] };
     }
 
     const sourceText = sourceFile.getFullText();

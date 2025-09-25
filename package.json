@@ -1,6 +1,6 @@
 {
-  "name": "tsmarkdown",
-  "version": "0.1.0",
+  "name": "typescriptmd",
+  "version": "0.1.1",
   "description": "A type-safe, component-based markdown engine for TypeScript",
   "main": "src/index.ts",
   "type": "module",
@@ -15,7 +15,6 @@
   },
   "files": [
     "dist/**/*",
-    "bin/**/*",
     "README.md",
     "LICENSE"
   ],

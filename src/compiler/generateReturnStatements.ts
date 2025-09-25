@@ -1,5 +1,5 @@
 import { ParsedTSmd } from "../parser";
-import { propsToObjectString } from "../renderer/string-helpers";
+import { propsToObjectString, normalizeIndentation } from "../renderer/string-helpers";
 import { Chunk } from "../runtime/tsm-runtime";
 
 // Helper function to detect ternary expression patterns in arrays
@@ -21,7 +21,7 @@ function unquoteIfQuoted(str: string): string {
 }
 
 // Helper function to reconstruct ternary expressions from arrays
-function reconstructTernary(arr: any[]): string {
+function reconstructTernary(arr: any[], parsed?: ParsedTSmd): string {
     if (!isTernaryArray(arr)) {
         return arr.join('');
     }
@@ -42,39 +42,299 @@ function reconstructTernary(arr: any[]): string {
         falseValue = falseValue.slice(1, -1);
     }
 
-    // Check if true/false values are __tsm calls that need recursive processing
-    if (typeof trueValue === 'string' && trueValue.startsWith('__tsm([') && trueValue.endsWith('])')) {
-        // __tsm calls are already properly formatted, extract as-is
-        trueValue = trueValue;
-    }
-    if (typeof falseValue === 'string' && falseValue.startsWith('__tsm([') && falseValue.endsWith('])')) {
-        // __tsm calls are already properly formatted, extract as-is
-        falseValue = falseValue;
+    // Check if true/false values contain nested interpolations that need __tsm conversion
+    let processedTrueValue: string;
+    let processedFalseValue: string;
+
+    if (typeof trueValue === 'string') {
+        if (trueValue.startsWith('__tsm([') && trueValue.endsWith('])')) {
+            // __tsm calls are already properly formatted, extract as-is
+            processedTrueValue = trueValue;
+        } else if (trueValue.includes('__INTERPOLATION_') && parsed) {
+            // Contains interpolation placeholders, process them
+            let processedValue = trueValue;
+            parsed.interpolations.forEach(({ placeholder, expression }) => {
+                processedValue = processedValue.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), `\${${expression}}`);
+            });
+
+            // If the processed value contains template literal syntax, check if it's a map function
+            if (processedValue.includes('${') && processedValue.includes('}')) {
+                if (processedValue.includes('.map(') && processedValue.includes('=>')) {
+                    // This is a map function, return it as a template literal (executable TypeScript)
+                    processedTrueValue = `\`${processedValue}\``;
+                } else {
+                    // Convert to __tsm array format for other cases
+                    processedTrueValue = convertTernaryValueToTsmArray(processedValue);
+                }
+            } else {
+                processedTrueValue = processedValue;
+            }
+        } else if (trueValue.includes('{{') && trueValue.includes('}}')) {
+            // Contains nested interpolations, convert to __tsm array format
+            processedTrueValue = convertTernaryValueToTsmArray(trueValue);
+        } else {
+            // Simple string values should be wrapped in __tsm calls
+            processedTrueValue = `__tsm(["${trueValue}"])`;
+        }
+    } else {
+        // Recursively process nested ternary expressions
+        processedTrueValue = reconstructTernary(trueValue, parsed);
     }
 
-    // Recursively process nested ternary expressions
-    const processedTrueValue = typeof trueValue === 'string' ? trueValue : reconstructTernary(trueValue);
-    const processedFalseValue = typeof falseValue === 'string' ? falseValue : reconstructTernary(falseValue);
+    if (typeof falseValue === 'string') {
+        if (falseValue.startsWith('__tsm([') && falseValue.endsWith('])')) {
+            // __tsm calls are already properly formatted, extract as-is
+            processedFalseValue = falseValue;
+        } else if (falseValue.includes('__INTERPOLATION_') && parsed) {
+            // Contains interpolation placeholders, process them
+            let processedValue = falseValue;
+            parsed.interpolations.forEach(({ placeholder, expression }) => {
+                processedValue = processedValue.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), `\${${expression}}`);
+            });
 
-    // Add quotes back if the original values were quoted
-    const finalTrueValue = rawTrueValue.startsWith('"') && rawTrueValue.endsWith('"') ? `"${processedTrueValue}"` : processedTrueValue;
-    const finalFalseValue = rawFalseValue.startsWith('"') && rawFalseValue.endsWith('"') ? `"${processedFalseValue}"` : processedFalseValue;
+            // If the processed value contains template literal syntax, check if it's a map function
+            if (processedValue.includes('${') && processedValue.includes('}')) {
+                if (processedValue.includes('.map(') && processedValue.includes('=>')) {
+                    // This is a map function, return it as a template literal (executable TypeScript)
+                    processedFalseValue = `\`${processedValue}\``;
+                } else {
+                    // Convert to __tsm array format for other cases
+                    processedFalseValue = convertTernaryValueToTsmArray(processedValue);
+                }
+            } else {
+                processedFalseValue = processedValue;
+            }
+        } else if (falseValue.includes('{{') && falseValue.includes('}}')) {
+            // Contains nested interpolations, convert to __tsm array format
+            processedFalseValue = convertTernaryValueToTsmArray(falseValue);
+        } else {
+            // Simple string values should be wrapped in __tsm calls
+            processedFalseValue = `__tsm(["${falseValue}"])`;
+        }
+    } else if (Array.isArray(falseValue)) {
+        // Handle array values by converting them to __tsm calls
+        processedFalseValue = convertArrayToTsmCall(falseValue);
+    } else {
+        // Recursively process nested ternary expressions
+        processedFalseValue = reconstructTernary(falseValue, parsed);
+    }
+
+    // Add quotes back if the original values were quoted, but not if the processed value is already a __tsm call, template literal, or map function
+    const finalTrueValue = (rawTrueValue.startsWith('"') && rawTrueValue.endsWith('"') && !processedTrueValue.startsWith('__tsm(') && !processedTrueValue.startsWith('`')) ? `"${processedTrueValue}"` : processedTrueValue;
+    const finalFalseValue = (rawFalseValue.startsWith('"') && rawFalseValue.endsWith('"') && !processedFalseValue.startsWith('__tsm(') && !processedFalseValue.startsWith('`')) ? `"${processedFalseValue}"` : processedFalseValue;
 
     return `${condition} ? ${finalTrueValue} : ${finalFalseValue}`;
 }
 
-function processNestedArrays(chunk: any[]): string {
+// Helper function to convert map function content to __tsm array format
+function convertToTsmArray(content: string): string {
+    // Apply the same whitespace normalization logic as full-file-compiler.ts
+    // Count leading and trailing newlines in the content
+    const leadingMatch = content.match(/^(\s*\n+)/);
+    const trailingMatch = content.match(/(\n+\s*)$/);
+
+    const leadingNewlines = leadingMatch ? (leadingMatch[1].match(/\n/g) || []).length : 0;
+    const trailingNewlines = trailingMatch ? (trailingMatch[1].match(/\n/g) || []).length : 0;
+
+    // Normalize indentation and trim, but preserve (n-1) newlines
+    const normalized = normalizeIndentation(content);
+    const trimmed = normalized.trim();
+    const leadingNewlineString = '\n'.repeat(Math.max(0, leadingNewlines - 1));
+    const trailingNewlineString = '\n'.repeat(Math.max(0, trailingNewlines - 1));
+
+    const normalizedContent = leadingNewlineString + trimmed + trailingNewlineString;
+
+    // Split the normalized content by template literal syntax and convert to __tsm array format
+    const parts: string[] = [];
+    let currentIndex = 0;
+
+    // Find all ${...} expressions
+    const templateLiteralRegex = /\$\{([^}]+)\}/g;
+    let match;
+
+    while ((match = templateLiteralRegex.exec(normalizedContent)) !== null) {
+        // Add text before the expression
+        if (match.index > currentIndex) {
+            const textBefore = normalizedContent.substring(currentIndex, match.index);
+            if (textBefore) {
+                // Use regular string literals, not template literals
+                const stringLiteral = JSON.stringify(textBefore);
+                parts.push(stringLiteral);
+            }
+        }
+
+        // Add the expression
+        parts.push(match[1]);
+
+        currentIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text after the last expression
+    if (currentIndex < normalizedContent.length) {
+        const textAfter = normalizedContent.substring(currentIndex);
+        if (textAfter) {
+            // Use regular string literals, not template literals
+            const stringLiteral = JSON.stringify(textAfter);
+            parts.push(stringLiteral);
+        }
+    }
+
+    // If no template literals were found, treat the entire content as a string
+    if (parts.length === 0) {
+        const stringLiteral = JSON.stringify(normalizedContent);
+        parts.push(stringLiteral);
+    }
+
+    return `__tsm([${parts.join(', ')}])`;
+}
+
+// Helper function to convert array values to __tsm calls
+function convertArrayToTsmCall(arr: any[]): string {
+    const chunks: string[] = [];
+
+    for (const item of arr) {
+        if (typeof item === 'string') {
+            chunks.push(`"${item}"`);
+        } else if (Array.isArray(item)) {
+            // This is likely an interpolation, process it
+            if (item.length === 1 && typeof item[0] === 'string') {
+                // Simple interpolation
+                chunks.push(item[0]);
+            } else {
+                // Complex interpolation, convert to __tsm call
+                chunks.push(convertArrayToTsmCall(item));
+            }
+        } else {
+            chunks.push(String(item));
+        }
+    }
+
+    return `__tsm([${chunks.join(', ')}])`;
+}
+
+// Helper function to convert ternary expression values to __tsm array format
+function convertTernaryValueToTsmArray(content: string): string {
+    // Check if the content contains nested interpolations or template literal syntax
+    const hasNestedInterpolations = content.includes('{{') && content.includes('}}');
+    const hasTemplateLiteralSyntax = content.includes('${') && content.includes('}');
+
+    if (!hasNestedInterpolations && !hasTemplateLiteralSyntax) {
+        // No nested interpolations or template literal syntax, return as-is
+        return JSON.stringify(content);
+    }
+
+    // Apply the same whitespace normalization logic as full-file-compiler.ts
+    const leadingMatch = content.match(/^(\s*\n+)/);
+    const trailingMatch = content.match(/(\n+\s*)$/);
+
+    const leadingNewlines = leadingMatch ? (leadingMatch[1].match(/\n/g) || []).length : 0;
+    const trailingNewlines = trailingMatch ? (trailingMatch[1].match(/\n/g) || []).length : 0;
+
+    // Normalize indentation and trim, but preserve (n-1) newlines
+    const normalized = normalizeIndentation(content);
+    const trimmed = normalized.trim();
+    const leadingNewlineString = '\n'.repeat(Math.max(0, leadingNewlines - 1));
+    const trailingNewlineString = '\n'.repeat(Math.max(0, trailingNewlines - 1));
+
+    const normalizedContent = leadingNewlineString + trimmed + trailingNewlineString;
+
+    // Split the normalized content by template literal syntax and convert to __tsm array format
+    const parts: string[] = [];
+    let currentIndex = 0;
+
+    // Find all ${...} expressions
+    const templateLiteralRegex = /\$\{([^}]+)\}/g;
+    let match;
+
+    while ((match = templateLiteralRegex.exec(normalizedContent)) !== null) {
+        // Add text before the expression
+        if (match.index > currentIndex) {
+            const textBefore = normalizedContent.substring(currentIndex, match.index);
+            if (textBefore) {
+                // Use regular string literals, not template literals
+                const stringLiteral = JSON.stringify(textBefore);
+                parts.push(stringLiteral);
+            }
+        }
+
+        // Add the expression
+        parts.push(match[1]);
+
+        currentIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text after the last expression
+    if (currentIndex < normalizedContent.length) {
+        const textAfter = normalizedContent.substring(currentIndex);
+        if (textAfter) {
+            // Use regular string literals, not template literals
+            const stringLiteral = JSON.stringify(textAfter);
+            parts.push(stringLiteral);
+        }
+    }
+
+    // If no template literals were found, treat the entire content as a string
+    if (parts.length === 0) {
+        const stringLiteral = JSON.stringify(normalizedContent);
+        parts.push(stringLiteral);
+    }
+
+    return `__tsm([${parts.join(', ')}])`;
+}
+
+function processNestedArrays(chunk: any[], parsed?: ParsedTSmd): string {
+
     // First, check if this is a ternary expression pattern
     if (isTernaryArray(chunk)) {
-        return reconstructTernary(chunk);
+        return reconstructTernary(chunk, parsed);
     }
 
     // Check if any element is an array (nested)
     const hasNestedArrays = chunk.some(c => Array.isArray(c));
 
     if (!hasNestedArrays) {
-        // No nested arrays, just join with empty string
-        return chunk.join('');
+        // No nested arrays, check if any element contains interpolation placeholders
+        let joinedChunk = chunk.join('');
+        if (joinedChunk.includes('__INTERPOLATION_') && parsed) {
+            parsed.interpolations.forEach(({ placeholder, expression }) => {
+                // For interpolation placeholders, we need to replace with the expression wrapped in ${} for template literal syntax
+                // But we need to be careful about the context - if this is inside a map function, we need to use template literal syntax
+                if (joinedChunk.includes('map(') && joinedChunk.includes('=>')) {
+                    // This is inside a map function, so we need to use template literal syntax
+                    // Replace just the placeholder with ${expression} for template literal syntax
+                    // But preserve the surrounding whitespace and newlines
+                    const placeholderRegex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+                    joinedChunk = joinedChunk.replace(placeholderRegex, `\${${expression}}`);
+                } else {
+                    // Regular interpolation replacement
+                    joinedChunk = joinedChunk.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), `\${${expression}}`);
+                }
+            });
+        }
+
+        // After processing all interpolations, convert map function to return __tsm chunks
+        if (joinedChunk.includes('map(') && joinedChunk.includes('=>') && joinedChunk.includes('${') && !joinedChunk.includes('__tsm(')) {
+            // For map functions, we need to re-enter the __tsm scope
+            // This means we need to parse the content and convert it to proper __tsm array format
+            const mapMatchWithParens = joinedChunk.match(/items\.map\(\([^)]+\)\s*=>\s*\(([^)]+)\)\)/);
+            if (mapMatchWithParens) {
+                const mapContent = mapMatchWithParens[1]; // Don't trim to preserve newlines!
+                // Parse the content and convert to __tsm array format
+                const tsmContent = convertToTsmArray(mapContent);
+                joinedChunk = joinedChunk.replace(mapMatchWithParens[0], `items.map((item, index) => ${tsmContent})`);
+            } else {
+                // Try the original pattern: items.map((item, index) => (\n...\n))
+                const mapMatch = joinedChunk.match(/items\.map\(\([^)]+\)\s*=>\s*\(([^)]+)\)/);
+                if (mapMatch) {
+                    const mapContent = mapMatch[1]; // Don't trim to preserve newlines!
+                    // Parse the content and convert to __tsm array format
+                    const tsmContent = convertToTsmArray(mapContent);
+                    joinedChunk = joinedChunk.replace(mapMatch[0], `items.map((item, index) => ${tsmContent})`);
+                }
+            }
+        }
+
+        return joinedChunk;
     }
 
     // Process each element, recursively handling nested arrays
@@ -85,11 +345,11 @@ function processNestedArrays(chunk: any[]): string {
         if (Array.isArray(element)) {
             // Check if this nested array is a ternary expression
             if (isTernaryArray(element)) {
-                processedElements.push(reconstructTernary(element));
+                processedElements.push(reconstructTernary(element, parsed));
                 hasTernaryElements = true;
             } else {
                 // Recursively process nested array
-                const processed = processNestedArrays(element);
+                const processed = processNestedArrays(element, parsed);
                 processedElements.push(processed);
                 // If the nested array resulted in a __tsm call, we need to wrap this in __tsm too
                 if (processed.startsWith('__tsm(')) {
@@ -97,13 +357,20 @@ function processNestedArrays(chunk: any[]): string {
                 }
             }
         } else {
-            processedElements.push(element);
+            // Check if this element contains interpolation placeholders
+            let processedElement = element;
+            if (typeof element === 'string' && element.includes('__INTERPOLATION_') && parsed) {
+                parsed.interpolations.forEach(({ placeholder, expression }) => {
+                    // For interpolation placeholders, we need to replace with the expression wrapped in ${} for template literal syntax
+                    processedElement = processedElement.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), `\${${expression}}`);
+                });
+            }
+            processedElements.push(processedElement);
         }
     }
 
     // Join all processed elements
     const joinedExpression = processedElements.join('');
-    console.log("JOINED EXPRESSION: ", joinedExpression);
 
     // Only wrap in __tsm() if we have complex nested content that isn't just ternary expressions
     if (hasTernaryElements && joinedExpression.includes('__tsm(')) {
@@ -213,6 +480,16 @@ export function generateReturnStatements(parsed: ParsedTSmd): string {
                                 });
                                 includeQuotes = false;
                             }
+
+                            // Replace interpolation placeholders with actual expressions
+                            if (chunk.includes('__INTERPOLATION_')) {
+                                parsed.interpolations.forEach(({ placeholder, expression }) => {
+                                    // For interpolation placeholders, we need to replace with the expression wrapped in ${} for template literal syntax
+                                    processedChunk = processedChunk.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), `\${${expression}}`);
+                                });
+                                includeQuotes = false;
+                            }
+
                             const literal = includeQuotes
                                 ? encodeStringLiteral(processedChunk, { style: "auto", allowTemplate: false })
                                 : processedChunk;
@@ -221,7 +498,7 @@ export function generateReturnStatements(parsed: ParsedTSmd): string {
                         } else if (Array.isArray(chunk)) {
                             // TSMInterpolations should be evaluated by TypeScript as expressions
                             // Process nested arrays with proper ternary handling
-                            const expression = processNestedArrays(chunk);
+                            const expression = processNestedArrays(chunk, parsed);
                             chunks.push(expression);
                         } else {
                             chunks.push(String(chunk));

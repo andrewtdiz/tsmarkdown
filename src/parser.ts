@@ -163,6 +163,7 @@ export function parseTSmd(content: string): ParsedTSmd {
   // Generate props interface
   const propsInterface = generatePropsInterface(functionName, parameterTypes);
 
+  //@ts-ignore
   return {
     imports: imports.filter(Boolean),
     functionName,

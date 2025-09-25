@@ -215,6 +215,7 @@ export function processJSXElementsForParsing(
         const parsedProps = parseJSXProps(props, jsxExpressions);
 
         // Convert JSX element to function call: ComponentName({ prop1: value1, prop2: value2 })
+        //@ts-ignore
         const propsString = propsToObjectString(parsedProps);
         const functionCall = `${componentName}(${propsString})`;
         return functionCall;
@@ -332,7 +333,7 @@ export function convertJSXToFunctionCalls(
         // We pass the jsxExpressions array so that expressions within props can be tracked
         const parsedProps = parseJSXProps(props, jsxExpressions || [], true);
 
-        // Generate function call: ComponentName({ prop1: value1, prop2: value2 })
+        //@ts-ignore
         const propsString = propsToObjectString(parsedProps);
         return `${componentName}(${propsString})`;
     });

@@ -1,21 +1,35 @@
 
 import { __tsm } from "./src/runtime/tsm-runtime";
 
+interface ListItemProps {
+  item: string;
+  index: number
+}
 
-    
-function Test(): string {
-  const name = 'Test';
+function ListItem({ item, index }: ListItemProps): string {
+  
     return __tsm([
-    "# ", name
+    "- ", item, "", '\n',
+    ""
+]);
+}
+
+function Test(): string {
+  const items = ['Apple', 'Banana', 'Cherry'];
+const user = { name: 'Alice', age: 30 };
+    return __tsm([
+    "Here's a list of items:", '\n',
+    "", items.map((item, index) => (
+ListItem({ item: item, index: index })
+))
 ]);
 }
 
 (async () => {
   try {
-    const props = {};
-    
-    const out = await Test(props);
+    const out = await Test();
     Bun.write("compiled-test.md", out);
+
   } catch (err) {
     console.error("Runtime error:", err);
     process.exitCode = 1;

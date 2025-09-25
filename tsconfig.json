@@ -13,6 +13,15 @@
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true
   },
-  "include": ["src/**/*", "bin/**/*"],
-  "exclude": ["node_modules", "dist", "test", "test-folder", "**/*.test.ts"]
+  "include": [
+    "src/**/*",
+    "bin/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test",
+    "test-folder",
+    "**/*.test.ts"
+  ]
 }
