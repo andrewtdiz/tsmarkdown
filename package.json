@@ -24,6 +24,7 @@
     "test": "bun test",
     "dev": "bun run build:tsc --watch",
     "clean": "rm -rf dist",
+    "publish": "npm publish --access public",
     "lint": "bun run build:tsc --noEmit",
     "version": "bun run build && git add -A dist",
     "postversion": "git push && git push --tags",
