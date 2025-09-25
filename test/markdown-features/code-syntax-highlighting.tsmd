@@ -60,9 +60,9 @@ function CodeSyntaxHighlighting() {
     You can mix `inline code` with regular text and code blocks:
 
     ```bash
-    bun add tsmarkdown
+    bun add typescriptmd
     ```
 
-    Then use it in your project with `import { compile } from 'tsmarkdown'`.
+    Then use it in your project with `import { compile } from 'typescriptmd'`.
   )
 }

@@ -2,7 +2,8 @@
 
 ![TS Markdown Extension](./EmbedImage.png)
 
-A TS Markdown (TSMD) framework that allows embedding markdown content within TypeScript functions using special block expressions. Create dynamic, template-driven content with full TypeScript support.
+A type-safe, component based markdown engine for embedding markdown content with TypeScript.
+Create dynamic, template-driven markdown with full type support.
 
 > ⚠️ **Early Alpha**: This library is in early alpha and is not stable for production applications.
 
@@ -43,10 +44,8 @@ function Welcome() {
 
     {{ isProduction ? (
       ## Production Mode ✅
-      Your app is running in production mode.
     ) : (
       ## Development Mode 🚧
-      You're in development mode with hot reload enabled.
     ) }}
   )
 }

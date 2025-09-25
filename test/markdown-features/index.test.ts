@@ -78,10 +78,10 @@ describe('TS Markdown Features', () => {
                     'You can mix `inline code` with regular text and code blocks:',
                     '',
                     '```bash',
-                    'npm install tsmarkdown',
+                    'npm install typescriptmd',
                     '```',
                     '',
-                    'Then use it in your project with `import { parseTSmd } from \'tsmarkdown\'`.'
+                    'Then use it in your project with `import { parseTSmd } from \'typescriptmd\'`.'
                 )
                 .build();
 
