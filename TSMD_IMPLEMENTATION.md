@@ -254,9 +254,8 @@ export async function TestComponent(): Promise<string | false> {
 * **TSM001** Non-stringifiable object interpolation (suggest `.toString()`).
 * **TSM002** Unbalanced `{{ ... }}` or unmatched `</...>` tag.
 * **TSM003** Component not imported: `<@X/>` without `X` import.
-* **TSM004** Disallowed top-level XML tag (if later we reserve names).
-* **TSM005** Async in sync context (if function not `async` but a child returns Promise).
-* **TSM006** Expression parse failure inside `{{ }}` (surface TS parser message + span).
+* **TSM004** Async in sync context (if function not `async` but a child returns Promise).
+* **TSM005** Expression parse failure inside `{{ }}` (surface TS parser message + span).
 * All diagnostics carry **file/line/column** and a quick-fix when possible.
 
 # 8) Whitespace Rules (Deterministic)

@@ -1,62 +1,100 @@
-# TSMD Architecture Investigation
+An analysis of the current `tsmarkdown` transpiler architecture reveals significant deviations from the `TSMD_IMPLEMENTATION.md` specification and several architectural issues that hinder maintainability and correctness.
 
-This document outlines the findings from investigating the current architecture of the TSMD transpiler, comparing the implementation in `src/compiler/full-file-compiler.ts` against the specification in `TSMD_IMPLEMENTATION.md`.
+This document outlines these findings and proposes a rearchitecture and migration strategy.
 
-## 1. Overall Architecture
+## 1. Current Architecture Overview
 
-The current transpilation process follows a multi-stage pipeline that deviates from the original specification.
+The current transpilation process is a complex, multi-stage pipeline that relies on a mix of regular expressions, TypeScript AST traversal, and manual string manipulation.
 
-1.  **Regex-based Pre-processing (`preprocessTSmdInFunctions`):** The compiler first performs a regex-based search for `return (...)` statements. It attempts to convert the content of these statements into standard TypeScript template literals (e.g., `` `...` ``) by replacing `{{...}}` with `${...}`. This is a significant departure from the spec, which proposed using the TypeScript AST to locate TSM blocks and then parsing them with a custom grammar.
+The high-level flow is as follows:
 
-2.  **Global Template Processing (`processGlobalTemplates`):** The compiler attempts to process top-level variable declarations to find TSM blocks, similar to how JSX returns work, e.g., `const myTemplate = (...)`. However, the implementation incorrectly looks for a non-standard `(*...*)` syntax instead of the correct `(...)` block syntax.
+1.  **Regex Pre-processing:** The source code is first passed through a regex-based pre-processor (`preprocessTSmdInFunctions`) that attempts to convert TSM `return (...)` blocks into standard TypeScript template literals (`` `...` ``). This is done to prevent the TypeScript parser from failing on the custom TSM syntax.
+2.  **Global Template Processing:** The pre-processed code is then parsed to find and transpile global variables that use a non-standard `(*...*)` template syntax (`processGlobalTemplates`).
+3.  **AST Parsing:** The resulting source is then parsed into a TypeScript AST.
+4.  **Function & Content Extraction:** The compiler traverses the AST to identify functions. For each function, it re-extracts the function body and return statements. The content of TSM blocks is extracted using brittle string-slicing and manual parenthesis matching, rather than relying on the AST.
+5.  **TSM Parsing:** The extracted string content is then sent to a separate TSM parser (`parseContent`) which tokenizes it into an array of "chunks".
+6.  **Code Generation:** Finally, a complex code generator (`generateReturnStatements`) iterates over these chunks to construct the final `__tsm([...])` runtime calls, attempting to reconstruct control flow like ternaries from the flat chunk array.
 
-3.  **TypeScript AST Parsing:** The pre-processed source code is then parsed into a standard TypeScript AST using `ts.createSourceFile`.
+This process is fragmented across multiple compiler entry points (`transpile.ts`, `new-compiler.ts`, `multi-function-compiler.ts`), with significant code duplication and convoluted logic.
 
-4.  **Feature Extraction:** The compiler traverses the AST to find functions and global template variables. It extracts the content from function return statements and the incorrectly identified `(*...*)` blocks.
+## 2. Key Issues & Architectural Mismatches
 
-5.  **TSM Feature Parsing (`parseContent`):** The extracted content is processed by a custom parser (`parseContent`) which identifies and builds data structures for interpolations (`{{...}}`), conditional blocks, and component tags (`<@.../>`).
+The current implementation suffers from several core problems that make it fragile and difficult to maintain.
 
-6.  **Code Generation:** The parsed structures are used to generate the final TypeScript code, which replaces the original TSM blocks with calls to the `__tsm` runtime function. The `generateTranspiledFile` function assembles the final transpiled file.
+### 2.1. Critical Defect: Regex-Based Pre-processing
 
-## 2. Feature Coverage (Spec vs. Implementation)
+The most significant architectural flaw is the reliance on regular expressions (`preprocessTSmdInFunctions`) to transform TSM syntax *before* proper AST parsing.
 
-| Feature | Specification | Implementation Status | Notes |
-| :--- | :--- | :--- | :--- |
-| **Block Markdown Return** | `return (...)` syntax parsed as a TSM block. | **Partially Implemented** | Implemented via a fragile regex pre-processor that converts it to a template literal. This is a major deviation from the spec's proposed AST-based approach and is prone to errors with nested or complex code. |
-| **Inline Interpolation** | `{{ expr }}` | **Implemented** | Handled by both the pre-processor and the `parseContent` pipeline. |
-| **Conditional Forms** | `{{ cond ? ... }}`, `{{ cond && ... }}` | **Implemented** | The parser correctly identifies and transforms conditional and ternary expressions. |
-| **Component Tags** | `<@Comp .../>` | **Implemented** | The parser handles JSX-like component syntax and converts it to function calls. |
-| **Global Templates** | Support for `(...)` blocks in variables is implied by the design. | **Incorrectly Implemented** | The feature is implemented, but it looks for a non-standard `(*...*)` syntax instead of the correct `(...)` block syntax used for returns. |
-| **Falsy Compaction** | Falsy values render as empty strings. | **Implemented** | Relies on the `__tsm` runtime function, which appears to handle this as specified. |
-| **Line-Erase Escape** | `{{ null }}` should remove a previous empty line. | **Not Implemented** | There is no evidence in the compiler or parser of handling for `{{ null }}` or the `__erasePrevLine` runtime function. |
-| **XML Wrappers** | `<content>...</content>` for structure only. | **Not Implemented** | The parser does not appear to recognize or strip these structural XML tags. |
-| **Comments in Blocks** | `//` comments should be ignored. | **Not Implemented** | The regex pre-processor does not account for comments, and they will likely be treated as literal text, contrary to the spec. |
+*   **Problem:** This approach is inherently fragile. It is incapable of understanding the full context of the TypeScript code, leading to incorrect transformations, especially with nested structures or complex expressions. It is a "hack" to make the source parsable by the TS compiler.
+*   **Spec Contradiction:** The specification implies an AST-first approach where the standard TS parser is used to identify the boundaries of a TSM block, which is then parsed internally. The current method does the opposite.
 
-## 3. Key Findings & Deviations
+### 2.2. AST Underutilization & Brittle String Manipulation
 
-1.  **Brittle and Flawed Parsing Strategy:** The entire parsing approach is architecturally unsound. 
-    *   **AST Underutilization:** The `extractMarkdownFromReturnStatement` function critically fails to use the AST. Instead of traversing the `ParenthesizedExpression` node, it reverts to operating on the raw source text, using manual parenthesis counting to find the end of the block. This is extremely fragile and will break with moderately complex nested code.
-    *   **Regex Pre-processing:** The initial `preprocessTSmdInFunctions` step, which attempts to convert TSM blocks to template strings, is a workaround that adds complexity and is prone to failure.
-    *   **Convoluted Whitespace Logic:** The process for normalizing indentation and handling newlines within `extractMarkdownFromReturnStatement` is complex, redundant, and involves multiple manual steps. This indicates a lack of a clear, robust whitespace handling strategy.
+The compiler consistently fails to use the TypeScript AST as a reliable source of truth.
 
-2.  **Incorrect Global Template Implementation:** The implementation for global templates is flawed. Instead of reusing the standard `(...)` block syntax, it incorrectly looks for a special, non-standard `(*...*)` syntax. This is a bug that creates an unnecessary and confusing inconsistency.
+*   **Problem:** After parsing the code into an AST, the compiler frequently reverts to manual string manipulation. For example, `extractMarkdownFromReturnStatement` and its variants use `sourceText.slice()` and manual parenthesis counting to extract the content of a `return (...)` block. This is extremely brittle and will fail with slight changes in formatting, comments, or nesting.
+*   **Impact:** This leads to duplicated and complex logic (e.g., multiple `extractFunctionContent` implementations) and is a primary source of bugs.
 
-3.  **Incomplete Feature Set:** Several key features from the specification are missing, most notably the line-erase escape (`{{ null }}`) and the handling of structural XML wrappers (`<content>`). The lack of comment support is also a critical gap.
+### 2.3. Incorrect Block Syntax & Spec Deviation
 
-## 4. Conclusion & Recommendations
+The compiler has implemented a template syntax that is not defined in the specification.
 
-The current implementation successfully covers several core TSM features, such as interpolation, conditionals, and components. However, its architecture deviates significantly from the original design, introducing risks and inconsistencies.
+*   **Problem:** The `processGlobalTemplates` function processes a `(*...*)` syntax for top-level template variables. The `TSMD_IMPLEMENTATION.md` specification **only** defines the `return (...)` syntax for TSM blocks within functions.
+*   **Impact:** This creates an inconsistent and undocumented syntax, diverging from the clear design goal of embedding markdown-like blocks within standard TypeScript function returns.
 
-**Recommendations:**
+### 2.4. Convoluted & Fragmented Architecture
 
-1.  **Overhaul the Parser:** The entire parsing mechanism needs to be refactored to be AST-first.
-    *   Remove the `preprocessTSmdInFunctions` step entirely.
-    *   Rewrite `extractMarkdownFromReturnStatement` to rely *only* on the TypeScript AST to extract the content of a TSM block. It should not perform manual string manipulation like parenthesis counting.
-    *   Simplify and consolidate the whitespace and indentation logic into a single, reliable function.
+The codebase contains multiple, overlapping compiler implementations.
 
-2.  **Correct the Global Template Implementation:** The bug in `processGlobalTemplates` should be fixed to correctly identify standard `(...)` TSM blocks instead of the non-standard `(*...*)` syntax.
+*   **Problem:** The existence of `transpile.ts` (as `full-file-compiler`), `multi-function-compiler.ts`, and `new-compiler.ts` indicates a lack of a unified architectural vision. These files contain duplicated logic, such as different versions of `extractFunctionContent` and `extractMarkdownFromReturnStatement`.
+*   **Impact:** This makes the codebase extremely difficult to understand, debug, and extend. A change in one compiler may not be reflected in the others, leading to inconsistent behavior.
 
-3.  **Implement Missing Features:** To achieve full feature coverage as per the spec, the following need to be implemented:
-    *   Line-erase escape (`{{ null }}`).
-    *   Handling of structural XML wrappers.
-    *   Ignoring comments within TSM blocks.
+### 2.5. Overly Complex Code Generation
+
+The code generation step is more complex than it needs to be.
+
+*   **Problem:** The TSM parser produces a simple array of "chunks". The `generateReturnStatements` function then performs complex operations (`processNestedArrays`, `reconstructTernary`) to rebuild programmatic structures like conditionals from this flat array.
+*   **Impact:** A more robust TSM parser that produces a proper AST (with nodes for `Text`, `Interpolation`, `Conditional`, etc.) would allow for a much simpler and more reliable code generator that simply "visits" each node and emits the corresponding TypeScript.
+
+### 2.6. Missing Features & Incomplete Implementation
+
+A preliminary review suggests that several features from the specification are not fully implemented or are missing entirely.
+
+*   **Examples:** The `{{ null }}` line-erase escape, rules for falsy values compacting whitespace, and component children are key features that appear to be unimplemented. The current focus on regex and string manipulation has likely diverted effort from implementing these core semantics.
+
+## 3. Proposed Rearchitecture & Incremental Migration
+
+To address these issues, a phased migration to a new, AST-centric architecture is recommended. This will align the compiler with the specification, improve robustness, and simplify the codebase.
+
+### Phase 1: Establish a True AST-First Pipeline
+
+The immediate priority is to eliminate all regex-based pre-processing and brittle string manipulation.
+
+1.  **Remove Pre-processing:** Delete `preprocessTSmdInFunctions` entirely.
+2.  **Parse Unmodified Source:** The compiler pipeline must start by parsing the original, unmodified TypeScript source code using `ts.createSourceFile`.
+3.  **AST-Based Block Identification:** Create a new "Block Finder" module that traverses the AST to identify TSM blocks.
+    *   A TSM block is a `ts.ReturnStatement` whose `expression` is a `ts.ParenthesizedExpression`.
+    *   This approach precisely and robustly identifies block boundaries.
+4.  **AST-Based Content Extraction:** Once a `ParenthesizedExpression` node is identified, its inner content can be extracted reliably using its AST node properties, completely replacing the `slice()` and manual-parsing logic.
+
+### Phase 2: Unify the Compiler and Enhance the TSM AST
+
+With a stable AST-first foundation, the next step is to unify the fragmented compiler logic and improve the internal TSM representation.
+
+1.  **Consolidate Compilers:** Merge the logic from `transpile.ts`, `new-compiler.ts`, and `multi-function-compiler.ts` into a single, coherent pipeline.
+2.  **Deprecate Incorrect Syntax:** Remove the logic for the non-standard `(*...*)` syntax from `processVariables.ts`. All TSM blocks should be handled through the unified `return (...)` mechanism.
+3.  **Improve the TSM Parser:** Refactor the TSM parser (`parser-utils`, `pipeline`) to produce a rich Abstract Syntax Tree (AST) as defined in `tsm-ast.ts`, rather than a simple array of chunks. This AST should have distinct node types for `Text`, `Interpolation`, `Component`, `ConditionalExpression`, etc.
+
+### Phase 3: Simplify Code Generation & Implement Missing Features
+
+A rich TSM AST will dramatically simplify code generation.
+
+1.  **Rewrite Code Generator:** Replace the complex `generateReturnStatements` with a new generator that operates on the TSM AST. This new generator will be a "visitor" that walks the TSM AST and recursively builds the `__tsm([...])` call.
+    *   Visiting a `Text` node emits a string literal.
+    *   Visiting an `Interpolation` node emits the raw expression.
+    *   Visiting a `ConditionalExpression` node emits a TypeScript ternary expression.
+2.  **Implement Missing Features:** With a robust architecture in place, conduct a full audit against `TSMD_IMPLEMENTATION.md` and implement all missing or incomplete features, such as:
+    *   `{{ null }}` line-erase escape.
+    *   Correct whitespace compaction for falsy values.
+    *   Support for component children (`<@Comp>...</@Comp>`).
+    *   Error handling and diagnostics as defined in the spec.

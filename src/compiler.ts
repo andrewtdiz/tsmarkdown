@@ -1,8 +1,21 @@
-import { ParsedTSmd } from './parser';
-import { extractDependencies, compileTypeScript, compileTemplate, compileJSXExpression } from './compiler/compiler-utils';
-import { TSMComponent, TSMComponentAttribute } from './parser/tsm-ast';
-export { compileAllExportedFunctions, compileAllFunctions, type MultiFunctionCompilationResult } from './compiler/multi-function-compiler';
-export { compileFullFile, type FullFileCompilationResult, type FullFileExecutionResult } from './compiler/full-file-compiler';
+import { ParsedTSmd } from "./parser";
+import {
+  extractDependencies,
+  compileTypeScript,
+  compileTemplate,
+  compileJSXExpression,
+} from "./compiler/compiler-utils";
+import { TSMComponent, TSMComponentAttribute } from "./parser/tsm-ast";
+export {
+  compileAllExportedFunctions,
+  compileAllFunctions,
+  type MultiFunctionCompilationResult,
+} from "./compiler/multi-function-compiler";
+export {
+  transpile as compileFullFile,
+  type FullFileCompilationResult,
+  type FullFileExecutionResult,
+} from "./transpile";
 
 export interface CompiledTSmd {
   id: string;
@@ -12,14 +25,27 @@ export interface CompiledTSmd {
   functionParams: string[];
   interpolations: Array<{ placeholder: string; expression: string }>;
   conditionalBlocks: Array<{ condition: string; content: any[] }>;
-  ternaryExpressions: Array<{ condition: string; trueValue: any[]; falseValue: any[] }>;
+  ternaryExpressions: Array<{
+    condition: string;
+    trueValue: any[];
+    falseValue: any[];
+  }>;
   jsxExpressions: Array<{ name: string; props: TSMComponentAttribute[] }>;
-  returnStatements: Array<{ condition?: string; content: string; isTemplate: boolean }>;
+  returnStatements: Array<{
+    condition?: string;
+    content: string;
+    isTemplate: boolean;
+  }>;
   metadata: {
     functionName: string;
     lastModified: string;
     propsInterface?: string;
-    parameterTypes: Array<{ name: string; type: string; required: boolean; defaultValue?: string }>;
+    parameterTypes: Array<{
+      name: string;
+      type: string;
+      required: boolean;
+      defaultValue?: string;
+    }>;
   };
 }
 
@@ -28,7 +54,7 @@ export function compile(parsed: ParsedTSmd): CompiledTSmd {
   const dependencies = extractDependencies(parsed.imports);
 
   // Generate a basic ID from function name
-  const id = parsed.functionName || 'unnamed-component';
+  const id = parsed.functionName || "unnamed-component";
 
   return {
     id,
@@ -37,14 +63,18 @@ export function compile(parsed: ParsedTSmd): CompiledTSmd {
     dependencies,
     functionParams: parsed.functionParams,
     interpolations: parsed.interpolations,
-    conditionalBlocks: parsed.conditionalBlocks.map(block => ({
+    conditionalBlocks: parsed.conditionalBlocks.map((block) => ({
       condition: block.condition,
-      content: Array.isArray(block.content) ? block.content : [block.content]
+      content: Array.isArray(block.content) ? block.content : [block.content],
     })),
-    ternaryExpressions: parsed.ternaryExpressions.map(expr => ({
+    ternaryExpressions: parsed.ternaryExpressions.map((expr) => ({
       condition: expr.condition,
-      trueValue: Array.isArray(expr.trueValue) ? expr.trueValue : [expr.trueValue],
-      falseValue: Array.isArray(expr.falseValue) ? expr.falseValue : [expr.falseValue]
+      trueValue: Array.isArray(expr.trueValue)
+        ? expr.trueValue
+        : [expr.trueValue],
+      falseValue: Array.isArray(expr.falseValue)
+        ? expr.falseValue
+        : [expr.falseValue],
     })),
     jsxExpressions: parsed.jsxExpressions,
     returnStatements: parsed.returnStatements,
@@ -52,8 +82,8 @@ export function compile(parsed: ParsedTSmd): CompiledTSmd {
       functionName: parsed.functionName,
       lastModified: new Date().toISOString(),
       propsInterface: parsed.propsInterface,
-      parameterTypes: parsed.parameterTypes
-    }
+      parameterTypes: parsed.parameterTypes,
+    },
   };
 }
 
