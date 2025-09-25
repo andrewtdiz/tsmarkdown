@@ -39,6 +39,11 @@ export async function watch(watchOptions?: WatchOptions) {
             mkdirSync(dir, { recursive: true });
         }
 
+        const generatedDir = `${dir}/_generated`;
+        if (!existsSync(generatedDir)) {
+            mkdirSync(generatedDir, { recursive: true });
+        }
+
         try {
             const file = readFileSync(inputFileName, "utf8");
             const fullFileResult = await transpile(file);
