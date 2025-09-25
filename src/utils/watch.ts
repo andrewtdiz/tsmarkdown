@@ -1,5 +1,5 @@
 import { readdir } from "fs/promises";
-import { readFileSync, unlinkSync, watch as fsWatch, writeFileSync } from "fs";
+import { readFileSync, unlinkSync, watch as fsWatch, writeFileSync, mkdirSync, existsSync } from "fs";
 import { transpile } from "../compiler/full-file-compiler";
 
 /**
@@ -34,6 +34,10 @@ export async function watch(watchOptions?: WatchOptions) {
         const inputFileName = `${dir}/${fileName}`;
         const fileTitle = fileName.split(".")[0];
         const outputFileName = `${dir}/_generated/${fileTitle}.ts`;
+
+        if (!existsSync(dir)) {
+            mkdirSync(dir, { recursive: true });
+        }
 
         try {
             const file = readFileSync(inputFileName, "utf8");
