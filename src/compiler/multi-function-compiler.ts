@@ -11,23 +11,25 @@ import { compile } from '../compiler';
 import { extractFunctions } from '../parser/typescript-parser';
 import { parseContent } from '../parser/pipeline';
 import { protectCodeBlocks, restoreCodeBlocks } from '../parser/code-protection';
-import { normalizeIndentation } from '../renderer/string-helpers';
+import { normalizeIndentation } from '../utils/string-helpers';
 import type { TSMComponentAttribute } from '../parser/tsm-ast';
 import { Chunk } from '../runtime/tsm-runtime';
 
 /**
  * Preprocesses TSmd syntax within functions to make them parseable by TypeScript
  */
-function preprocessTSmdInFunctions(source: string): string {
+export function preprocessTSmdInFunctions(source: string): string {
     // Find all return statements with TSmd syntax and convert them to template literals
     // This handles patterns like: return (content with {{ interpolation }})
 
     let processedSource = source;
 
     // Find return statements with parentheses that contain TSmd syntax
-    const returnWithParensRegex = /return\s*\(\s*([^)]*\{\{[^}]+\}\}[^)]*)\s*\)/g;
+    const returnWithParensRegex = /return\s*\(\s*([\s\S]*?\{\{[\s\S]*?\}\}[\s\S]*?)\s*\)/g;
 
     processedSource = processedSource.replace(returnWithParensRegex, (match, content) => {
+        console.log('DEBUG: Regex match:', match);
+        console.log('DEBUG: Regex content:', content);
         // Convert TSmd interpolations to template literal syntax
         let templateContent = content
             .replace(/\{\{([^}]+)\}\}/g, '${$1}')  // Convert {{ var }} to ${var}

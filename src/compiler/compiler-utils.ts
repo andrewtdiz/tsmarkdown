@@ -1,6 +1,6 @@
 import { ParsedTSmd } from "../parser";
 import type { Chunk } from "../runtime/tsm-runtime";
-import { parseJSXProps, propsToObjectString } from "../renderer/string-helpers";
+import { parseJSXProps } from "../utils/string-helpers";
 import { TSMComponent, TSMComponentAttribute } from "../parser/tsm-ast";
 import { generateReturnStatements } from "./generateReturnStatements";
 

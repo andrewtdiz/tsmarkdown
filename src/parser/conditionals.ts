@@ -1,6 +1,7 @@
 // Conditional parsing and processing
 import { findMatchingBrace, findMatchingParen } from './string-helpers';
 import type { ParseContext } from './types';
+import { processTernaryExpressions } from './ternary';
 
 // Recursive conditional parser
 export function parseConditionals(content: string, context: ParseContext): string {
@@ -145,7 +146,7 @@ export function processConditionalBlocks(
             }
             if (blockContent.includes('{') && blockContent.includes('?')) {
                 // Note: This creates a dependency on ternary - consider refactoring to avoid circular dependencies
-                const { processTernaryExpressions } = require('./ternary');
+                
                 processedBlockContent = processTernaryExpressions(processedBlockContent, ternaryExpressions);
             }
             if (blockContent.includes('{{')) {

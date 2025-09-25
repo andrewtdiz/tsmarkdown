@@ -1,0 +1,21 @@
+function SpaceBelowExample({ item }: { item: string }) {
+  return (
+    - {{ item }}
+
+  )
+}
+
+function SpaceAboveExample({ item }: { item: string }) {
+  return (
+
+    - {{ item }}
+  )
+}
+
+function SpaceBothSidesExample({ item }: { item: string }) {
+  return (
+
+    - {{ item }}
+
+  )
+}

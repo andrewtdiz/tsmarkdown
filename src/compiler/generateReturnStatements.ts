@@ -1,5 +1,5 @@
 import { ParsedTSmd } from "../parser";
-import { propsToObjectString, normalizeIndentation } from "../renderer/string-helpers";
+import { propsToObjectString, normalizeIndentation } from "../utils/string-helpers";
 import { Chunk } from "../runtime/tsm-runtime";
 
 // Helper function to detect ternary expression patterns in arrays

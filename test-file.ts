@@ -2,17 +2,18 @@ import { execFileSync, execSync } from "node:child_process";
 import { compileFullFile } from "./src/compiler";
 
 import content from "./test/core-features/complex-expressions.tsmd"
+import { transpile } from "./src/compiler/full-file-compiler";
 
 const totalStart = performance.now();
 const file = await Bun.file(content).text();
-const fullFileResult = await compileFullFile(file);
+const {transpiledFile} = compileFullFile(file);
 
-console.log('DEBUG: fullFileResult:', fullFileResult.transpiledFile);
+console.log('DEBUG: fullFileResult:', transpiledFile);
 
 const fileToRun = `
 import { __tsm } from "./src/runtime/tsm-runtime";
 
-${fullFileResult.transpiledFile}
+${transpiledFile}
 
 (async () => {
   try {

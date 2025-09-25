@@ -4,7 +4,7 @@ import type { ParseContext } from './types';
 import type { Chunk } from '../runtime/tsm-runtime';
 import type { TSMChunk, TSMComponent, TSMComponentAttribute, TSMAttributeValue } from './tsm-ast';
 import { protectCodeBlocks, restoreCodeBlocks } from './code-protection';
-import { normalizeIndentation, parseJSXProps, propsToObjectString } from '../renderer/string-helpers';
+import { normalizeIndentation, parseJSXProps, propsToObjectString } from '../utils/string-helpers';
 import { parseContent } from './pipeline';
 
 // Warning system for legacy single-brace usage
