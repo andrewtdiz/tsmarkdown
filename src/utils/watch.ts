@@ -48,7 +48,7 @@ export async function watch(watchOptions?: WatchOptions) {
             const file = readFileSync(inputFileName, "utf8");
             const fullFileResult = await transpile(file);
 
-            writeFileSync(outputFileName, `import { __tsm } from "tsmarkdown";\n\n${fullFileResult}`);
+            writeFileSync(outputFileName, `import { __tsm } from "typescriptmd";\n\n${fullFileResult}`);
 
         } catch (error) {
             console.error(`❌ Error transpiling ${fileName}:`, error);
