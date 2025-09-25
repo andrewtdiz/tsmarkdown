@@ -5,7 +5,7 @@
  */
 
 // Core exports
-export { transpile } from './compiler/full-file-compiler';
+export { watch } from './utils/watch';
 
 // Runtime types and functions
 export type { Chunk } from './runtime/tsm-runtime';
