@@ -3,14 +3,17 @@
   "workspaces": {
     "": {
       "name": "tsmarkdown",
-      "dependencies": {
-        "@types/react": "^19.1.13",
-      },
       "devDependencies": {
         "@types/bun": "^1.2.22",
         "@types/node": "^20.0.0",
         "typescript": "^5.9.2",
       },
+      "peerDependencies": {
+        "typescript": ">=5.0.0",
+      },
+      "optionalPeers": [
+        "typescript",
+      ],
     },
   },
   "packages": {
