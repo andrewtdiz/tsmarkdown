@@ -1,5 +1,5 @@
 // Unified double-brace syntax dispatcher
-import { findMatchingDoubleBrace, findMatchingBrace } from './string-helpers';
+import { findMatchingDoubleBrace, findMatchingBrace } from '../utils/string-helpers';
 import type { ParseContext } from './types';
 import type { Chunk } from '../runtime/tsm-runtime';
 import type { TSMChunk, TSMComponent, TSMComponentAttribute, TSMAttributeValue } from './tsm-ast';
@@ -54,6 +54,10 @@ function processLegacySingleBraces(content: string, context: ParseContext): stri
             let placeholder: string;
 
             switch (expressionType) {
+                case 'null':
+                    // Handle {{ null }} line-erase escape
+                    placeholder = `__NULL_${Date.now()}__`;
+                    break;
                 case 'conditional':
                     placeholder = `__CONDITIONAL_${context.conditionalBlocks.length}__`;
                     const andPattern = /&&\s*\(/;
@@ -119,21 +123,74 @@ function processLegacySingleBraces(content: string, context: ParseContext): stri
     return processedContent;
 }
 
+// Helper function to detect if a ternary expression contains TSM blocks
+function isTSMBlockTernary(expression: string, questionIndex: number, colonIndex: number): boolean {
+    // Extract the true and false values
+    const trueValue = expression.substring(questionIndex + 1, colonIndex).trim();
+    const falseValue = expression.substring(colonIndex + 1).trim();
+
+    // Check if either value starts with ( and contains TSM syntax
+    const isTrueTSMBlock = isTSMBlockPattern(trueValue);
+    const isFalseTSMBlock = isTSMBlockPattern(falseValue);
+
+    return isTrueTSMBlock || isFalseTSMBlock;
+}
+
+// Helper function to detect if a conditional expression contains TSM blocks
+function isTSMBlockConditional(expression: string): boolean {
+    const andPattern = /&&\s*\(/;
+    const match = expression.match(andPattern);
+    if (!match) return false;
+
+    const andIndex = match.index!;
+    const parenStart = andIndex + match[0].length - 1;
+    const parenEnd = findMatchingParen(expression, parenStart);
+
+    if (parenEnd === -1) return false;
+
+    const blockContent = expression.substring(parenStart + 1, parenEnd).trim();
+
+    // If there's content within parentheses in a logical AND expression,
+    // it should be treated as TSM content regardless of syntax markers
+    return blockContent.length > 0;
+}
+
+// Helper function to detect TSM content patterns (for interpolations)
+function isTSMContentPattern(content: string): boolean {
+    // For now, disable TSM content detection in interpolations
+    // This approach is causing issues with mixed content
+    return false;
+}
+
+// Helper function to detect TSM block patterns
+function isTSMBlockPattern(content: string): boolean {
+    // A TSM block pattern is identified by:
+    // 1. Starting with (
+    // 2. Containing TSM syntax markers: #, {{, <@, *, -, etc.
+    // 3. Not being a simple string or expression
+
+    if (!content.startsWith('(')) return false;
+
+    return isTSMContentPattern(content);
+}
+
 // Classify expression type and route to appropriate handler
-function classifyExpression(expression: string): 'conditional' | 'ternary' | 'jsx' | 'interpolation' {
+function classifyExpression(expression: string): 'conditional' | 'ternary' | 'jsx' | 'null' | 'tsm' | 'interpolation' {
     const trimmed = expression.trim();
 
-    // Check for conditional pattern: condition && (content)
-    // Must have && followed by ( and the pattern should be at the start
-    if (trimmed.includes('&&') && trimmed.includes('(') && trimmed.includes(')')) {
-        const andPattern = /&&\s*\(/;
-        if (andPattern.test(trimmed)) {
-            return 'conditional';
-        }
+    // Check for null pattern: {{ null }}
+    if (trimmed === 'null') {
+        return 'null';
     }
+
     // Check for JSX pattern: contains < and > or JSX elements
     if (trimmed.includes('<@') && trimmed.includes('>')) {
         return 'jsx';
+    }
+
+    // Check for TSM content pattern: contains TSM syntax markers
+    if (isTSMContentPattern(trimmed)) {
+        return 'tsm';
     }
 
     // Check for ternary pattern: condition ? trueValue : falseValue
@@ -142,7 +199,22 @@ function classifyExpression(expression: string): 'conditional' | 'ternary' | 'js
         const questionIndex = trimmed.indexOf('?');
         const colonIndex = trimmed.lastIndexOf(':');
         if (colonIndex > questionIndex) {
-            return 'ternary';
+            // Check if this is a TSM block ternary: condition ? (TSM content) : (TSM content)
+            if (isTSMBlockTernary(trimmed, questionIndex, colonIndex)) {
+                return 'ternary';
+            }
+        }
+    }
+
+    // Check for conditional pattern: condition && (content)
+    // Must have && followed by ( and the pattern should be at the start
+    if (trimmed.includes('&&') && trimmed.includes('(') && trimmed.includes(')')) {
+        const andPattern = /&&\s*\(/;
+        if (andPattern.test(trimmed)) {
+            // Check if this is a TSM block conditional: condition && (TSM content)
+            if (isTSMBlockConditional(trimmed)) {
+                return 'conditional';
+            }
         }
     }
 
@@ -179,6 +251,10 @@ export function parseInterpolations(content: string, context: ParseContext): str
             let placeholder: string = '';
 
             switch (expressionType) {
+                case 'null':
+                    // Handle {{ null }} line-erase escape
+                    placeholder = `__NULL_${Date.now()}__`;
+                    break;
                 case 'conditional':
                     // Parse conditional logic
                     const andPattern = /&&\s*\(/;
@@ -496,6 +572,14 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
             const expressionType = classifyExpression(expression);
 
             switch (expressionType) {
+                case 'null':
+                    // Handle {{ null }} line-erase escape
+                    chunks.push({
+                        type: 'TSMInterpolation',
+                        expression: 'null',
+                        isNull: true
+                    });
+                    break;
                 case 'conditional':
                     // Parse conditional logic
                     const andPattern = /&&\s*\(/;
@@ -508,25 +592,25 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
                         if (parenEnd !== -1) {
                             const blockContent = expression.substring(parenStart + 1, parenEnd).trim();
 
-                            // Process the conditional content through the parsing pipeline
+                            // PHASE 1 FIX: Recursively parse the nested content into AST
                             const { protectedContent, codeBlocks } = protectCodeBlocks(blockContent);
                             const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
-                            const content = parseContent(normalizedMarkdown, context);
-                            const restoredContent = restoreCodeBlocks(content, codeBlocks);
+                            const nestedAST = parseContent(normalizedMarkdown, context);
 
-                            // Store the conditional block
+                            // Store the conditional block with the parsed AST
                             const currentIndex = context.conditionalBlocks.length;
                             context.conditionalBlocks.push({
                                 condition: condition,
-                                content: restoredContent,
+                                content: nestedAST, // Store AST instead of processed chunks
                             });
 
-                            // Add the conditional expression as TSMInterpolation
+                            // Add the conditional expression as TSMInterpolation with nested AST
                             chunks.push({
                                 type: 'TSMInterpolation',
                                 expression: expression,
                                 isConditional: false,
                                 isLogical: true,
+                                nestedConditionalBlock: nestedAST, // Store the nested AST directly
                             });
                         } else {
                             // Invalid conditional syntax, treat as regular interpolation
@@ -542,28 +626,54 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
                     // Parse ternary logic with proper nesting support
                     const { condition, trueValue, falseValue } = parseNestedTernary(expression);
                     if (condition && trueValue && falseValue) {
-                        // Process the true and false values through the parsing pipeline
-                        const processValue = (value: string): Chunk[] => {
-                            if (value.trim()) {
-                                const { protectedContent, codeBlocks } = protectCodeBlocks(value);
-                                const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
-                                const chunks = parseContent(normalizedMarkdown, context);
-                                return restoreCodeBlocks(chunks, codeBlocks);
-                            }
-                            return [];
-                        };
+                        // Check if this is a TSM block ternary
+                        const isTrueTSMBlock = isTSMBlockPattern(trueValue);
+                        const isFalseTSMBlock = isTSMBlockPattern(falseValue);
 
-                        const processedTrueValue = processValue(trueValue);
-                        const processedFalseValue = processValue(falseValue);
+                        if (isTrueTSMBlock || isFalseTSMBlock) {
+                            // Process TSM blocks through the parsing pipeline
+                            const processTSMBlock = (value: string): Chunk[] => {
+                                if (value.trim()) {
+                                    // Remove outer parentheses if present
+                                    let blockContent = value.trim();
+                                    if (blockContent.startsWith('(') && blockContent.endsWith(')')) {
+                                        blockContent = blockContent.slice(1, -1).trim();
+                                    }
 
-                        context.ternaryExpressions.push({
-                            condition: condition,
-                            trueValue: processedTrueValue,
-                            falseValue: processedFalseValue,
-                        });
+                                    const { protectedContent, codeBlocks } = protectCodeBlocks(blockContent);
+                                    const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
+                                    const ast = parseContent(normalizedMarkdown, context);
+                                    const chunks = renderASTToChunks(ast, context);
+                                    return restoreCodeBlocks(chunks, codeBlocks);
+                                }
+                                return [];
+                            };
 
-                        // Add the ternary expression as TSMInterpolation
-                        chunks.push(createTSMInterpolation(expression, false, true));
+                            const processedTrueValue = isTrueTSMBlock ? processTSMBlock(trueValue) : [trueValue];
+                            const processedFalseValue = isFalseTSMBlock ? processTSMBlock(falseValue) : [falseValue];
+
+                            context.ternaryExpressions.push({
+                                condition: condition,
+                                trueValue: processedTrueValue,
+                                falseValue: processedFalseValue,
+                            });
+
+                            // Add the ternary expression as TSMInterpolation
+                            chunks.push(createTSMInterpolation(expression, false, true));
+                        } else {
+                            // Regular ternary with TypeScript expressions
+                            const processedTrueValue = parseInterpolations(trueValue, context);
+                            const processedFalseValue = parseInterpolations(falseValue, context);
+
+                            context.ternaryExpressions.push({
+                                condition: condition,
+                                trueValue: [processedTrueValue],
+                                falseValue: [processedFalseValue],
+                            });
+
+                            // Add the ternary expression as TSMInterpolation
+                            chunks.push(createTSMInterpolation(expression, false, true));
+                        }
                     } else {
                         console.log('DEBUG: Invalid ternary syntax, treating as regular interpolation');
                         // Invalid ternary syntax, treat as regular interpolation
@@ -605,7 +715,8 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
                                 if (value.trim()) {
                                     const { protectedContent, codeBlocks } = protectCodeBlocks(value);
                                     const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
-                                    const chunks = parseContent(normalizedMarkdown, context);
+                                    const ast = parseContent(normalizedMarkdown, context);
+                                    const chunks = renderASTToChunks(ast, context);
                                     return restoreCodeBlocks(chunks, codeBlocks);
                                 }
                                 return [];
@@ -630,6 +741,17 @@ export function parseInterpolationsToAST(content: string, context: ParseContext)
                         // Use the processed expression for the interpolation
                         chunks.push(createTSMInterpolation(jsxProcessedExpression, false, false));
                     }
+                    break;
+
+                case 'tsm':
+                    // Handle TSM content in interpolations - convert to __tsm block
+                    // For TSM content in interpolations, we need to create a special interpolation
+                    // that will be converted to a __tsm call during code generation
+                    chunks.push({
+                        type: 'TSMInterpolation',
+                        expression: expression,
+                        isTSMContent: true
+                    });
                     break;
 
                 case 'interpolation':
@@ -890,7 +1012,8 @@ export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[]
                             if (value.trim()) {
                                 const { protectedContent, codeBlocks } = protectCodeBlocks(value);
                                 const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
-                                const chunks = parseContent(normalizedMarkdown, context);
+                                const ast = parseContent(normalizedMarkdown, context);
+                                const chunks = renderASTToChunks(ast, context);
                                 const restoredChunks = restoreCodeBlocks(chunks, codeBlocks);
 
                                 // If we have chunks, check if they represent a conditional expression

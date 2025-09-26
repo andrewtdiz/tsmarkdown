@@ -1,5 +1,5 @@
 import { execFileSync } from "child_process";
-import { compileFullFile } from "./compiler";
+
 
 export interface TSMDTestResult {
   passed: boolean;
@@ -20,6 +20,8 @@ export interface TSMDTestCase {
 export class TSMDTestRunner {
   async runTestCase(testCase: TSMDTestCase): Promise<TSMDTestResult> {
     try {
+      // Use the new compiler architecture
+      const { compileFullFile } = await import('./compiler');
       const fullFileResult = await compileFullFile(testCase.source);
 
       if (fullFileResult.errors.length > 0) {

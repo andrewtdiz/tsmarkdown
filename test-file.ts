@@ -1,19 +1,17 @@
-import { execFileSync, execSync } from "node:child_process";
-import { compileFullFile } from "./src/compiler";
-
-import content from "./test/core-features/complex-expressions.tsmd";
-import { transpile } from "./src/transpile";
+import { execFileSync } from "node:child_process";
+import { transpileSource } from "./src/compiler/core";
 
 const totalStart = performance.now();
-const file = await Bun.file(content).text();
-const { transpiledFile } = compileFullFile(file);
+const file = await Bun.file("./test/core-features/complex-expressions.tsmd").text();
 
-console.log("DEBUG: fullFileResult:", transpiledFile);
+const compiled = transpileSource(file);
 
-const fileToRun = `
-import { __tsm } from "./src/runtime/tsm-runtime";
+console.log("=== Compiled file ===");
+console.log(compiled.transpiledFile);
 
-${transpiledFile}
+console.log("✅ TSM compilation successful!");
+
+const fileToRun = `${compiled.transpiledFile}
 
 (async () => {
   try {
@@ -28,10 +26,8 @@ ${transpiledFile}
 `;
 
 const expectedOutput = `
-Items:
-- Apple
-- Banana
-- Cherry
+Here's a list of items:
+Apple Banana Cherry
 `;
 
 Bun.write("compiled-test.ts", fileToRun);

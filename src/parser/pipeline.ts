@@ -5,22 +5,68 @@ import { protectCodeBlocks, restoreCodeBlocks } from './code-protection';
 import type { ParseContext } from './types';
 import type { Chunk } from '../runtime/tsm-runtime';
 
-// Re-export the shared type
 export type { ParseContext } from './types';
 
-// Unified parsing entry point - uses the new TSM AST system
-export function parseContent(content: string, context: ParseContext): Chunk[] {
-    // First, protect code blocks and inline code from parsing
+import { TSMBlock, TSMLine, TSMChunk, TSMTextChunk, TSMInterpolation } from "./tsm-ast";
+import { CodeProtection } from "./code-protection";
+
+export function parseContent(content: string, context: ParseContext): TSMBlock {
+    console.log(content);
     const { protectedContent, codeBlocks } = protectCodeBlocks(content);
 
-    // Parse to TSM AST
     const ast = parseInterpolationsToAST(protectedContent, context);
 
-    // Render AST to chunks
-    let chunks = renderASTToChunks(ast, context);
+    if (codeBlocks.length > 0) {
+        return restoreCodeBlocksInAST(ast, codeBlocks);
+    }
 
-    // Restore code blocks
-    chunks = restoreCodeBlocks(chunks, codeBlocks);
+    return ast;
+}
 
-    return chunks;
+/**
+ * Restores code blocks in TSM AST nodes
+ */
+function restoreCodeBlocksInAST(ast: TSMBlock, codeBlocks: CodeProtection[]): TSMBlock {
+    const restoredLines: TSMLine[] = [];
+
+    for (const line of ast.lines) {
+        const restoredChunks: TSMChunk[] = [];
+
+        for (const chunk of line.chunks) {
+            if (chunk.type === 'TSMTextChunk') {
+                // Restore code blocks in text chunks
+                let restoredContent = chunk.content;
+                for (const codeBlock of codeBlocks) {
+                    restoredContent = restoredContent.replace(codeBlock.placeholder, codeBlock.content);
+                }
+                restoredChunks.push({
+                    ...chunk,
+                    content: restoredContent
+                });
+            } else if (chunk.type === 'TSMInterpolation') {
+                // Restore code blocks in interpolation expressions
+                let restoredExpression = chunk.expression;
+                for (const codeBlock of codeBlocks) {
+                    restoredExpression = restoredExpression.replace(codeBlock.placeholder, codeBlock.content);
+                }
+                restoredChunks.push({
+                    ...chunk,
+                    expression: restoredExpression
+                });
+            } else {
+                // Pass through other chunk types unchanged
+                restoredChunks.push(chunk);
+            }
+        }
+
+        restoredLines.push({
+            ...line,
+            chunks: restoredChunks
+        });
+    }
+
+    return {
+        ...ast,
+        lines: restoredLines
+    };
 }

@@ -11,7 +11,7 @@
     }
   },
   "bin": {
-    "tsmarkdown": "./dist/bin/tsmarkdown.js"
+    "typescriptmd": "./dist/bin/typescriptmd.js"
   },
   "files": [
     "dist/**/*",
@@ -25,10 +25,10 @@
     "dev": "bun run build:tsc --watch",
     "clean": "rm -rf dist",
     "publish": "npm publish --access public",
-    "lint": "bun run build:tsc --noEmit",
+    "lint": "bun tsc --noEmit",
     "version": "bun run build && git add -A dist",
     "postversion": "git push && git push --tags",
-    "tsmarkdown": "bun run bin/tsmarkdown.ts"
+    "typescriptmd": "bun run bin/typescriptmd.ts"
   },
   "keywords": [
     "tsmd",

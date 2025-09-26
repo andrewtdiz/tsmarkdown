@@ -1,5 +1,5 @@
 // Conditional parsing and processing
-import { findMatchingBrace, findMatchingParen } from './string-helpers';
+import { findMatchingBrace, findMatchingParen } from '../utils/string-helpers';
 import type { ParseContext } from './types';
 import { processTernaryExpressions } from './ternary';
 

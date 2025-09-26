@@ -1,18 +1,15 @@
 function ListItem({ item, index }: { item: string, index: number }) {
   return (
     - {{ item }}
-
   )
 }
 
 function Test() {
   const items = ['Apple', 'Banana', 'Cherry'];
-  const user = { name: 'Alice', age: 30 };
+  const itemsStr = items.map((item, index) => `- ${item}`).join('\n');
   
   return (
     Here's a list of items:
-    {{ items.map((item, index) => (
-      <@ListItem item={item} index={index} />
-    ))}}
+    <@ListItem items={items[0]} />
   )
 }

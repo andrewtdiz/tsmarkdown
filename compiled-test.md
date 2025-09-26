@@ -1,2 +1,2 @@
-`Here's a list of items:
-- Apple- Banana- Cherry`
+Here's a list of items:
+__JSX_EXPRESSION_0__

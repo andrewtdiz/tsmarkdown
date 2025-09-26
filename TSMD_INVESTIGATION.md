@@ -1,100 +1,391 @@
-An analysis of the current `tsmarkdown` transpiler architecture reveals significant deviations from the `TSMD_IMPLEMENTATION.md` specification and several architectural issues that hinder maintainability and correctness.
+# TSM Implementation Architecture Investigation
 
-This document outlines these findings and proposes a rearchitecture and migration strategy.
+## Overview
 
-## 1. Current Architecture Overview
+This document provides a comprehensive analysis of the current TypeScript-Markdown (TSM) transpiler implementation, focusing on the architecture, parsing strategies, and the proper separation of concerns between TypeScript AST usage and regex-based parsing.
 
-The current transpilation process is a complex, multi-stage pipeline that relies on a mix of regular expressions, TypeScript AST traversal, and manual string manipulation.
+## Current Architecture Analysis
 
-The high-level flow is as follows:
+### 1. Core Transpilation Pipeline (`src/compiler/core.ts`)
 
-1.  **Regex Pre-processing:** The source code is first passed through a regex-based pre-processor (`preprocessTSmdInFunctions`) that attempts to convert TSM `return (...)` blocks into standard TypeScript template literals (`` `...` ``). This is done to prevent the TypeScript parser from failing on the custom TSM syntax.
-2.  **Global Template Processing:** The pre-processed code is then parsed to find and transpile global variables that use a non-standard `(*...*)` template syntax (`processGlobalTemplates`).
-3.  **AST Parsing:** The resulting source is then parsed into a TypeScript AST.
-4.  **Function & Content Extraction:** The compiler traverses the AST to identify functions. For each function, it re-extracts the function body and return statements. The content of TSM blocks is extracted using brittle string-slicing and manual parenthesis matching, rather than relying on the AST.
-5.  **TSM Parsing:** The extracted string content is then sent to a separate TSM parser (`parseContent`) which tokenizes it into an array of "chunks".
-6.  **Code Generation:** Finally, a complex code generator (`generateReturnStatements`) iterates over these chunks to construct the final `__tsm([...])` runtime calls, attempting to reconstruct control flow like ternaries from the flat chunk array.
+The main entry point uses a **hybrid approach** that combines TypeScript AST parsing with regex fallback:
 
-This process is fragmented across multiple compiler entry points (`transpile.ts`, `new-compiler.ts`, `multi-function-compiler.ts`), with significant code duplication and convoluted logic.
+#### AST-First Strategy
+- **Primary Method**: Uses TypeScript AST (`findTsmBlocks`) to locate `return (...)` statements
+- **AST Benefits**: Leverages TypeScript's robust parsing for valid TypeScript syntax
+- **AST Limitations**: Fails when TSM syntax is not valid TypeScript (e.g., markdown content with `#` headers)
 
-## 2. Key Issues & Architectural Mismatches
+#### Regex Fallback Strategy  
+- **Fallback Method**: Uses regex-based parsing (`findTsmBlocksWithRegex`) when AST fails
+- **Regex Benefits**: Can handle invalid TypeScript syntax that contains TSM constructs
+- **Regex Limitations**: Less precise than AST parsing, may miss edge cases
 
-The current implementation suffers from several core problems that make it fragile and difficult to maintain.
+#### Hybrid Implementation
+```typescript
+function findTsmBlocksWithAST(sourceFile: ts.SourceFile, source: string) {
+    try {
+        // Try AST approach first
+        const astBlocks = findTsmBlocks(sourceFile);
+        // Process AST results...
+    } catch (error) {
+        // Fall back to regex when AST fails
+        console.log('AST parsing failed, using regex fallback:', error);
+    }
+    
+    // Always use regex as well to catch TSM blocks AST couldn't parse
+    const regexBlocks = findTsmBlocksWithRegex(source);
+    // Merge results, avoiding duplicates
+}
+```
 
-### 2.1. Critical Defect: Regex-Based Pre-processing
+### 2. TSM Block Detection (`src/compiler/block-finder.ts`)
 
-The most significant architectural flaw is the reliance on regular expressions (`preprocessTSmdInFunctions`) to transform TSM syntax *before* proper AST parsing.
+#### AST-Based Detection
+- **Method**: `findTsmBlocks()` traverses TypeScript AST looking for `ReturnStatement` nodes with `ParenthesizedExpression`
+- **Precision**: High accuracy for valid TypeScript syntax
+- **Content Extraction**: `extractBlockContent()` uses AST node positions for precise content extraction
+- **Indentation Handling**: Automatically de-indents content using AST position information
 
-*   **Problem:** This approach is inherently fragile. It is incapable of understanding the full context of the TypeScript code, leading to incorrect transformations, especially with nested structures or complex expressions. It is a "hack" to make the source parsable by the TS compiler.
-*   **Spec Contradiction:** The specification implies an AST-first approach where the standard TS parser is used to identify the boundaries of a TSM block, which is then parsed internally. The current method does the opposite.
+#### Content Validation
+- **TSM Detection**: `isTSMContent()` checks for TSM syntax markers (`#`, `{{`, `<@`, `*`, `-`)
+- **Pattern Matching**: Simple regex-based detection of TSM constructs
 
-### 2.2. AST Underutilization & Brittle String Manipulation
+### 3. TSM Content Parsing (`src/parser/pipeline.ts`)
 
-The compiler consistently fails to use the TypeScript AST as a reliable source of truth.
+#### Unified Parsing Entry Point
+```typescript
+export function parseContent(content: string, context: ParseContext): TSMBlock {
+    // 1. Protect code blocks from parsing
+    const { protectedContent, codeBlocks } = protectCodeBlocks(content);
+    
+    // 2. Parse to TSM AST
+    const ast = parseInterpolationsToAST(protectedContent, context);
+    
+    // 3. Restore code blocks in the AST
+    if (codeBlocks.length > 0) {
+        return restoreCodeBlocksInAST(ast, codeBlocks);
+    }
+    
+    return ast;
+}
+```
 
-*   **Problem:** After parsing the code into an AST, the compiler frequently reverts to manual string manipulation. For example, `extractMarkdownFromReturnStatement` and its variants use `sourceText.slice()` and manual parenthesis counting to extract the content of a `return (...)` block. This is extremely brittle and will fail with slight changes in formatting, comments, or nesting.
-*   **Impact:** This leads to duplicated and complex logic (e.g., multiple `extractFunctionContent` implementations) and is a primary source of bugs.
+#### Code Protection Strategy
+- **Purpose**: Prevents code blocks (```` ``` ```` and `` ` ``) from being parsed as TSM syntax
+- **Implementation**: Uses placeholder replacement during parsing, then restores original content
+- **Critical**: Ensures JavaScript/TypeScript code within markdown isn't misinterpreted
 
-### 2.3. Incorrect Block Syntax & Spec Deviation
+### 4. Interpolation Parsing (`src/parser/interpolations.ts`)
 
-The compiler has implemented a template syntax that is not defined in the specification.
+#### Dual Parsing System
+The interpolation parser implements **two parallel systems**:
 
-*   **Problem:** The `processGlobalTemplates` function processes a `(*...*)` syntax for top-level template variables. The `TSMD_IMPLEMENTATION.md` specification **only** defines the `return (...)` syntax for TSM blocks within functions.
-*   **Impact:** This creates an inconsistent and undocumented syntax, diverging from the clear design goal of embedding markdown-like blocks within standard TypeScript function returns.
+1. **Legacy Chunk-Based Parser**: `parseInterpolations()` - processes content into chunks
+2. **Modern AST-Based Parser**: `parseInterpolationsToAST()` - builds TSM AST nodes
 
-### 2.4. Convoluted & Fragmented Architecture
+#### Expression Classification
+```typescript
+function classifyExpression(expression: string): 'conditional' | 'ternary' | 'jsx' | 'null' | 'interpolation' {
+    // Check for null pattern: {{ null }}
+    if (trimmed === 'null') return 'null';
+    
+    // Check for JSX pattern: contains < and > or JSX elements  
+    if (trimmed.includes('<@') && trimmed.includes('>')) return 'jsx';
+    
+    // Check for ternary pattern: condition ? trueValue : falseValue
+    if (trimmed.includes('?') && trimmed.includes(':')) return 'ternary';
+    
+    // Check for conditional pattern: condition && (content)
+    if (trimmed.includes('&&') && trimmed.includes('(')) return 'conditional';
+    
+    return 'interpolation';
+}
+```
 
-The codebase contains multiple, overlapping compiler implementations.
+#### Nested Expression Handling
+- **Recursive Processing**: Handles nested `{{ }}` expressions within other expressions
+- **Context Preservation**: Maintains parsing context across nested levels
+- **Placeholder System**: Uses unique placeholders to avoid conflicts during processing
 
-*   **Problem:** The existence of `transpile.ts` (as `full-file-compiler`), `multi-function-compiler.ts`, and `new-compiler.ts` indicates a lack of a unified architectural vision. These files contain duplicated logic, such as different versions of `extractFunctionContent` and `extractMarkdownFromReturnStatement`.
-*   **Impact:** This makes the codebase extremely difficult to understand, debug, and extend. A change in one compiler may not be reflected in the others, leading to inconsistent behavior.
+### 5. TSM AST Structure (`src/parser/tsm-ast.ts`)
 
-### 2.5. Overly Complex Code Generation
+#### Well-Defined AST Nodes
+```typescript
+// Core AST types
+export interface TSMBlock extends TSMNode {
+    type: 'TSMBlock';
+    lines: TSMLine[];
+}
 
-The code generation step is more complex than it needs to be.
+export interface TSMLine extends TSMNode {
+    type: 'TSMLine';
+    chunks: TSMChunk[];
+    isEmpty?: boolean;
+    isComment?: boolean;
+}
 
-*   **Problem:** The TSM parser produces a simple array of "chunks". The `generateReturnStatements` function then performs complex operations (`processNestedArrays`, `reconstructTernary`) to rebuild programmatic structures like conditionals from this flat array.
-*   **Impact:** A more robust TSM parser that produces a proper AST (with nodes for `Text`, `Interpolation`, `Conditional`, etc.) would allow for a much simpler and more reliable code generator that simply "visits" each node and emits the corresponding TypeScript.
+export type TSMChunk = TSMTextChunk | TSMInterpolation | TSMComponent;
+```
 
-### 2.6. Missing Features & Incomplete Implementation
+#### Type Safety
+- **Type Guards**: Comprehensive type checking functions (`isTSMBlock`, `isTSMLine`, etc.)
+- **Visitor Pattern**: Support for AST traversal and transformation
+- **Transformer Pattern**: Support for AST modification
 
-A preliminary review suggests that several features from the specification are not fully implemented or are missing entirely.
+### 6. Code Generation (`src/compiler/ast-code-generator.ts`)
 
-*   **Examples:** The `{{ null }}` line-erase escape, rules for falsy values compacting whitespace, and component children are key features that appear to be unimplemented. The current focus on regex and string manipulation has likely diverted effort from implementing these core semantics.
+#### AST Visitor Implementation
+```typescript
+class TSMCodeGenerator implements TSMVisitor {
+    generate(block: TSMBlock): string {
+        this.output = [];
+        this.visitBlock(block);
+        return this.output.join('');
+    }
+    
+    visitBlock(block: TSMBlock): void {
+        this.output.push('__tsm([');
+        // Process each line...
+        this.output.push('])');
+    }
+}
+```
 
-## 3. Proposed Rearchitecture & Incremental Migration
+#### Complex Expression Handling
+- **Ternary Expressions**: Properly handles `{{ cond ? (...) : (...) }}` with TSM block detection
+- **Logical Expressions**: Handles `{{ cond && (...) }}` patterns
+- **Component Calls**: Generates proper function calls for `<@Component />` syntax
+- **Nested TSM Blocks**: Recursively processes TSM content within expressions
 
-To address these issues, a phased migration to a new, AST-centric architecture is recommended. This will align the compiler with the specification, improve robustness, and simplify the codebase.
+### 7. Runtime System (`src/runtime/tsm-runtime.ts`)
 
-### Phase 1: Establish a True AST-First Pipeline
+#### Chunk Processing
+```typescript
+export function __tsm(chunks: Array<Chunk>): string {
+    const buffer: string[] = [];
+    const flattenedChunks = __tsmJoin(chunks);
+    
+    for (const chunk of flattenedChunks) {
+        if (chunk === __ERASE_PREV_LINE || chunk === null) {
+            __erasePrevLine(buffer);
+        } else if (chunk === undefined || chunk === false) {
+            continue; // Falsy values don't emit text
+        } else if (typeof chunk === 'string') {
+            buffer.push(chunk);
+        }
+        // Handle other chunk types...
+    }
+    
+    return buffer.join('');
+}
+```
 
-The immediate priority is to eliminate all regex-based pre-processing and brittle string manipulation.
+#### Falsy Compaction
+- **Null Handling**: `{{ null }}` triggers line erasure functionality
+- **Falsy Values**: `undefined` and `false` don't emit text or whitespace
+- **Whitespace Rules**: Proper handling of leading/trailing spaces around falsy values
 
-1.  **Remove Pre-processing:** Delete `preprocessTSmdInFunctions` entirely.
-2.  **Parse Unmodified Source:** The compiler pipeline must start by parsing the original, unmodified TypeScript source code using `ts.createSourceFile`.
-3.  **AST-Based Block Identification:** Create a new "Block Finder" module that traverses the AST to identify TSM blocks.
-    *   A TSM block is a `ts.ReturnStatement` whose `expression` is a `ts.ParenthesizedExpression`.
-    *   This approach precisely and robustly identifies block boundaries.
-4.  **AST-Based Content Extraction:** Once a `ParenthesizedExpression` node is identified, its inner content can be extracted reliably using its AST node properties, completely replacing the `slice()` and manual-parsing logic.
+## Architecture Strengths
 
-### Phase 2: Unify the Compiler and Enhance the TSM AST
+### 1. Proper Separation of Concerns
 
-With a stable AST-first foundation, the next step is to unify the fragmented compiler logic and improve the internal TSM representation.
+#### TypeScript AST Usage
+- **When Used**: For parsing valid TypeScript syntax and locating TSM blocks
+- **Benefits**: Leverages TypeScript's robust parsing capabilities
+- **Scope**: Limited to structural analysis (finding `return (...)` statements)
 
-1.  **Consolidate Compilers:** Merge the logic from `transpile.ts`, `new-compiler.ts`, and `multi-function-compiler.ts` into a single, coherent pipeline.
-2.  **Deprecate Incorrect Syntax:** Remove the logic for the non-standard `(*...*)` syntax from `processVariables.ts`. All TSM blocks should be handled through the unified `return (...)` mechanism.
-3.  **Improve the TSM Parser:** Refactor the TSM parser (`parser-utils`, `pipeline`) to produce a rich Abstract Syntax Tree (AST) as defined in `tsm-ast.ts`, rather than a simple array of chunks. This AST should have distinct node types for `Text`, `Interpolation`, `Component`, `ConditionalExpression`, etc.
+#### Regex Usage  
+- **When Used**: For parsing TSM-specific syntax (`{{ }}`, `<@Component />`, markdown)
+- **Benefits**: Can handle syntax that's not valid TypeScript
+- **Scope**: Content parsing within TSM blocks
 
-### Phase 3: Simplify Code Generation & Implement Missing Features
+### 2. Layered Architecture
 
-A rich TSM AST will dramatically simplify code generation.
+```
+┌─────────────────────────────────────┐
+│           Core Transpiler           │  ← Entry point, orchestration
+├─────────────────────────────────────┤
+│        Block Detection Layer        │  ← AST + Regex hybrid
+├─────────────────────────────────────┤
+│         TSM Parser Layer            │  ← TSM-specific parsing
+├─────────────────────────────────────┤
+│        AST Generation Layer         │  ← Code generation
+├─────────────────────────────────────┤
+│         Runtime Layer               │  ← Execution primitives
+└─────────────────────────────────────┘
+```
 
-1.  **Rewrite Code Generator:** Replace the complex `generateReturnStatements` with a new generator that operates on the TSM AST. This new generator will be a "visitor" that walks the TSM AST and recursively builds the `__tsm([...])` call.
-    *   Visiting a `Text` node emits a string literal.
-    *   Visiting an `Interpolation` node emits the raw expression.
-    *   Visiting a `ConditionalExpression` node emits a TypeScript ternary expression.
-2.  **Implement Missing Features:** With a robust architecture in place, conduct a full audit against `TSMD_IMPLEMENTATION.md` and implement all missing or incomplete features, such as:
-    *   `{{ null }}` line-erase escape.
-    *   Correct whitespace compaction for falsy values.
-    *   Support for component children (`<@Comp>...</@Comp>`).
-    *   Error handling and diagnostics as defined in the spec.
+### 3. Robust Error Handling
+
+#### Graceful Degradation
+- AST parsing fails → Falls back to regex
+- Invalid TSM syntax → Treats as regular text
+- Missing components → Generates placeholders
+
+#### Code Protection
+- Code blocks are protected from TSM parsing
+- Inline code is preserved during processing
+- JavaScript expressions within markdown are not misinterpreted
+
+## Areas for Improvement
+
+### 1. Parser Separation Issues
+
+#### Current State
+- **Markdown Parsing**: Handled by regex-based interpolation parser
+- **Expression Parsing**: Mixed with markdown parsing in same module
+- **Component Parsing**: Integrated into interpolation parser
+
+#### Recommended Separation
+```
+┌─────────────────────────────────────┐
+│         Markdown Parser             │  ← Pure markdown syntax (#, *, -, etc.)
+├─────────────────────────────────────┤
+│       Expression Parser              │  ← {{ }} expressions only
+├─────────────────────────────────────┤
+│        Component Parser              │  ← <@Component /> syntax
+└─────────────────────────────────────┘
+```
+
+### 2. AST vs Regex Usage Optimization
+
+#### Current Hybrid Approach
+- **Good**: Covers both valid and invalid TypeScript syntax
+- **Issue**: Some redundancy between AST and regex approaches
+- **Opportunity**: More precise routing based on content type
+
+#### Recommended Approach
+```typescript
+function findTsmBlocks(sourceFile: ts.SourceFile, source: string) {
+    // 1. Use AST for structural analysis (finding return statements)
+    const astBlocks = findTsmBlocksAST(sourceFile);
+    
+    // 2. For each AST block, determine parsing strategy
+    for (const block of astBlocks) {
+        const content = extractBlockContent(block, sourceFile);
+        
+        if (isValidTypeScriptExpression(content)) {
+            // Use AST-based parsing for valid TypeScript
+            parseWithAST(content);
+        } else {
+            // Use regex-based parsing for TSM syntax
+            parseWithRegex(content);
+        }
+    }
+}
+```
+
+### 3. TSM AST Completeness
+
+#### Current AST Coverage
+- ✅ Text chunks
+- ✅ Interpolations  
+- ✅ Components
+- ✅ Lines and blocks
+
+#### Missing AST Nodes
+- ❌ Markdown-specific nodes (headers, lists, emphasis)
+- ❌ Conditional block nodes
+- ❌ Ternary expression nodes
+
+#### Recommended Enhancement
+```typescript
+// Add markdown-specific AST nodes
+export interface TSMHeader extends TSMNode {
+    type: 'TSMHeader';
+    level: number; // 1-6 for h1-h6
+    content: string;
+}
+
+export interface TSMList extends TSMNode {
+    type: 'TSMList';
+    items: TSMListItem[];
+    ordered: boolean;
+}
+
+export interface TSMConditional extends TSMNode {
+    type: 'TSMConditional';
+    condition: string;
+    trueBlock: TSMBlock;
+    falseBlock?: TSMBlock;
+}
+```
+
+## Implementation Recommendations
+
+### 1. Immediate Improvements
+
+#### Separate Parser Modules
+```typescript
+// src/parser/markdown-parser.ts
+export function parseMarkdown(content: string): TSMBlock {
+    // Handle pure markdown syntax
+}
+
+// src/parser/expression-parser.ts  
+export function parseExpressions(content: string): TSMInterpolation[] {
+    // Handle {{ }} expressions only
+}
+
+// src/parser/component-parser.ts
+export function parseComponents(content: string): TSMComponent[] {
+    // Handle <@Component /> syntax only
+}
+```
+
+#### Enhanced AST Usage
+```typescript
+// Use TypeScript AST more extensively for expression parsing
+function parseTypeScriptExpression(expression: string): ts.Expression {
+    const sourceFile = ts.createSourceFile(
+        'expression.ts',
+        `const expr = ${expression};`,
+        ts.ScriptTarget.Latest,
+        true
+    );
+    
+    // Extract and return the expression node
+    return extractExpressionNode(sourceFile);
+}
+```
+
+### 2. Long-term Architecture
+
+#### Unified Parser Architecture
+```
+┌─────────────────────────────────────┐
+│         TSM Parser Core             │
+├─────────────────────────────────────┤
+│  ┌─────────────┐ ┌─────────────────┐│
+│  │  Markdown   │ │   Expression    ││
+│  │   Parser    │ │     Parser      ││
+│  └─────────────┘ └─────────────────┘│
+│  ┌─────────────┐ ┌─────────────────┐│
+│  │ Component   │ │   TypeScript    ││
+│  │   Parser    │ │   AST Parser    ││
+│  └─────────────┘ └─────────────────┘│
+└─────────────────────────────────────┘
+```
+
+#### Enhanced Type Safety
+- Full TypeScript AST integration for expression parsing
+- Comprehensive TSM AST with all syntax constructs
+- Type-safe code generation with proper error handling
+
+## Conclusion
+
+The current TSM implementation demonstrates a **well-architected hybrid approach** that effectively combines TypeScript AST parsing with regex-based fallback. The separation between structural analysis (AST) and content parsing (regex) is appropriate and follows good software engineering principles.
+
+### Key Strengths
+1. **Robust Error Handling**: Graceful degradation from AST to regex
+2. **Code Protection**: Proper handling of JavaScript/TypeScript within markdown
+3. **Type Safety**: Well-defined AST structure with comprehensive type guards
+4. **Runtime Efficiency**: Efficient chunk processing with falsy compaction
+
+### Areas for Enhancement
+1. **Parser Separation**: More modular parser architecture
+2. **AST Completeness**: Enhanced TSM AST with markdown-specific nodes
+3. **Expression Parsing**: Greater use of TypeScript AST for expression analysis
+4. **Error Reporting**: More detailed error messages with source locations
+
+The architecture successfully balances the need for robust TypeScript parsing with the flexibility required for TSM-specific syntax, making it a solid foundation for the transpiler's continued development.

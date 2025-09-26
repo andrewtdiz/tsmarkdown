@@ -43,10 +43,12 @@ export interface TSMInterpolation extends TSMNode {
     isConditional?: boolean; // true for {{ cond ? (...) : (...) }}
     isLogical?: boolean; // true for {{ cond && (...) }} or {{ !cond && (...) }}
     isNull?: boolean; // true for {{ null }}
+    isTSMContent?: boolean; // true for {{ TSM content }} that should be converted to __tsm
     conditionalBlocks?: {
         trueBlock?: TSMBlock;
         falseBlock?: TSMBlock;
     };
+    nestedConditionalBlock?: TSMBlock; // NEW: Store nested conditional content as AST
 }
 
 // Component - represents <@ComponentName .../> tags

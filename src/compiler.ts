@@ -6,16 +6,7 @@ import {
   compileJSXExpression,
 } from "./compiler/compiler-utils";
 import { TSMComponent, TSMComponentAttribute } from "./parser/tsm-ast";
-export {
-  compileAllExportedFunctions,
-  compileAllFunctions,
-  type MultiFunctionCompilationResult,
-} from "./compiler/multi-function-compiler";
-export {
-  transpile as compileFullFile,
-  type FullFileCompilationResult,
-  type FullFileExecutionResult,
-} from "./transpile";
+
 
 export interface CompiledTSmd {
   id: string;
@@ -89,3 +80,6 @@ export function compile(parsed: ParsedTSmd): CompiledTSmd {
 
 // Backward compatibility alias
 export const compileTSmd = compile;
+
+// Export the new core transpiler for backward compatibility
+export { compileFullFile } from './compiler/core';

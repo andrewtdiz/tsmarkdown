@@ -1,8 +1,8 @@
 import { generatePropsInterface, parseParameters, parseParameterTypes } from "./parser/parameters";
-import { processJSXExpressions } from "./renderer/jsx-runtime";
-import { normalizeIndentation, parseJSXProps } from "./renderer/string-helpers";
+import { normalizeIndentation, parseJSXProps } from "./utils/string-helpers";
 import { parseContent } from "./parser/pipeline";
 import { protectCodeBlocks, restoreCodeBlocks } from "./parser/code-protection";
+import { renderASTToChunks } from "./parser/interpolations";
 import type { Chunk } from "./runtime/tsm-runtime";
 import { TSMComponentAttribute } from "./parser/tsm-ast";
 
@@ -127,15 +127,26 @@ export function parseTSmd(content: string): ParsedTSmd {
     jsxExpressions
   };
 
-  let markdown = parseContent(normalizedMarkdown, context);
+  const ast = parseContent(normalizedMarkdown, context);
+
+  // Convert AST to chunks
+  let markdown = renderASTToChunks(ast, context);
 
   // Restore the protected code blocks in the final markdown
   markdown = restoreCodeBlocks(markdown, allCodeBlocks);
 
+  // Create return statement from the markdown content
+  if (markdown.length > 0) {
+    returnStatements.push({
+      content: markdown.join(''),
+      isTemplate: true
+    });
+  }
+
   // Process JSX expressions from context to populate jsxExpressions
   for (const jsxExpr of context.jsxExpressions) {
     // Parse JSX elements to extract name and props
-    const jsxElementRegex = /<(@?)(\w+)([^/>]*)\/>/;
+    const jsxElementRegex = /<(@?)(\w+)(.*?)\/>/;
     const match = jsxExpr.expression.match(jsxElementRegex);
     if (match) {
       const [, atSymbol, componentName, propsString] = match;
@@ -143,7 +154,7 @@ export function parseTSmd(content: string): ParsedTSmd {
 
       // Parse props using parseJSXProps
       const parsedProps = parseJSXProps(propsString);
-      const attributes: TSMComponentAttribute[] = parsedProps.map(prop => ({
+      const attributes: TSMComponentAttribute[] = parsedProps.map((prop: { name: string; value: string; isExpression: boolean }) => ({
         type: 'TSMComponentAttribute',
         name: prop.name,
         value: prop.isExpression
@@ -166,6 +177,15 @@ export function parseTSmd(content: string): ParsedTSmd {
   //@ts-ignore
   return {
     imports: imports.filter(Boolean),
+    functionInfo: {
+      name: functionName,
+      isExported: false,
+      isDefaultExport: false,
+      isAsync,
+      parameters: parameterTypes,
+      line: 0,
+      column: 0
+    },
     functionName,
     functionParams,
     isAsync,

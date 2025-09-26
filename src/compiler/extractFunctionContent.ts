@@ -1,123 +1,53 @@
 import ts from "typescript";
-import { extractConditionFromAST, extractMarkdownFromReturnStatement, extractNonReturnStatements, getRootLevelReturnsOfFunction } from "./function-extractor";
+import { findTsmBlocks, extractBlockContent } from "./block-finder";
 
-function extractFunctionContent(ast: ts.SourceFile, functionName: string): { typescript: string; returnStatements: any[]; interpolations: any[]; conditionalBlocks: any[]; ternaryExpressions: any[]; jsxExpressions: any[] } {
-    let functionNode: ts.Node | null = null;
-    let typescript = '';
-    let returnStatements: any[] = [];
-    let allInterpolations: any[] = [];
-    let allConditionalBlocks: any[] = [];
-    let allTernaryExpressions: any[] = [];
-    let allJsxExpressions: any[] = [];
+export function extractFunctionContent(ast: ts.SourceFile, functionName: string): {
+    typescript: string;
+    returnStatements: {
+        condition: string | undefined;
+        content: string;
+        isTemplate: boolean;
+    }[];
+} {
+    let functionNode: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | null = null;
 
-    function visit(node: ts.Node): void {
+    function visit(node: ts.Node) {
         if (ts.isFunctionDeclaration(node) && node.name?.text === functionName) {
             functionNode = node;
-
-            if (node.body) {
-                const sourceFile = node.getSourceFile();
-                typescript = extractNonReturnStatements(sourceFile, node);
-                const returns = getRootLevelReturnsOfFunction(sourceFile, node);
-
-                for (const returnStmt of returns) {
-                    const { content, interpolations, conditionalBlocks, ternaryExpressions, jsxExpressions } = extractMarkdownFromReturnStatement(returnStmt, sourceFile);
-                    const condition = extractConditionFromAST(returnStmt, sourceFile);
-
-                    returnStatements.push({
-                        condition: condition,
-                        content: content,
-                        isTemplate: true
-                    });
-
-                    allInterpolations.push(...interpolations);
-                    allConditionalBlocks.push(...conditionalBlocks);
-                    allTernaryExpressions.push(...ternaryExpressions);
-                    allJsxExpressions.push(...jsxExpressions);
-                }
-            }
-        }
-
-        if (ts.isVariableStatement(node)) {
+        } else if (ts.isVariableStatement(node)) {
             for (const declaration of node.declarationList.declarations) {
-                if (ts.isIdentifier(declaration.name) && declaration.name.text === functionName && declaration.initializer) {
-                    if (ts.isFunctionExpression(declaration.initializer) || ts.isArrowFunction(declaration.initializer)) {
-                        functionNode = declaration.initializer;
-
-                        if (declaration.initializer.body) {
-                            const sourceFile = node.getSourceFile();
-                            typescript = extractNonReturnStatements(sourceFile, declaration.initializer);
-
-                            if (ts.isArrowFunction(declaration.initializer)) {
-                                if (ts.isParenthesizedExpression(declaration.initializer.body)) {
-                                    const { content, interpolations, conditionalBlocks, ternaryExpressions, jsxExpressions } = extractMarkdownFromReturnStatement({
-                                        expression: declaration.initializer.body
-                                    } as unknown as ts.ReturnStatement, sourceFile);
-
-                                    returnStatements.push({
-                                        condition: undefined,
-                                        content: content,
-                                        isTemplate: true
-                                    });
-
-                                    allInterpolations.push(...interpolations);
-                                    allConditionalBlocks.push(...conditionalBlocks);
-                                    allTernaryExpressions.push(...ternaryExpressions);
-                                    allJsxExpressions.push(...jsxExpressions);
-                                } else {
-                                    const returns = getRootLevelReturnsOfFunction(sourceFile, declaration.initializer);
-
-                                    for (const returnStmt of returns) {
-                                        const { content, interpolations, conditionalBlocks, ternaryExpressions, jsxExpressions } = extractMarkdownFromReturnStatement(returnStmt, sourceFile);
-                                        const condition = extractConditionFromAST(returnStmt, sourceFile);
-
-                                        returnStatements.push({
-                                            condition: condition,
-                                            content: content,
-                                            isTemplate: true
-                                        });
-
-                                        allInterpolations.push(...interpolations);
-                                        allConditionalBlocks.push(...conditionalBlocks);
-                                        allTernaryExpressions.push(...ternaryExpressions);
-                                        allJsxExpressions.push(...jsxExpressions);
-                                    }
-                                }
-                            } else {
-                                const returns = getRootLevelReturnsOfFunction(sourceFile, declaration.initializer);
-
-                                for (const returnStmt of returns) {
-                                    const { content, interpolations, conditionalBlocks, ternaryExpressions, jsxExpressions } = extractMarkdownFromReturnStatement(returnStmt, sourceFile);
-                                    const condition = extractConditionFromAST(returnStmt, sourceFile);
-
-                                    returnStatements.push({
-                                        condition: condition,
-                                        content: content,
-                                        isTemplate: true
-                                    });
-
-                                    allInterpolations.push(...interpolations);
-                                    allConditionalBlocks.push(...conditionalBlocks);
-                                    allTernaryExpressions.push(...ternaryExpressions);
-                                    allJsxExpressions.push(...jsxExpressions);
-                                }
-                            }
-                        }
-                    }
+                if (ts.isIdentifier(declaration.name) && declaration.name.text === functionName && declaration.initializer && (ts.isFunctionExpression(declaration.initializer) || ts.isArrowFunction(declaration.initializer))) {
+                    functionNode = declaration.initializer;
                 }
             }
         }
-
-        ts.forEachChild(node, visit);
+        if (!functionNode) {
+            ts.forEachChild(node, visit);
+        }
     }
 
     visit(ast);
 
+    if (!functionNode) {
+        return { typescript: '', returnStatements: [] };
+    }
+
+    const tsmBlocks = findTsmBlocks(functionNode);
+    const returnStatements = tsmBlocks.map(block => {
+        const content = extractBlockContent(block, ast);
+        return {
+            condition: undefined, // Condition extraction is part of the old implementation and will be handled differently now.
+            content: content,
+            isTemplate: true,
+        };
+    });
+
+    // For now, we are not extracting the other typescript parts of the function.
+    // This will be handled by the new compiler architecture.
+    const typescript = '';
+
     return {
         typescript,
         returnStatements,
-        interpolations: allInterpolations,
-        conditionalBlocks: allConditionalBlocks,
-        ternaryExpressions: allTernaryExpressions,
-        jsxExpressions: allJsxExpressions
     };
 }

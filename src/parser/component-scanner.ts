@@ -1,6 +1,6 @@
 // Component Scanner - identifies TypeScript prelude and markdown body in TSmd components
 
-import { findMatchingBrace, findMatchingParen } from './string-helpers';
+import { findMatchingBrace, findMatchingParen } from '../utils/string-helpers';
 import * as ts from 'typescript';
 
 export interface ReturnStatement {
@@ -367,9 +367,7 @@ function findAllReturns(componentBody: string): ReturnStatement[] {
             }
         }
 
-        // Look for return statement
         if (inFunction && nextChars === 'return') {
-            // Check if this is a return statement (followed by whitespace or parenthesis)
             const afterReturn = componentBody.slice(i + 6);
             const trimmedAfterReturn = afterReturn.trim();
 
@@ -383,27 +381,21 @@ function findAllReturns(componentBody: string): ReturnStatement[] {
                     continue; // Invalid syntax, keep looking
                 }
 
-                // Check if this return statement has a condition (if statement before it)
                 const condition = extractConditionBeforeReturn(componentBody, i);
                 const isConditional = condition !== undefined;
 
-                // Extract content and clean it up
                 let contentStartIndex = openParenIndex + 1;
                 let contentEndIndex = closeParenIndex;
 
-                // Find the actual start of content (skip leading whitespace, newlines, and opening parenthesis)
                 const rawContent = componentBody.slice(contentStartIndex, contentEndIndex);
                 const trimmedContent = rawContent.trim();
 
-                // Find the start of the trimmed content
                 const leadingWhitespace = rawContent.length - rawContent.trimStart().length;
                 contentStartIndex = contentStartIndex + leadingWhitespace;
 
-                // Find the end of the trimmed content
                 const trailingWhitespace = rawContent.trimStart().length - trimmedContent.length;
                 contentEndIndex = contentStartIndex + trimmedContent.length;
 
-                // Only include this return statement if it contains markdown content
                 const finalContent = componentBody.slice(contentStartIndex, contentEndIndex);
                 if (isMarkdownReturn(finalContent)) {
                     const returnStmt = {

@@ -5,7 +5,7 @@ export type { ParseContext } from './types';
 export { parseContent } from './pipeline';
 
 // String utilities
-export { findMatchingBrace, findMatchingParen, normalizeIndentation } from './string-helpers';
+export { findMatchingBrace, findMatchingParen, normalizeIndentation } from '../utils/string-helpers';
 
 // Interpolation parsing
 export { parseInterpolations } from './interpolations';

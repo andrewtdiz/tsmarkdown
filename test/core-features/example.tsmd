@@ -1,13 +1,16 @@
 function Test() {
   const isVisible = true;
   const notVisible = false;
+  const someData = "Some Data";
   const isEitherVisible = isVisible || notVisible;
 
   return (
     # Test{{ isEitherVisible && `: ${isVisible ? "Visible" : "Not Visible"}` }}
 
     {{ isEitherVisible ? (
-      # Test: {{ isVisible ? "Visible" : "Not Visible" }}
+      # Test: {{ isVisible ? "Visible" : (
+        # Test: Not Visible {{ someData }}
+      ) }}
     ) : (
       # Test
     )}}
