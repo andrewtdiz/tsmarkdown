@@ -9,8 +9,7 @@ interface ListItemProps {
 function ListItem({ item, index }: ListItemProps): string {
   
     return __tsm([
-    "- ", item, "", '\n',
-    ""
+    item, " | ", " "
 ]);
 }
 
@@ -19,9 +18,7 @@ function Test(): string {
 const user = { name: 'Alice', age: 30 };
     return __tsm([
     "Here's a list of items:", '\n',
-    "", items.map((item, index) => (
-ListItem({ item: item, index: index })
-))
+    "", items.map((item, index) => __tsm(["- ", item, "\n", index === items.length - 1 && null]))
 ]);
 }
 

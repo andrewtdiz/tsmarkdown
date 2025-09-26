@@ -1,36 +1,27 @@
+#!/usr/bin/env node
+
+// Standalone TypeScript Markdown watcher
+// This script provides a simple interface for users to run the watch command
+
 import { readdir } from "fs/promises";
 import { readFileSync, unlinkSync, watch as fsWatch, writeFileSync, mkdirSync, existsSync } from "fs";
-import { transpile } from "../compiler/full-file-compiler.js";
+import { transpile } from "../dist/src/compiler/full-file-compiler.js";
 
 /**
  * Options for the file watcher
  */
-type WatchOptions = {
+const watchOptions = {
     /** Directory to watch (relative to cwd) */
-    directory?: string;
-}
+    directory: process.argv[2] || "/tsmd"
+};
 
-/**
- * Watches .tsmd files and auto-transpiles them to TypeScript
- * 
- * @param watchOptions - Watch configuration
- * @param watchOptions.directory - Directory to watch (defaults to "/tsmd")
- * @returns File system watcher
- * 
- * @example
- * ```typescript
- * const watcher = await watch({ directory: "/tsmd" });
- * watcher.close();
- * ```
- */
-export async function watch(watchOptions?: WatchOptions) {
-    const directory = watchOptions?.directory;
-
+async function watch() {
+    const directory = watchOptions.directory;
     const cwd = process.cwd();
-    const listenDir = directory || `/tsmd`;
+    const listenDir = directory;
     const dir = `${cwd}${listenDir}`;
 
-    async function processTsmdFile(fileName: string) {
+    async function processTsmdFile(fileName) {
         const inputFileName = `${dir}/${fileName}`;
         const fileTitle = fileName.split(".")[0];
         const outputFileName = `${dir}/_generated/${fileTitle}.ts`;
@@ -93,6 +84,8 @@ export async function watch(watchOptions?: WatchOptions) {
     });
 
     console.clear();
+    console.log(`Starting TypeScript Markdown watcher...`);
+    console.log(`Watching directory: ${listenDir}`);
     console.log(`Listening for changes in ${listenDir}...`);
 
     process.on("SIGINT", () => {
@@ -103,3 +96,12 @@ export async function watch(watchOptions?: WatchOptions) {
 
     return watcher;
 }
+
+// Parse command line arguments
+const args = process.argv.slice(2);
+const directory = args[0] || "/tsmd"; // Default to /tsmd if no argument provided
+
+console.log(`Starting TypeScript Markdown watcher...`);
+console.log(`Watching directory: ${directory}`);
+
+await watch();

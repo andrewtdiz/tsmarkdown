@@ -6,14 +6,14 @@
  */
 
 import * as ts from 'typescript';
-import { ParsedTSmd } from '../parser';
-import { compile } from '../compiler';
-import { extractFunctions } from '../parser/typescript-parser';
-import { parseContent } from '../parser/pipeline';
-import { protectCodeBlocks, restoreCodeBlocks } from '../parser/code-protection';
-import { normalizeIndentation } from '../renderer/string-helpers';
-import { Chunk, __tsm } from '../runtime/tsm-runtime';
-import { TSMComponentAttribute } from '../parser/tsm-ast';
+import { ParsedTSmd } from '../parser.js';
+import { compile } from '../compiler.js';
+import { extractFunctions } from '../parser/typescript-parser.js';
+import { parseContent } from '../parser/pipeline.js';
+import { protectCodeBlocks, restoreCodeBlocks } from '../parser/code-protection.js';
+import { normalizeIndentation } from '../renderer/string-helpers.js';
+import { Chunk, __tsm } from '../runtime/tsm-runtime.js';
+import { TSMComponentAttribute } from '../parser/tsm-ast.js';
 import { parseJSXExpressionToTSMComponent } from '../parser/interpolations';
 
 /**

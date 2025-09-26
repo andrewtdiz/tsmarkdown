@@ -1,7 +1,6 @@
 function ListItem({ item, index }: { item: string, index: number }) {
   return (
-    - {{ item }}
-
+    {{ item }} | {{ " " }}
   )
 }
 
@@ -12,7 +11,8 @@ function Test() {
   return (
     Here's a list of items:
     {{ items.map((item, index) => (
-      <@ListItem item={item} index={index} />
+      - {{ item}}
+      {{ index === items.length - 1 && null}}
     ))}}
   )
 }
