@@ -1,6 +1,5 @@
 import { resolve } from 'path';
 import { CompiledTSmd, compile } from '../compiler';
-import { parseTSmd } from '../parser';
 import { readFileSync } from 'fs';
 
 export interface RenderContext {
@@ -17,30 +16,6 @@ export interface RenderResult {
 }
 
 export const componentRegistry: ComponentRegistry = {};
-
-export async function loadDependencies(dependencies: string[], basePath: string, errors: string[]): Promise<void> {
-    for (const componentName of dependencies) {
-        if (!componentRegistry[componentName]) {
-            try {
-                // Try to find the component file
-                const componentPath = await resolveComponentPath(componentName, basePath);
-                if (componentPath) {
-                    const componentContent = readFileSync(componentPath, 'utf8');
-                    const parsed = parseTSmd(componentContent);
-                    const compiled = compile(parsed);
-                    componentRegistry[componentName] = compiled;
-
-                    // Recursively load dependencies of this component
-                    if (compiled.dependencies && compiled.dependencies.length > 0) {
-                        await loadDependencies(compiled.dependencies, basePath, errors);
-                    }
-                }
-            } catch (error) {
-                errors.push(`Failed to load component ${componentName}: ${error}`);
-            }
-        }
-    }
-}
 
 export function resolveComponentPath(componentName: string, basePath: string): string | null {
     // Try different possible paths for the component

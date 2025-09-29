@@ -11,7 +11,7 @@ import { compile } from '../compiler.js';
 import { extractFunctions } from '../parser/typescript-parser.js';
 import { parseContent } from '../parser/pipeline.js';
 import { protectCodeBlocks, restoreCodeBlocks } from '../parser/code-protection.js';
-import { normalizeIndentation } from '../renderer/string-helpers.js';
+import { generatePropsInterface, normalizeIndentation } from '../renderer/string-helpers.js';
 import { Chunk, __tsm } from '../runtime/tsm-runtime.js';
 import { TSMComponentAttribute } from '../parser/tsm-ast.js';
 import { parseJSXExpressionToTSMComponent } from '../parser/interpolations';
@@ -203,7 +203,6 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
 
         const variableValues = extractVariableValues(processedSourceFile);
 
-        // Now extract and compile functions from the processed source
         const allFunctions = extractFunctions(processedSourceFile);
 
         for (const functionInfo of allFunctions) {
@@ -237,8 +236,7 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
                     ternaryExpressions: ternaryExpressions,
                     jsxExpressions: jsxExpressionsMapped,
                     returnStatements: returnStatements,
-                    propsInterface: functionInfo.parameters.length > 0 ?
-                        `interface ${functionInfo.name}Props {\n  ${functionInfo.parameters.map(p => `${p.name}: ${p.type}${p.required ? '' : '?'}`).join(';\n  ')}\n}` : '',
+                    propsInterface: generatePropsInterface(functionInfo),
                     parameterTypes: functionInfo.parameters
                 };
 
@@ -856,7 +854,7 @@ function extractNonReturnStatements(
     }
 
     collectStatements(fn.body);
-    return statementsToKeep.join('\n');
+    return statementsToKeep.join('\n  ');
 }
 
 function extractConditionFromAST(returnNode: ts.ReturnStatement, sourceFile: ts.SourceFile): string | undefined {

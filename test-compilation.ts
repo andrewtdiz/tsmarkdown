@@ -2,8 +2,6 @@ import { execFileSync, execSync } from "node:child_process";
 import { compileFullFile } from "./src/compiler";
 
 const completeTypeScriptSource = `
-import { getData } from "./api/getData";
-
 const VERSION_NUMBER = "1.0.0";
 
 function LocalComponent() {
@@ -20,7 +18,7 @@ function OlItem({ item, index }: { item: string, index: number }) {
   )
 }
 
-function List({ items, withAnd, separator }: { items: string[]; withAnd: boolean, separator: string }) {
+function List({ items, withAnd, separator }: { items: string[]; withAnd?: boolean, separator?: string }) {
   const beginningItems = items.slice(0, -1);
   const lastItem = items[items.length - 1];
   const sep = separator || ',';

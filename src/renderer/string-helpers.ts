@@ -1,4 +1,5 @@
 import { TSMComponentAttribute } from "../parser/tsm-ast";
+import { FunctionInfo } from "../parser.js";
 
 export function findMatchingBrace(content: string, startIndex: number): number {
     let braceCount = 0;
@@ -273,4 +274,21 @@ export function propsToObjectString(props: TSMComponentAttribute[]): string {
     });
 
     return propStrings.length > 0 ? `{ ${propStrings.join(', ')} }` : '';
+}
+
+/**
+ * Generates a TypeScript interface for component props based on function parameters
+ */
+export function generatePropsInterface(functionInfo: FunctionInfo): string {
+    if (functionInfo.parameters.length === 0) {
+        return '';
+    }
+
+    const interfaceName = `${functionInfo.name}Props`;
+    const properties = functionInfo.parameters.map(p => `${p.name}${p.required ? '' : '?'}: ${p.type}`).join(';\n  ');
+
+    return `
+interface ${interfaceName} {
+  ${properties}
+}`.slice(1);
 }

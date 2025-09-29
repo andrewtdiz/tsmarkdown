@@ -1,7 +1,4 @@
 // Using Bun.file() for file operations instead of fs
-import { CompiledTSmd, compile } from '../compiler';
-import { parseTSmd } from '../parser';
-import { componentRegistry, mergePropsWithDefaults, resolveComponentPath } from './render-context';
 import { processEscapeSequences, normalizeIndentation, valueToString } from './string-helpers';
 import { parseInterpolations } from '../parser/interpolations';
 

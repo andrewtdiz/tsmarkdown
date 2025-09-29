@@ -1,7 +1,7 @@
 import { ParsedTSmd } from './parser';
-import { extractDependencies, compileTypeScript, compileTemplate, compileJSXExpression } from './compiler/compiler-utils';
-import { TSMComponent, TSMComponentAttribute } from './parser/tsm-ast';
-export { compileAllExportedFunctions, compileAllFunctions, type MultiFunctionCompilationResult } from './compiler/multi-function-compiler';
+import { extractDependencies, compileTypeScript, compileTemplate } from './compiler/compiler-utils';
+import { TSMComponentAttribute } from './parser/tsm-ast';
+export { type MultiFunctionCompilationResult } from './compiler/multi-function-compiler';
 export { compileFullFile, type FullFileCompilationResult, type FullFileExecutionResult } from './compiler/full-file-compiler';
 
 export interface CompiledTSmd {
