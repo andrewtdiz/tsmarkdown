@@ -1,4 +1,5 @@
 import * as ts from 'typescript';
+import { Chunk } from '../runtime/tsm-runtime';
 
 /**
  * Represents a nested TSM block found within an expression
@@ -23,12 +24,60 @@ export interface NestedTSMBlock {
  * @param sourceFile The TypeScript source file AST node.
  * @returns An array of ParenthesizedExpression nodes that represent TSM blocks.
  */
-export function findTsmBlocks(node: ts.Node): ts.ParenthesizedExpression[] {
+export function findRootLevelTsmBlocks(node: ts.Node): ts.ParenthesizedExpression[] {
     const tsmBlocks: ts.ParenthesizedExpression[] = [];
+    const newBlocks: Chunk[] = [];
 
     function visit(node: ts.Node) {
+        if (ts.isReturnStatement(node)) {
+            console.log('DEBUG: Return statement found, parent:', node.parent.getFullText());
+            console.log('DEBUG: parent kind:', node.parent.kind);
+
+            const returnStart = node.getStart();
+
+            const textBeforeReturn = node.getSourceFile().text.substring(0, returnStart);
+            const linesBeforeReturn = textBeforeReturn.split('\n');
+            const returnLine = linesBeforeReturn[linesBeforeReturn.length - 1];
+
+            const leadingSpaces = returnLine.match(/^(\s*)/)?.[1]?.length || 0;
+
+            const closingParen = node.getSourceFile().text.substring(returnStart + 1);
+            const lines = closingParen.split(/(?<!\\)\n/);
+
+            const closingParenLine = lines.findIndex(line => line.startsWith(" ".repeat(leadingSpaces) + ")"));
+            if (closingParenLine !== -1) {
+                const insideLines = lines.slice(1, closingParenLine);
+                const minWhiteSpace = insideLines.reduce((min, line) => Math.min(min, line.match(/^(\s*)/)?.[1]?.length || 0), leadingSpaces * 2);
+                const removeLeadingIndent = insideLines.map(line => line.slice(minWhiteSpace));
+                console.log('DEBUG: removeLeadingIndent:', removeLeadingIndent);
+
+                newBlocks.push(...removeLeadingIndent);
+                // const stringArrayLiteral = ts.factory.createArrayLiteralExpression(
+                //     removeLeadingIndent.map(v => ts.factory.createStringLiteral(v)),
+                //     true
+                //   );
+                // const nodes = ts.factory.createCallExpression(
+                //     ts.factory.createIdentifier("__tsm"),
+                //     undefined,
+                //     [stringArrayLiteral]     
+                //   );
+
+                //   const sf = ts.factory.createSourceFile(
+                //     [ts.factory.createExpressionStatement(nodes)],
+                //     ts.factory.createToken(ts.SyntaxKind.EndOfFileToken),
+                //     ts.NodeFlags.None
+                //   );
+
+                //   const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
+                //   console.log("DEBUG: nodes:", printer.printFile(sf));
+            } else {
+                console.log('DEBUG: Closing parenthesis not found');
+            }
+
+        }
         if (ts.isReturnStatement(node) && node.expression && ts.isParenthesizedExpression(node.expression)) {
             // This is a TSM block, e.g., `return (...)`
+            console.log('DEBUG: TSM block found:', node.expression.getFullText());
             tsmBlocks.push(node.expression);
         }
         ts.forEachChild(node, visit);
@@ -48,6 +97,7 @@ export function findTsmBlocks(node: ts.Node): ts.ParenthesizedExpression[] {
  * @returns The raw, de-indented string content of the block.
  */
 export function extractBlockContent(block: ts.ParenthesizedExpression, sourceFile: ts.SourceFile): string {
+    console.log('DEBUG: block:', block.getFullText());
     const rawContent = sourceFile.text.substring(block.getStart() + 1, block.getEnd() - 1);
 
     const lines = rawContent.split('\n');
@@ -295,113 +345,4 @@ function calculateNestingLevels(blocks: NestedTSMBlock[]): void {
         currentBlock.nestingLevel = nestingLevel;
         currentBlock.parentBlock = parentBlock;
     }
-}
-
-/**
- * Enhanced TSM block finder that detects both top-level and nested blocks
- */
-export function findTsmBlocksWithNestedDetection(sourceFile: ts.SourceFile, source: string): Array<{ match: any; content: string; nestedBlocks?: NestedTSMBlock[] }> {
-    const tsmBlocks: Array<{ match: any; content: string; nestedBlocks?: NestedTSMBlock[] }> = [];
-
-    // First, find top-level TSM blocks using existing method
-    const topLevelBlocks = findTsmBlocksWithRegex(source);
-
-    for (const block of topLevelBlocks) {
-        // Check if this block contains nested TSM content
-        const nestedBlocks = findNestedTsmBlocks(block.content);
-
-        tsmBlocks.push({
-            match: block.match,
-            content: block.content,
-            nestedBlocks: nestedBlocks.length > 0 ? nestedBlocks : undefined
-        });
-    }
-
-    return tsmBlocks;
-}
-
-/**
- * Find TSM blocks using regex-based parsing (fallback for invalid TypeScript syntax)
- */
-function findTsmBlocksWithRegex(source: string): Array<{ match: any; content: string }> {
-    const tsmBlocks: Array<{ match: any; content: string }> = [];
-    const returnRegex = /return\s*\(/g;
-    let match;
-
-    while ((match = returnRegex.exec(source)) !== null) {
-        const startPos = match.index;
-        const openParenPos = match.index + match[0].length - 1;
-
-        // Find the matching closing parenthesis
-        let parenCount = 1;
-        let pos = openParenPos + 1;
-        let endPos = -1;
-
-        while (pos < source.length && parenCount > 0) {
-            if (source[pos] === '(') {
-                parenCount++;
-            } else if (source[pos] === ')') {
-                parenCount--;
-                if (parenCount === 0) {
-                    endPos = pos;
-                    break;
-                }
-            }
-            pos++;
-        }
-
-        if (endPos !== -1) {
-            const rawContent = source.substring(openParenPos + 1, endPos);
-            const content = deindentContent(rawContent);
-            if (isTSMContent(content)) {
-                const fullMatch = {
-                    index: openParenPos + 1,
-                    [0]: source.substring(openParenPos + 1, endPos),
-                    [1]: content
-                };
-                tsmBlocks.push({ match: fullMatch, content });
-            }
-        }
-    }
-
-    return tsmBlocks;
-}
-
-/**
- * De-indent content by removing common leading whitespace from all lines
- */
-function deindentContent(content: string): string {
-    const lines = content.split('\n');
-
-    // Find the minimum indentation of all non-empty lines.
-    let minIndent = Infinity;
-    for (const line of lines) {
-        if (line.trim().length > 0) {
-            const indent = line.match(/^(\s*)/)?.[1]?.length || 0;
-            minIndent = Math.min(minIndent, indent);
-        }
-    }
-
-    if (minIndent === Infinity) {
-        return lines.join('\n');
-    }
-
-    // Remove the common indentation from each line.
-    const deindentedLines = lines.map(line => {
-        return line.startsWith(' '.repeat(minIndent)) ? line.slice(minIndent) : line;
-    });
-
-    // Join the lines and trim any leading/trailing whitespace or newlines.
-    return deindentedLines.join('\n');
-}
-
-/**
- * Check if content contains TSM syntax
- */
-function isTSMContent(content: string): boolean {
-    return content.includes('{{') ||
-        content.includes('<@') ||
-        (content.includes('#') && (content.includes('##') || content.includes('###'))) ||
-        (content.includes('*') && !!content.match(/\*\*.*\*\*/)) ||
-        (content.includes('-') && !!content.match(/^- .*$/m));
 }

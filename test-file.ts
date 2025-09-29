@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { transpileSource } from "./src/compiler/core";
 
 const totalStart = performance.now();
-const file = await Bun.file("./test/core-features/complex-expressions.tsmd").text();
+const file = await Bun.file("./example/Example.tsmd").text();
 
 const compiled = transpileSource(file);
 

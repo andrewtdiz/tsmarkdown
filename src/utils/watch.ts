@@ -7,6 +7,7 @@ import {
   mkdirSync,
   existsSync,
 } from "fs";
+import { transpileSource } from "../compiler/core";
 
 /**
  * Options for the file watcher
@@ -53,12 +54,12 @@ export async function watch(watchOptions?: WatchOptions) {
     try {
       const file = readFileSync(inputFileName, "utf8");
       // TODO: Fix this when the new compiler is ready
-      // const fullFileResult = await _transpile(file);
+      const fullFileResult = transpileSource(file);
 
-      // writeFileSync(
-      //   outputFileName,
-      //   `import { __tsm } from "typescriptmd";\n\n${fullFileResult}`
-      // );
+      writeFileSync(
+        outputFileName,
+        `import { __tsm } from "typescriptmd";\n\n${fullFileResult.transpiledFile}`
+      );
     } catch (error) {
       console.error(`❌ Error transpiling ${fileName}:`, error);
     }

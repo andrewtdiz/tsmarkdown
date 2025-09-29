@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { findTsmBlocks, extractBlockContent } from "./block-finder";
+import { findRootLevelTsmBlocks, extractBlockContent } from "./block-finder";
 
 export function extractFunctionContent(ast: ts.SourceFile, functionName: string): {
     typescript: string;
@@ -32,7 +32,7 @@ export function extractFunctionContent(ast: ts.SourceFile, functionName: string)
         return { typescript: '', returnStatements: [] };
     }
 
-    const tsmBlocks = findTsmBlocks(functionNode);
+    const tsmBlocks = findRootLevelTsmBlocks(functionNode);
     const returnStatements = tsmBlocks.map(block => {
         const content = extractBlockContent(block, ast);
         return {

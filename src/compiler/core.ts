@@ -1,5 +1,5 @@
 import * as ts from 'typescript';
-import { findTsmBlocks, extractBlockContent, findTsmBlocksWithNestedDetection, NestedTSMBlock } from './block-finder';
+import { findRootLevelTsmBlocks, extractBlockContent, NestedTSMBlock } from './block-finder';
 import { parseContent } from '../parser/pipeline';
 import { generateFromAST, generateExpressionFromAST } from './ast-code-generator';
 import { isPositionWithinReturnStatement } from './ast/return-detection';
@@ -27,41 +27,28 @@ export const compileFullFile = transpileSource;
 function findTsmBlocksWithAST(sourceFile: ts.SourceFile, source: string): Array<{ match: TSMBlockMatch; content: string }> {
     const tsmBlocks: Array<{ match: TSMBlockMatch; content: string }> = [];
 
-    // Disable AST-based approach for now as it's unreliable with TSM syntax
-    // try {
-    //     const astBlocks = findTsmBlocks(sourceFile);
-    //     if (astBlocks.length > 0) {
-    //         for (const block of astBlocks) {
-    //             const content = extractBlockContent(block, sourceFile);
-    //             console.log('AST block found with content:', JSON.stringify(content));
-    //             console.log('AST block start:', block.getStart(), 'end:', block.getEnd());
-    //             if (isTSMContent(content)) {
-    //                 const startPos = block.getStart();
-    //                 const endPos = block.getEnd();
-    //                 const match: TSMBlockMatch = {
-    //                     index: startPos,
-    //                     [0]: source.substring(startPos, endPos),
-    //                     [1]: content
-    //                 };
-    //                 tsmBlocks.push({ match, content });
-    //             }
-    //         }
-    //     }
-    // } catch (error) {
-    //     // AST parsing failed due to invalid syntax, continue with regex fallback
-    //     console.log('AST parsing failed, using regex fallback:', error);
-    // }
-
-    // Always use regex-based approach as well to catch TSM blocks that AST couldn't parse
-    // This is necessary because TSM syntax is not valid TypeScript
-    const regexBlocks = findTsmBlocksWithRegex(source);
-
-    // Merge results, avoiding duplicates
-    const existingPositions = new Set(tsmBlocks.map(b => b.match.index));
-    for (const block of regexBlocks) {
-        if (!existingPositions.has(block.match.index)) {
-            tsmBlocks.push(block);
+    try {
+        const astBlocks = findRootLevelTsmBlocks(sourceFile);
+        if (astBlocks.length > 0) {
+            for (const block of astBlocks) {
+                const content = extractBlockContent(block, sourceFile);
+                console.log('AST block found with content:', JSON.stringify(content));
+                console.log('AST block start:', block.getStart(), 'end:', block.getEnd());
+                if (isTSMContent(content)) {
+                    const startPos = block.getStart();
+                    const endPos = block.getEnd();
+                    const match: TSMBlockMatch = {
+                        index: startPos,
+                        [0]: source.substring(startPos, endPos),
+                        [1]: content
+                    };
+                    tsmBlocks.push({ match, content });
+                }
+            }
         }
+    } catch (error) {
+        // AST parsing failed due to invalid syntax, continue with regex fallback
+        console.log('AST parsing failed, using regex fallback:', error);
     }
 
     return tsmBlocks;
@@ -96,53 +83,6 @@ function deindentContent(content: string): string {
 }
 
 /**
- * Find TSM blocks using regex-based parsing (fallback for invalid TypeScript syntax)
- */
-function findTsmBlocksWithRegex(source: string): Array<{ match: TSMBlockMatch; content: string }> {
-    const tsmBlocks: Array<{ match: TSMBlockMatch; content: string }> = [];
-    const returnRegex = /return\s*\(/g;
-    let match;
-
-    while ((match = returnRegex.exec(source)) !== null) {
-        const startPos = match.index;
-        const openParenPos = match.index + match[0].length - 1;
-
-        // Find the matching closing parenthesis
-        let parenCount = 1;
-        let pos = openParenPos + 1;
-        let endPos = -1;
-
-        while (pos < source.length && parenCount > 0) {
-            if (source[pos] === '(') {
-                parenCount++;
-            } else if (source[pos] === ')') {
-                parenCount--;
-                if (parenCount === 0) {
-                    endPos = pos;
-                    break;
-                }
-            }
-            pos++;
-        }
-
-        if (endPos !== -1) {
-            const rawContent = source.substring(openParenPos + 1, endPos);
-            const content = deindentContent(rawContent);
-            if (isTSMContent(content)) {
-                const fullMatch: TSMBlockMatch = {
-                    index: openParenPos + 1, // Start from the opening parenthesis
-                    [0]: source.substring(openParenPos + 1, endPos), // Only the content inside parentheses
-                    [1]: content
-                };
-                tsmBlocks.push({ match: fullMatch, content });
-            }
-        }
-    }
-
-    return tsmBlocks;
-}
-
-/**
  * Check if content contains TSM syntax
  */
 function isTSMContent(content: string): boolean {
@@ -170,7 +110,7 @@ export function transpileSource(source: string): TranspilationResult {
             true // setParentNodes
         );
 
-        const tsmBlocks = findTsmBlocksWithNestedDetection(sourceFile, source);
+        const tsmBlocks = findTsmBlocksWithAST(sourceFile, source);
         console.log('tsmBlocks with nested detection:', tsmBlocks);
 
         if (tsmBlocks.length === 0) {
@@ -180,7 +120,7 @@ export function transpileSource(source: string): TranspilationResult {
             };
         }
 
-        const parsedBlocks = tsmBlocks.map(({ content, nestedBlocks }) => {
+        const parsedBlocks = tsmBlocks.map(({ content }) => {
             const context: ParseContext = {
                 interpolations: [],
                 conditionalBlocks: [],
@@ -188,31 +128,9 @@ export function transpileSource(source: string): TranspilationResult {
                 jsxExpressions: []
             };
 
-            // Parse the main content
             const ast = parseContent(content, context);
 
-            // Process nested blocks if they exist
             let processedNestedBlocks: NestedTSMBlock[] | undefined;
-            if (nestedBlocks && nestedBlocks.length > 0) {
-                processedNestedBlocks = nestedBlocks.map(nestedBlock => {
-                    // Create a new context for the nested block with its variable scope
-                    const nestedContext: ParseContext = {
-                        interpolations: [],
-                        conditionalBlocks: [],
-                        ternaryExpressions: [],
-                        jsxExpressions: [],
-                        variableValues: nestedBlock.variableScope
-                    };
-
-                    // Parse the nested content
-                    const nestedAST = parseContent(nestedBlock.nestedContent, nestedContext);
-
-                    return {
-                        ...nestedBlock,
-                        parsedAST: nestedAST
-                    };
-                });
-            }
 
             return {
                 ast,
