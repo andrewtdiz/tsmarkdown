@@ -5,11 +5,13 @@ function ListItem({ item, index }: { item: string, index: number }) {
 }
 
 function Test() {
-  const items = ['Apple', 'Banana', 'Cherry'];
-  const itemsStr = items.map((item, index) => `- ${item}`).join('\n');
+  const fruits = ['Apple', 'Banana', 'Cherry'];
+  const itemsStr = fruits.map((fruit, i) => `- ${item}`).join('\n');
   
   return (
     Here's a list of items:
-    <@ListItem items={items[0]} />
+    {{ fruits.map((fruit, index) => (
+      <@ListItem item={fruit} index={index} />
+    ))}}
   )
 }

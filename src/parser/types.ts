@@ -9,3 +9,9 @@ export interface ParseContext {
     jsxExpressions: Array<{ placeholder: string; expression: string; name: string; props: Array<TSMComponentAttribute> }>;
     variableValues?: Map<string, any>;
 }
+
+export interface TSMBlockMatch {
+    index: number;
+    0: string;
+    1: string;
+}

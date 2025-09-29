@@ -1,5 +1,5 @@
 import * as ts from 'typescript';
-import { Chunk } from '../runtime/tsm-runtime';
+import { TSMBlockMatch } from '../parser/types';
 
 /**
  * Represents a nested TSM block found within an expression
@@ -24,15 +24,12 @@ export interface NestedTSMBlock {
  * @param sourceFile The TypeScript source file AST node.
  * @returns An array of ParenthesizedExpression nodes that represent TSM blocks.
  */
-export function findRootLevelTsmBlocks(node: ts.Node): ts.ParenthesizedExpression[] {
-    const tsmBlocks: ts.ParenthesizedExpression[] = [];
-    const newBlocks: Chunk[] = [];
+export function findRootLevelTsmBlocks(node: ts.Node): Array<{ match: TSMBlockMatch, content: string }> {
+    const blocks: Array<{ match: TSMBlockMatch, content: string }> = [];
+
 
     function visit(node: ts.Node) {
         if (ts.isReturnStatement(node)) {
-            console.log('DEBUG: Return statement found, parent:', node.parent.getFullText());
-            console.log('DEBUG: parent kind:', node.parent.kind);
-
             const returnStart = node.getStart();
 
             const textBeforeReturn = node.getSourceFile().text.substring(0, returnStart);
@@ -51,7 +48,16 @@ export function findRootLevelTsmBlocks(node: ts.Node): ts.ParenthesizedExpressio
                 const removeLeadingIndent = insideLines.map(line => line.slice(minWhiteSpace));
                 console.log('DEBUG: removeLeadingIndent:', removeLeadingIndent);
 
-                newBlocks.push(...removeLeadingIndent);
+                const content = removeLeadingIndent.join('\n');
+
+                const match: TSMBlockMatch = {
+                    index: returnStart,
+                    [0]: content,
+                    [1]: content
+                };
+
+                blocks.push({ match, content });
+                // newBlocks.push(...removeLeadingIndent);
                 // const stringArrayLiteral = ts.factory.createArrayLiteralExpression(
                 //     removeLeadingIndent.map(v => ts.factory.createStringLiteral(v)),
                 //     true
@@ -75,16 +81,11 @@ export function findRootLevelTsmBlocks(node: ts.Node): ts.ParenthesizedExpressio
             }
 
         }
-        if (ts.isReturnStatement(node) && node.expression && ts.isParenthesizedExpression(node.expression)) {
-            // This is a TSM block, e.g., `return (...)`
-            console.log('DEBUG: TSM block found:', node.expression.getFullText());
-            tsmBlocks.push(node.expression);
-        }
         ts.forEachChild(node, visit);
     }
 
     visit(node);
-    return tsmBlocks;
+    return blocks;
 }
 
 /**

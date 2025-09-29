@@ -1,16 +1,18 @@
+import { __tsm, __erasePrevLine } from './src/runtime/tsm-runtime';
+
 export function Test() {
-  const items = ['Apple', 'Banana', 'Cherry'];
-  const itemsStr = items.map((item, index) => `- ${item}`).join('\n');
+  const fruits = ['Apple', 'Banana', 'Cherry'];
 
   if (false) {
-    return items.map((item, index) => (
+    __tsm(["- ", item])s.map((item, index) => (
       - {{ item }}
     ));
   }
     
-  return (
-    Here's a list of items:
-    <@ListItem items={items[0]} />
+  __tsm(["Here's a list of items:", "\n", "", fruits.map((fruit, i) => (
+  __JSX_EXPRESSION_0__
+))])it} index={i} />
+    ))}}
   )
 }
 

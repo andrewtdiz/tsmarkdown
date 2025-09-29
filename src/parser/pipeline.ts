@@ -3,15 +3,14 @@
 import { parseInterpolationsToAST, renderASTToChunks } from './interpolations';
 import { protectCodeBlocks, restoreCodeBlocks } from './code-protection';
 import type { ParseContext } from './types';
-import type { Chunk } from '../runtime/tsm-runtime';
 
 export type { ParseContext } from './types';
 
-import { TSMBlock, TSMLine, TSMChunk, TSMTextChunk, TSMInterpolation } from "./tsm-ast";
+import { TSMBlock, TSMLine, TSMChunk } from "./tsm-ast";
 import { CodeProtection } from "./code-protection";
 
 export function parseContent(content: string, context: ParseContext): TSMBlock {
-    console.log(content);
+    console.log("CONTENT:", content);
     const { protectedContent, codeBlocks } = protectCodeBlocks(content);
 
     const ast = parseInterpolationsToAST(protectedContent, context);

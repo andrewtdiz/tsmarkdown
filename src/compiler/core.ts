@@ -3,56 +3,16 @@ import { findRootLevelTsmBlocks, extractBlockContent, NestedTSMBlock } from './b
 import { parseContent } from '../parser/pipeline';
 import { generateFromAST, generateExpressionFromAST } from './ast-code-generator';
 import { isPositionWithinReturnStatement } from './ast/return-detection';
-import type { ParseContext } from '../parser/types';
+import type { ParseContext, TSMBlockMatch } from '../parser/types';
 
 export interface TranspilationResult {
     transpiledFile: string;
     errors: string[];
 }
 
-interface TSMBlockMatch {
-    index: number;
-    0: string;
-    1: string;
-}
 
 // Backward compatibility alias for existing test files
 export const compileFullFile = transpileSource;
-
-/**
- * Find TSM blocks using a hybrid approach:
- * 1. Try to parse with TypeScript AST for valid TypeScript code
- * 2. Use regex-based parsing for TSM blocks with invalid syntax
- */
-function findTsmBlocksWithAST(sourceFile: ts.SourceFile, source: string): Array<{ match: TSMBlockMatch; content: string }> {
-    const tsmBlocks: Array<{ match: TSMBlockMatch; content: string }> = [];
-
-    try {
-        const astBlocks = findRootLevelTsmBlocks(sourceFile);
-        if (astBlocks.length > 0) {
-            for (const block of astBlocks) {
-                const content = extractBlockContent(block, sourceFile);
-                console.log('AST block found with content:', JSON.stringify(content));
-                console.log('AST block start:', block.getStart(), 'end:', block.getEnd());
-                if (isTSMContent(content)) {
-                    const startPos = block.getStart();
-                    const endPos = block.getEnd();
-                    const match: TSMBlockMatch = {
-                        index: startPos,
-                        [0]: source.substring(startPos, endPos),
-                        [1]: content
-                    };
-                    tsmBlocks.push({ match, content });
-                }
-            }
-        }
-    } catch (error) {
-        // AST parsing failed due to invalid syntax, continue with regex fallback
-        console.log('AST parsing failed, using regex fallback:', error);
-    }
-
-    return tsmBlocks;
-}
 
 /**
  * De-indent content by removing common leading whitespace from all lines
@@ -110,8 +70,7 @@ export function transpileSource(source: string): TranspilationResult {
             true // setParentNodes
         );
 
-        const tsmBlocks = findTsmBlocksWithAST(sourceFile, source);
-        console.log('tsmBlocks with nested detection:', tsmBlocks);
+        const tsmBlocks = findRootLevelTsmBlocks(sourceFile);
 
         if (tsmBlocks.length === 0) {
             return {
@@ -127,7 +86,6 @@ export function transpileSource(source: string): TranspilationResult {
                 ternaryExpressions: [],
                 jsxExpressions: []
             };
-
             const ast = parseContent(content, context);
 
             let processedNestedBlocks: NestedTSMBlock[] | undefined;
