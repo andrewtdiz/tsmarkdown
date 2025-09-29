@@ -19,7 +19,6 @@ export interface ParsedTSmd {
   functionParams: string[];
   isAsync: boolean;
   typescript: string;
-  markdown: Chunk[];
   interpolations: Array<{ placeholder: string; expression: string }>;
   conditionalBlocks: Array<{ condition: string; content: string }>;
   ternaryExpressions: Array<{ condition: string; trueValue: string; falseValue: string }>;

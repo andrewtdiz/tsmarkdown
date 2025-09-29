@@ -14,11 +14,13 @@ function ListItem({ item, index }: ListItemProps): string {
 }
 
 function Test(): string {
-  const items = ['Apple', 'Banana', 'Cherry'];
+  const fruits = ['Apple', 'Banana', 'Cherry'];
   const user = { name: 'Alice', age: 30 };
     return __tsm([
-    "Here's a list of items:", '\n',
-    "", items.map((item, index) => __tsm(["- ", item, "\n", index === items.length - 1 && null]))
+    "Here's a list of fruits:", '\n',
+    "<fruits>", '\n',
+    "", fruits.filter(f => f.length > 5).map((fruit, i) => __tsm(["ListItem({ item: fruit, index: i })"])), "", '\n',
+    "</fruits>"
 ]);
 }
 

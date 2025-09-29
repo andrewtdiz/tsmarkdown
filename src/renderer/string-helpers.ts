@@ -276,9 +276,6 @@ export function propsToObjectString(props: TSMComponentAttribute[]): string {
     return propStrings.length > 0 ? `{ ${propStrings.join(', ')} }` : '';
 }
 
-/**
- * Generates a TypeScript interface for component props based on function parameters
- */
 export function generatePropsInterface(functionInfo: FunctionInfo): string {
     if (functionInfo.parameters.length === 0) {
         return '';

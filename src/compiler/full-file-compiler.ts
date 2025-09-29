@@ -191,7 +191,6 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
 
         const { processedSource, templates } = await processGlobalTemplates(sourceFile);
 
-        // Store the global templates
         globalTemplates.push(...templates);
 
         const processedSourceFile = ts.createSourceFile(
@@ -207,11 +206,7 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
 
         for (const functionInfo of allFunctions) {
             try {
-                // Extract the actual function content from the AST
                 const { typescript, returnStatements, interpolations, conditionalBlocks, ternaryExpressions, jsxExpressions } = extractFunctionContent(processedSourceFile, functionInfo.name);
-
-                // Create ParsedTSmd for each function
-                const markdownContent = returnStatements.length > 0 ? returnStatements[0].content : `# ${functionInfo.name} Content`;
 
                 const jsxExpressionsMapped = jsxExpressions
                     .map(expr => ({ parsed: parseJSXExpressionToTSMComponent(expr.expression), ...expr }))
@@ -230,7 +225,6 @@ export async function compileFullFile(source: string): Promise<FullFileCompilati
                     functionParams: functionInfo.parameters.map(p => p.name),
                     isAsync: functionInfo.isAsync,
                     typescript: typescript,
-                    markdown: markdownContent,
                     interpolations: interpolations,
                     conditionalBlocks: conditionalBlocks,
                     ternaryExpressions: ternaryExpressions,

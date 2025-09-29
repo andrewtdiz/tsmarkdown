@@ -608,7 +608,6 @@ function extractFunctionContent(ast: ts.SourceFile, functionName: string): { typ
 
                 // Find return statements within this function using the new AST approach
                 const returns = getRootLevelReturnsOfFunction(sourceFile, node);
-                console.log(`Found ${returns.length} return statements in function ${functionName}`);
 
                 for (const returnStmt of returns) {
                     // Extract the actual content from the return statement using AST

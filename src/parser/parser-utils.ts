@@ -18,7 +18,7 @@ export { processTernaryExpressions } from './ternary';
 
 
 // Parameter parsing
-export { parseParameters, parseParameterTypes, inferTypeFromUsage, generatePropsInterface } from './parameters';
+export { generatePropsInterface } from './parameters';
 
 // TypeScript parser integration exports (replaces ESLint parser)
 export { parseWithTypeScript, validateWithTypeScript, extractTypeInfo, analyzeReturnStatements, extractParametersFromAST, extractFunctions } from './typescript-parser';

@@ -214,6 +214,7 @@ export function processJSXElementsForParsing(
         // Use the shared prop parser to handle all prop types correctly
         const parsedProps = parseJSXProps(props, jsxExpressions);
 
+        console.log('DEBUG: parsedProps', parsedProps);
         // Convert JSX element to function call: ComponentName({ prop1: value1, prop2: value2 })
         //@ts-ignore
         const propsString = propsToObjectString(parsedProps);

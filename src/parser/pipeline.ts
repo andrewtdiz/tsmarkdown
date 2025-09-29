@@ -10,6 +10,7 @@ export type { ParseContext } from './types';
 
 // Unified parsing entry point - uses the new TSM AST system
 export function parseContent(content: string, context: ParseContext): Chunk[] {
+    console.log('DEBUG: parseContent', content);
     // First, protect code blocks and inline code from parsing
     const { protectedContent, codeBlocks } = protectCodeBlocks(content);
 

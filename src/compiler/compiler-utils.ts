@@ -1,5 +1,5 @@
 import { ParsedTSmd } from "../parser";
-import type { Chunk } from "../runtime/tsm-runtime";
+import { __tsm, type Chunk } from "../runtime/tsm-runtime";
 import { parseJSXProps, propsToObjectString } from "../renderer/string-helpers";
 import { TSMComponent, TSMComponentAttribute } from "../parser/tsm-ast";
 import { generateReturnStatements } from "./generateReturnStatements";
@@ -137,12 +137,8 @@ export function compileTemplate(markdown: string | Chunk[], jsxExpressions?: Arr
         // Replace JSX expression placeholders with actual expressions
         if (jsxExpressions) {
             const processedChunks = replaceJSXExpressionPlaceholders(markdown, jsxExpressions);
-            // Import __tsm here to avoid circular dependencies
-            const { __tsm } = require('../runtime/tsm-runtime');
             return __tsm(processedChunks);
         } else {
-            // Import __tsm here to avoid circular dependencies
-            const { __tsm } = require('../runtime/tsm-runtime');
             return __tsm(markdown);
         }
     }
@@ -180,57 +176,4 @@ function replaceJSXExpressionPlaceholders(chunks: Chunk[], jsxExpressions: Array
         }
         return chunk;
     });
-}
-
-export function parseImportStatement(importLine: string): DependencyInfo {
-    const result: DependencyInfo = {
-        modulePath: '',
-        namedImports: [],
-        isTypeOnly: false,
-        isSideEffect: false,
-        originalImport: importLine
-    };
-
-    // Check for type-only imports
-    if (importLine.includes('import type')) {
-        result.isTypeOnly = true;
-    }
-
-    // Extract module path
-    const modulePathMatch = importLine.match(/from\s*['"]([^'"]+)['"]/);
-    if (modulePathMatch) {
-        result.modulePath = modulePathMatch[1];
-    } else {
-        // Side-effect import (no from clause)
-        result.isSideEffect = true;
-        const sideEffectMatch = importLine.match(/import\s*['"]([^'"]+)['"]/);
-        if (sideEffectMatch) {
-            result.modulePath = sideEffectMatch[1];
-        }
-        return result;
-    }
-
-    // Extract default import
-    const defaultMatch = importLine.match(/import\s+(\w+)\s+from/);
-    if (defaultMatch) {
-        result.defaultImport = defaultMatch[1];
-    }
-
-    // Extract named imports (including aliases)
-    const namedMatch = importLine.match(/import\s*\{\s*([^}]+)\s*\}\s*from/);
-    if (namedMatch) {
-        const namedImports = namedMatch[1]
-            .split(',')
-            .map(name => name.trim())
-            .filter(Boolean);
-        result.namedImports = namedImports;
-    }
-
-    // Extract namespace import
-    const namespaceMatch = importLine.match(/import\s*\*\s+as\s+(\w+)\s+from/);
-    if (namespaceMatch) {
-        result.namespaceImport = namespaceMatch[1];
-    }
-
-    return result;
 }

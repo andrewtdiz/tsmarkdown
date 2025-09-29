@@ -283,6 +283,7 @@ function convertTernaryValueToTsmArray(content: string): string {
 }
 
 function processNestedArrays(chunk: any[], parsed?: ParsedTSmd): string {
+    console.log('DEBUG: chunk:', chunk, parsed);
 
     // First, check if this is a ternary expression pattern
     if (isTernaryArray(chunk)) {
@@ -312,25 +313,15 @@ function processNestedArrays(chunk: any[], parsed?: ParsedTSmd): string {
             });
         }
 
-        // After processing all interpolations, convert map function to return __tsm chunks
-        if (joinedChunk.includes('map(') && joinedChunk.includes('=>') && joinedChunk.includes('${') && !joinedChunk.includes('__tsm(')) {
-            // For map functions, we need to re-enter the __tsm scope
-            // This means we need to parse the content and convert it to proper __tsm array format
-            const mapMatchWithParens = joinedChunk.match(/items\.map\(\([^)]+\)\s*=>\s*\(([^)]+)\)\)/);
-            if (mapMatchWithParens) {
-                const mapContent = mapMatchWithParens[1]; // Don't trim to preserve newlines!
-                // Parse the content and convert to __tsm array format
+        if (joinedChunk.includes('map(') && joinedChunk.includes('=>') && joinedChunk.includes('\n') && !joinedChunk.includes('__tsm(')) {
+            // Match any expression ending with .map(...) that has newlines in the content
+            const mapMatch = joinedChunk.match(/(.+?)\.map\(\(([^)]+)\)\s*=>\s*\(([\s\S]*?)\)\)/);
+            if (mapMatch) {
+                const chainPrefix = mapMatch[1];
+                const params = mapMatch[2];
+                const mapContent = mapMatch[3];
                 const tsmContent = convertToTsmArray(mapContent);
-                joinedChunk = joinedChunk.replace(mapMatchWithParens[0], `items.map((item, index) => ${tsmContent})`);
-            } else {
-                // Try the original pattern: items.map((item, index) => (\n...\n))
-                const mapMatch = joinedChunk.match(/items\.map\(\([^)]+\)\s*=>\s*\(([^)]+)\)/);
-                if (mapMatch) {
-                    const mapContent = mapMatch[1]; // Don't trim to preserve newlines!
-                    // Parse the content and convert to __tsm array format
-                    const tsmContent = convertToTsmArray(mapContent);
-                    joinedChunk = joinedChunk.replace(mapMatch[0], `items.map((item, index) => ${tsmContent})`);
-                }
+                joinedChunk = joinedChunk.replace(mapMatch[0], `${chainPrefix}.map((${params}) => ${tsmContent})`);
             }
         }
 
@@ -454,10 +445,8 @@ export function generateReturnStatements(parsed: ParsedTSmd): string {
     for (let i = 0; i < parsed.returnStatements.length; i++) {
         const returnStmt = parsed.returnStatements[i];
         if (returnStmt.isTemplate) {
-            // Generate chunk-based code for this return statement
             const chunks: string[] = [];
 
-            // Add the markdown content as chunks
             if (returnStmt.content) {
                 if (Array.isArray(returnStmt.content)) {
                     // Content is already chunks - convert them to JavaScript literals
@@ -496,8 +485,6 @@ export function generateReturnStatements(parsed: ParsedTSmd): string {
 
                             chunks.push(literal);
                         } else if (Array.isArray(chunk)) {
-                            // TSMInterpolations should be evaluated by TypeScript as expressions
-                            // Process nested arrays with proper ternary handling
                             const expression = processNestedArrays(chunk, parsed);
                             chunks.push(expression);
                         } else {
