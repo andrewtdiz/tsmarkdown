@@ -246,17 +246,23 @@ describe("Recursive TSM Parser", () => {
         const interpolation = ast.lines[0].chunks[0] as TSMInterpolation;
         const nestedBlock = interpolation.nestedConditionalBlock as TSMBlock;
 
-        expect(nestedBlock.lines).toHaveLength(3);
+        expect(nestedBlock.lines).toHaveLength(5);
 
-        expect(nestedBlock.lines[0].chunks).toHaveLength(1);
+        expect(nestedBlock.lines[0].chunks).toHaveLength(0);
+        expect(nestedBlock.lines[0].isEmpty).toBe(true);
+
+        expect(nestedBlock.lines[1].chunks).toHaveLength(1);
         // @ts-ignore
-        expect(nestedBlock.lines[0].chunks[0].content.trim()).toBe("# Here's a component:");
+        expect(nestedBlock.lines[1].chunks[0].content.trim()).toBe("# Here's a component:");
 
-        expect(nestedBlock.lines[1].chunks).toHaveLength(0);
-        expect(nestedBlock.lines[1].isEmpty).toBe(true);
+        expect(nestedBlock.lines[2].chunks).toHaveLength(0);
+        expect(nestedBlock.lines[2].isEmpty).toBe(true);
 
-        expect(nestedBlock.lines[2].chunks).toHaveLength(1);
+        expect(nestedBlock.lines[3].chunks).toHaveLength(1);
         // @ts-ignore
-        expect(nestedBlock.lines[2].chunks[0].content.trim()).toBe("## Another line");
+        expect(nestedBlock.lines[3].chunks[0].content.trim()).toBe("## Another line");
+
+        expect(nestedBlock.lines[4].chunks).toHaveLength(0);
+        expect(nestedBlock.lines[4].isEmpty).toBe(true);
     });
 });

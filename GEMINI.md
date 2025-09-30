@@ -1,39 +1,29 @@
 # Project Overview
 
-This project is a type-safe, component-based markdown engine for TypeScript called "TS Markdown". It allows developers to create dynamic, template-driven markdown with full TypeScript support.
-
-The project includes:
-- A compiler that transpiles `.tsmd` files into TypeScript.
-- A command-line interface (CLI) to watch for file changes and automatically transpile them.
-- A testing utility for running tests on `.tsmd` files.
-- A VS Code extension for syntax highlighting and IntelliSense.
+This project is a type-safe, component-based markdown engine for TypeScript. It allows developers to create dynamic, template-driven markdown with full TypeScript support. The project includes a command-line interface (CLI) for transpiling `.tsmd` files into TypeScript files, as well as a library of functions for use in other projects.
 
 ## Building and Running
 
-The project uses `bun` for package management and running scripts.
+### Build
 
-- **Build:** `bun run build`
-  - This command transpiles the TypeScript source code into JavaScript and outputs it to the `dist` directory.
+To build the project, run the following command:
 
-- **Run in Development:** `bun run dev`
-  - This command watches for changes in the source code and automatically rebuilds the project.
+```bash
+bun run build
+```
 
-- **Run Tests:** `bun test`
-  - This command runs the test suite for the project.
+### Development
 
-- **Run the CLI:** `bun run tsmarkdown`
-  - This command runs the TS Markdown CLI, which watches for changes in `.tsmd` files and transpiles them to TypeScript. By default, it watches the `/tsmd` directory.
+To run the project in development mode with file watching, use the following command:
+
+```bash
+bun run dev
+```
 
 ## Development Conventions
 
-- **Testing:** The project uses `bun:test` for testing. Tests are located in the `test` directory and are organized by feature. The testing setup includes a custom test runner for `.tsmd` files, which allows for asserting on the exact output of the transpiled markdown.
-- **Linting:** The project uses the TypeScript compiler for linting (`bun run lint`).
-- **File Structure:**
-  - `src`: Contains the main source code for the library.
-    - `compiler`: The TSMD compiler.
-    - `parser`: The TSMD parser.
-    - `renderer`: The TSMD renderer.
-    - `runtime`: The TSMD runtime.
-    - `utils`: Utility functions.
-  - `bin`: Contains the source code for the CLI.
-  - `test`: Contains the tests for the project.
+The project is written in TypeScript and uses `bun` for package management. The code is organized into a `src` directory, which contains the core logic of the transpiler and a `test` directory, which contains the tests.
+
+The transpiler works by parsing `.tsmd` files, which are a mix of markdown and TypeScript, and then generating corresponding TypeScript files. The parser is designed to handle template interpolations, conditional rendering, and component integration.
+
+The project uses the `typescript` library to create an abstract syntax tree (AST) of the source code, which is then traversed to find and transpile the TSM blocks.

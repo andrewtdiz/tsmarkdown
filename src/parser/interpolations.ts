@@ -44,12 +44,9 @@ function stripBlockIndentation(content: string): string {
         return line.slice(minIndent);
     });
 
-    // Remove leading and trailing empty lines
-    while (strippedLines.length > 0 && strippedLines[0] === '') {
+    // Remove only the first and last empty lines (outermost empty lines)
+    if (strippedLines.length > 0 && strippedLines[0] === '') {
         strippedLines.shift();
-    }
-    while (strippedLines.length > 0 && strippedLines[strippedLines.length - 1] === '') {
-        strippedLines.pop();
     }
 
     return strippedLines.join('\n');
@@ -269,27 +266,6 @@ export function parseInterpolationsToAST(content: string, context: ParseContext,
         tsmLines.push({ type: 'TSMLine', chunks: [], isEmpty: true });
     }
 
-    // Trim leading and trailing empty lines, but keep empty lines in the middle
-    let startIndex = 0;
-    let endIndex = tsmLines.length - 1;
-
-    // Find first non-empty line
-    while (startIndex < tsmLines.length && tsmLines[startIndex].isEmpty) {
-        startIndex++;
-    }
-
-    // Find last non-empty line
-    while (endIndex >= 0 && tsmLines[endIndex].isEmpty) {
-        endIndex--;
-    }
-
-    // If all lines are empty, return a single empty line
-    if (startIndex > endIndex) {
-        return { type: 'TSMBlock', lines: [{ type: 'TSMLine', chunks: [], isEmpty: true }] };
-    }
-
-    // Return the trimmed slice (inclusive of endIndex)
-    const trimmedLines = tsmLines.slice(startIndex, endIndex + 1);
-
-    return { type: 'TSMBlock', lines: trimmedLines };
+    // Don't trim empty lines - preserve all lines including empty ones
+    return { type: 'TSMBlock', lines: tsmLines };
 }
