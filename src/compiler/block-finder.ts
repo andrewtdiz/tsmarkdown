@@ -38,39 +38,45 @@ export function findRootLevelTsmBlocks(node: ts.Node): Array<{ match: TSMBlockMa
 
             const leadingSpaces = returnLine.match(/^(\s*)/)?.[1]?.length || 0;
 
-            const closingParen = node.getSourceFile().text.substring(returnStart + 1);
-            const lines = closingParen.split(/(?<!\\)\n/);
+            const sourceText = node.getSourceFile().text;
+            const returnText = sourceText.substring(returnStart);
+            const openParenIndex = returnText.indexOf('(');
+            if (openParenIndex === -1) return;
 
-            const closingParenLine = lines.findIndex(line => line.startsWith(" ".repeat(leadingSpaces) + ")"));
-            if (closingParenLine !== -1) {
-                const insideLines = lines.slice(1, closingParenLine);
-                const minWhiteSpace = insideLines.reduce((min, line) => Math.min(min, line.match(/^(\s*)/)?.[1]?.length || 0), leadingSpaces * 2);
-                const removeLeadingIndent = insideLines.map(line => line.slice(minWhiteSpace));
+            // Find matching closing parenthesis
+            let parenCount = 1;
+            let closeParenIndex = -1;
+            for (let i = openParenIndex + 1; i < returnText.length; i++) {
+                if (returnText[i] === '(') {
+                    parenCount++;
+                } else if (returnText[i] === ')') {
+                    parenCount--;
+                    if (parenCount === 0) {
+                        closeParenIndex = i;
+                        break;
+                    }
+                }
+            }
 
-                const content = removeLeadingIndent.join('\n');
+            if (closeParenIndex !== -1) {
+                const fullReturnStatement = returnText.substring(0, closeParenIndex + 1);
+                let content = returnText.substring(openParenIndex + 1, closeParenIndex);
 
-                // Find the complete return statement by looking for the closing parenthesis
-                const sourceText = node.getSourceFile().text;
-                const returnText = sourceText.substring(returnStart);
-                const openParen = returnText.indexOf('(');
-                if (openParen === -1) return;
+                const lines = content.split('\n');
+                let minIndent = Infinity;
 
-                // Find matching closing parenthesis
-                let parenCount = 0;
-                let endPos = openParen;
-                for (let i = openParen; i < returnText.length; i++) {
-                    if (returnText[i] === '(') parenCount++;
-                    else if (returnText[i] === ')') {
-                        parenCount--;
-                        if (parenCount === 0) {
-                            endPos = i + 1;
-                            break;
-                        }
+                for (const line of lines) {
+                    if (line.trim().length > 0) {
+                        const indent = line.match(/^(\s*)/)?.[1]?.length || 0;
+                        minIndent = Math.min(minIndent, indent);
                     }
                 }
 
-                const fullReturnStatement = returnText.substring(0, endPos);
-
+                if (minIndent !== Infinity && minIndent > 0) {
+                    const deindentedLines = lines.map(line => line.startsWith(' '.repeat(minIndent)) ? line.slice(minIndent) : line);
+                    content = deindentedLines.join('\n');
+                }
+                
                 const match: TSMBlockMatch = {
                     index: returnStart,
                     [0]: fullReturnStatement,
@@ -88,41 +94,4 @@ export function findRootLevelTsmBlocks(node: ts.Node): Array<{ match: TSMBlockMa
 
     visit(node);
     return blocks;
-}
-
-/**
- * Extracts the raw string content from within a TSM block node.
- * It uses the AST node's position to slice the text from the original source file
- * and performs a basic de-indentation of the extracted block.
- *
- * @param block The ParenthesizedExpression node of the TSM block.
- * @param sourceFile The source file containing the block.
- * @returns The raw, de-indented string content of the block.
- */
-export function extractBlockContent(block: ts.ParenthesizedExpression, sourceFile: ts.SourceFile): string {
-    console.log('DEBUG: block:', block.getFullText());
-    const rawContent = sourceFile.text.substring(block.getStart() + 1, block.getEnd() - 1);
-
-    const lines = rawContent.split('\n');
-
-    // Find the minimum indentation of all non-empty lines.
-    let minIndent = Infinity;
-    for (const line of lines) {
-        if (line.trim().length > 0) {
-            const indent = line.match(/^(\s*)/)?.[1]?.length || 0;
-            minIndent = Math.min(minIndent, indent);
-        }
-    }
-
-    if (minIndent === Infinity) {
-        return lines.join('\n')
-    }
-
-    // Remove the common indentation from each line.
-    const deindentedLines = lines.map(line => {
-        return line.startsWith(' '.repeat(minIndent)) ? line.slice(minIndent) : line;
-    });
-
-    // Join the lines and trim any leading/trailing whitespace or newlines.
-    return deindentedLines.join('\n')
 }

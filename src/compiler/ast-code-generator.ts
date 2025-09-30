@@ -201,7 +201,7 @@ class TSMCodeGenerator implements TSMVisitor {
                 const nestedAst = parseContent(blockContent, this.parseContext!);
                 const nestedCode = nestedGenerator.generateExpression(nestedAst);
 
-                this.output.push(`${array}.map(${params} => ${nestedCode}).join('\\n')`);
+                this.output.push(`${array}.map(${params} => ${nestedCode}).join('')`);
             } else {
                 this.output.push(interpolation.expression);
             }

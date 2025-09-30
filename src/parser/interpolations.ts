@@ -44,11 +44,6 @@ function stripBlockIndentation(content: string): string {
         return line.slice(minIndent);
     });
 
-    // Remove only the first and last empty lines (outermost empty lines)
-    if (strippedLines.length > 0 && strippedLines[0] === '') {
-        strippedLines.shift();
-    }
-
     return strippedLines.join('\n');
 }
 
@@ -218,53 +213,28 @@ export function parseInterpolationsToAST(content: string, context: ParseContext,
     const tsmLines: TSMLine[] = [];
     let currentLine: TSMChunk[] = [];
 
+    const pushLine = () => {
+        const isEmpty = currentLine.every(c => c.type === 'TSMTextChunk' && c.content.trim() === '');
+        tsmLines.push({ type: 'TSMLine', chunks: currentLine, isEmpty });
+        currentLine = [];
+    };
+
     for (const chunk of chunks) {
         if (chunk.type === 'TSMTextChunk') {
-            // Split text chunks by newlines
             const lines = chunk.content.split('\n');
             for (let i = 0; i < lines.length; i++) {
-                const lineText = lines[i];
-                // Only add non-whitespace text chunks, or whitespace if there's already content on the line
-                if (lineText.length > 0 && (lineText.trim().length > 0 || currentLine.length > 0)) {
-                    currentLine.push(createTSMTextChunk(lineText));
+                if (lines[i].length > 0) {
+                    currentLine.push(createTSMTextChunk(lines[i]));
                 }
-                // Add line break (except for the last segment)
                 if (i < lines.length - 1) {
-                    // Always add the line, even if empty (to preserve empty lines)
-                    const isEmpty = currentLine.length === 0 ||
-                        (currentLine.length === 1 &&
-                            currentLine[0].type === 'TSMTextChunk' &&
-                            currentLine[0].content.trim() === '');
-                    tsmLines.push({
-                        type: 'TSMLine',
-                        chunks: currentLine,
-                        isEmpty: isEmpty
-                    });
-                    currentLine = [];
+                    pushLine();
                 }
             }
         } else {
-            // Interpolations and components go on the current line
             currentLine.push(chunk);
         }
     }
-
-    // Add the last line if it has content or if we need to preserve it
-    if (currentLine.length > 0) {
-        const isEmpty = currentLine.length === 1 &&
-            currentLine[0].type === 'TSMTextChunk' &&
-            currentLine[0].content.trim() === '';
-        tsmLines.push({
-            type: 'TSMLine',
-            chunks: currentLine,
-            isEmpty: isEmpty
-        });
-    }
-
-    // If no lines were created, create an empty line
-    if (tsmLines.length === 0) {
-        tsmLines.push({ type: 'TSMLine', chunks: [], isEmpty: true });
-    }
+    pushLine();
 
     // Don't trim empty lines - preserve all lines including empty ones
     return { type: 'TSMBlock', lines: tsmLines };

@@ -1,5 +1,5 @@
 import * as ts from 'typescript';
-import { findRootLevelTsmBlocks, extractBlockContent, NestedTSMBlock } from './block-finder';
+import { findRootLevelTsmBlocks, NestedTSMBlock } from './block-finder';
 import { parseContent } from '../parser/pipeline';
 import { generateFromAST, generateExpressionFromAST } from './ast-code-generator';
 import { isPositionWithinReturnStatement } from './ast/return-detection';
@@ -13,46 +13,6 @@ export interface TranspilationResult {
 
 // Backward compatibility alias for existing test files
 export const compileFullFile = transpileSource;
-
-/**
- * De-indent content by removing common leading whitespace from all lines
- */
-function deindentContent(content: string): string {
-    const lines = content.split('\n');
-
-    // Find the minimum indentation of all non-empty lines.
-    let minIndent = Infinity;
-    for (const line of lines) {
-        if (line.trim().length > 0) {
-            const indent = line.match(/^(\s*)/)?.[1]?.length || 0;
-            minIndent = Math.min(minIndent, indent);
-        }
-    }
-
-    if (minIndent === Infinity) {
-        return lines.join('\n');
-    }
-
-    // Remove the common indentation from each line.
-    const deindentedLines = lines.map(line => {
-        return line.startsWith(' '.repeat(minIndent)) ? line.slice(minIndent) : line;
-    });
-
-    // Join the lines and trim any leading/trailing whitespace or newlines.
-    return deindentedLines.join('\n');
-}
-
-/**
- * Check if content contains TSM syntax
- */
-function isTSMContent(content: string): boolean {
-    // More strict check for TSM content - look for clear TSM markers
-    return content.includes('{{') ||
-        content.includes('<@') ||
-        (content.includes('#') && (content.includes('##') || content.includes('###'))) ||
-        (content.includes('*') && !!content.match(/\*\*.*\*\*/)) ||
-        (content.includes('-') && !!content.match(/^- .*$/m)); // Only consider - as TSM if it's at start of line
-}
 
 /**
  * The new core entry point for the TSM transpiler.
@@ -96,7 +56,6 @@ export function transpileSource(source: string): TranspilationResult {
                 nestedBlocks: processedNestedBlocks
             };
         });
-        console.log('parsedBlocks:', JSON.stringify(parsedBlocks, null, 2));
 
         let transpiledCode = source;
 
