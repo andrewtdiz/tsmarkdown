@@ -70,7 +70,7 @@ export function __tsm(chunks: Array<Chunk>): string {
                     } else if (typeof item === 'string') {
                         buffer.push(item);
                     } else if (typeof item === 'number') {
-                        
+
                     } else if (item && typeof item[Symbol.iterator] === 'function') {
                         // Handle nested iterables recursively
                         for (const nestedItem of item) {
@@ -181,14 +181,11 @@ export function __erasePrevLine(buf: string[]): void {
         if (typeof item === 'string') {
             // Remove everything after the last newline in that item
             buf[lastNewlineBufferIndex] = item.substring(0, lastNewlineIndex);
-            // Remove any empty items that come after
-            while (buf.length > lastNewlineBufferIndex + 1) {
-                const nextItem = buf[lastNewlineBufferIndex + 1];
-                if (typeof nextItem === 'string' && nextItem === '') {
-                    buf.splice(lastNewlineBufferIndex + 1, 1);
-                } else {
-                    break;
-                }
+            // Remove all items that come after (not just empty strings)
+            buf.splice(lastNewlineBufferIndex + 1);
+            // If the item with the newline is now empty, remove it too
+            if (buf[lastNewlineBufferIndex] === '') {
+                buf.pop();
             }
         }
     } else {

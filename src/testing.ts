@@ -17,7 +17,7 @@ export interface TSMDTestCase {
   expectedErrors?: string[];
 }
 
-export class TSMDTestRunner {
+export class ExactTSMDTestRunner {
   async runTestCase(testCase: TSMDTestCase): Promise<TSMDTestResult> {
     try {
       // Use the new compiler architecture

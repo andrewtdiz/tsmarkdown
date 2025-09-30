@@ -1,12 +1,8 @@
 import { test, expect, describe } from 'bun:test';
-import {
-    createTSmdTest,
-    createTSmdTestSuite,
-    TSMDTestRunner,
-} from '../../src/testing';
+import { createTSmdTest, createTSmdTestSuite, ExactTSMDTestRunner } from '../../src/testing';
 
 describe('TSmd Exact Core Features', () => {
-    const runner = new TSMDTestRunner();
+    const runner = new ExactTSMDTestRunner();
 
     test('Basic interpolation - exact match', async () => {
         const contents = await Bun.file(import.meta.dir + '/basic-interpolation.tsmd').text();
@@ -106,7 +102,7 @@ const useAuth = () => ({
 });
 
 describe('TSmd Complex Nested Conditionals - Exact Tests', () => {
-    const runner = new TSMDTestRunner();
+    const runner = new ExactTSMDTestRunner();
 
     test('Complex nested conditionals - exact match', async () => {
         const contents = await Bun.file(import.meta.dir + '/complex-nested-conditionals.tsmd').text();
@@ -178,7 +174,7 @@ describe('TSmd Complex Nested Conditionals - Exact Tests', () => {
 });
 
 describe('TSmd Exact Test Suite Integration', () => {
-    const runner = new TSMDTestRunner();
+    const runner = new ExactTSMDTestRunner();
 
     test('Run exact test suite', async () => {
         const suite = createTSmdTestSuite('Exact Features Suite')

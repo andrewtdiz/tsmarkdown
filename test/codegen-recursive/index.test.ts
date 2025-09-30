@@ -41,7 +41,67 @@ describe("Recursive Code Generator", () => {
         const context = { indentLevel: 0, isAsync: false, functionName: 'test' };
         const generatedCode = generateFromAST(ast, context);
 
-        const expectedCode = `return __tsm([condition && (__tsm(["# Hello from a nested block"]))])`;
+        const expectedCode = `return __tsm([condition && __tsm(["# Hello from a nested block"])])`;
+        expect(generatedCode.replace(/\s/g, '')).toBe(expectedCode.replace(/\s/g, ''));
+    });
+
+    it("should generate correct code for a nested ternary expression", () => {
+        const trueBlock: TSMBlock = {
+            type: "TSMBlock",
+            lines: [
+                {
+                    type: "TSMLine",
+                    chunks: [
+                        {
+                            type: "TSMTextChunk",
+                            content: "# True branch"
+                        }
+                    ]
+                }
+            ]
+        };
+
+        const falseBlock: TSMBlock = {
+            type: "TSMBlock",
+            lines: [
+                {
+                    type: "TSMLine",
+                    chunks: [
+                        {
+                            type: "TSMTextChunk",
+                            content: "# False branch"
+                        }
+                    ]
+                }
+            ]
+        };
+
+        const interpolation: TSMInterpolation = {
+            type: "TSMInterpolation",
+            expression: "condition ? (\n# True branch\n) : (\n# False branch\n)",
+            isConditional: true,
+            ternaryExpressions: [
+                {
+                    trueBlock: trueBlock,
+                    falseBlock: falseBlock
+                }
+            ]
+        };
+
+        const ast: TSMBlock = {
+            type: "TSMBlock",
+            lines: [
+                {
+                    type: "TSMLine",
+                    chunks: [interpolation]
+                }
+            ]
+        };
+
+        const context = { indentLevel: 0, isAsync: false, functionName: 'test' };
+        const generatedCode = generateFromAST(ast, context);
+
+        const expectedCode = `return __tsm([condition ? __tsm(["# True branch"]) : __tsm(["# False branch"])])`;
         expect(generatedCode.replace(/\s/g, '')).toBe(expectedCode.replace(/\s/g, ''));
     });
 });

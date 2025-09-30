@@ -1,7 +1,7 @@
 import { findMatchingDoubleBrace, findMatchingBrace, findMatchingParen } from '../utils/string-helpers';
 import type { ParseContext } from './types';
 import type { Chunk } from '../runtime/tsm-runtime';
-import type { TSMChunk, TSMComponent, TSMComponentAttribute, TSMAttributeValue, TSMInterpolation, TSMLine } from './tsm-ast';
+import type { TSMChunk, TSMComponent, TSMComponentAttribute, TSMAttributeValue, TSMInterpolation, TSMLine, TSMBlock } from './tsm-ast';
 import { protectCodeBlocks, restoreCodeBlocks } from './code-protection';
 import { normalizeIndentation, parseJSXProps, propsToObjectString } from '../utils/string-helpers';
 import { parseContent } from './pipeline';
@@ -12,6 +12,50 @@ function createTSMTextChunk(content: string): TSMChunk {
         type: 'TSMTextChunk',
         content
     };
+}
+
+/**
+ * Strip common leading indentation from a block of text while preserving empty lines
+ * This is used for ternary and conditional blocks to normalize their indentation
+ */
+function stripBlockIndentation(content: string): string {
+    const lines = content.split('\n');
+
+    // Find minimum indentation (ignoring empty lines)
+    let minIndent = Infinity;
+    for (const line of lines) {
+        const trimmed = line.trimStart();
+        if (trimmed.length === 0) {
+            // Skip empty lines when calculating minimum indent
+            continue;
+        }
+        const indent = line.length - trimmed.length;
+        minIndent = Math.min(minIndent, indent);
+    }
+
+    // If all lines are empty, return as-is
+    if (minIndent === Infinity) {
+        return content;
+    }
+
+    // Strip the minimum indentation from all lines, preserving empty lines
+    const strippedLines = lines.map(line => {
+        if (line.trim().length === 0) {
+            // Preserve empty lines as empty strings
+            return '';
+        }
+        return line.slice(minIndent);
+    });
+
+    // Remove leading and trailing empty lines
+    while (strippedLines.length > 0 && strippedLines[0] === '') {
+        strippedLines.shift();
+    }
+    while (strippedLines.length > 0 && strippedLines[strippedLines.length - 1] === '') {
+        strippedLines.pop();
+    }
+
+    return strippedLines.join('\n');
 }
 
 function parseComponent(content: string): { component: TSMComponent, newIndex: number } {
@@ -130,7 +174,11 @@ export function parseInterpolationsToAST(content: string, context: ParseContext,
             const parenStart = conditionalMatch.index + conditionalMatch[0].length - 1;
             const parenEnd = findMatchingParen(expression, parenStart);
             if (parenEnd !== -1) {
-                const blockContent = expression.substring(parenStart + 1, parenEnd);
+                let blockContent = expression.substring(parenStart + 1, parenEnd);
+
+                // Strip common leading indentation from conditional blocks
+                blockContent = stripBlockIndentation(blockContent);
+
                 interpolation.isLogical = true;
                 interpolation.nestedConditionalBlock = parseContent(blockContent, context, true);
             }
@@ -150,8 +198,12 @@ export function parseInterpolationsToAST(content: string, context: ParseContext,
                     const falseBlockEnd = findMatchingParen(expression, falseBlockStart - 1);
 
                     if (falseBlockEnd !== -1) {
-                        const trueBlockContent = expression.substring(trueBlockStart, trueBlockEnd);
-                        const falseBlockContent = expression.substring(falseBlockStart, falseBlockEnd);
+                        let trueBlockContent = expression.substring(trueBlockStart, trueBlockEnd);
+                        let falseBlockContent = expression.substring(falseBlockStart, falseBlockEnd);
+
+                        // Strip common leading indentation from ternary blocks
+                        trueBlockContent = stripBlockIndentation(trueBlockContent);
+                        falseBlockContent = stripBlockIndentation(falseBlockContent);
 
                         interpolation.isConditional = true;
                         interpolation.ternaryExpressions!.push({

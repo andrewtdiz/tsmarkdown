@@ -5,6 +5,7 @@ import {
 } from '../../src/testing';
 
 describe('TypeScript and External Asset Import Features', () => {
+    const runner = new ExactTSMDTestRunner();
     describe('Module Resolution', () => {
         test('should resolve relative TypeScript imports with explicit extension', async () => {
             const contents = await Bun.file(import.meta.dir + '/relative-ts-import.tsmd').text();

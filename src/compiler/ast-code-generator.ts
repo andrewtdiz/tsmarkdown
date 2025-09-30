@@ -18,6 +18,7 @@ interface CodeGenContext {
     indentLevel: number;
     isAsync: boolean;
     functionName: string;
+    isNested?: boolean;
 }
 
 /**
@@ -80,41 +81,33 @@ class TSMCodeGenerator implements TSMVisitor {
         for (let i = 0; i < block.lines.length; i++) {
             const line = block.lines[i];
 
-            // Skip comment lines
-            if (line.isComment) continue;
-
-            // Skip leading empty lines
-            if (i < firstNonEmptyIndex) continue;
-
             // Add comma before each line (except the first)
-            if (i > firstNonEmptyIndex) {
+            if (i > 0 && i < block.lines.length) {
                 this.output.push(', ');
             }
 
-            // Check if this is an empty line (only contains empty text chunks)
-            const isEmptyLine = line.chunks.every(chunk =>
-                chunk.type === 'TSMTextChunk' && chunk.content.trim() === ''
-            );
-
-            if (isEmptyLine) {
-                // For empty lines, add an empty string to preserve the line break
-                this.output.push('""');
-            } else {
-                this.visitLine(line);
-            }
+            this.visitLine(line);
 
             // Add newline after each line (except the last non-empty line)
-            if (i < lastNonEmptyIndex) {
+            if (i < block.lines.length - 1) {
                 this.output.push(', "\\n"');
             }
         }
 
         this.output.push('])');
+        if (!this.context.isNested) {
+            this.output.push('\n');
+        }
     }
 
     visitLine(line: TSMLine): void {
         // Skip comment lines
         if (line.isComment) {
+            return;
+        }
+
+        if (line.chunks.length === 0) {
+            this.output.push('""');
             return;
         }
 
@@ -158,50 +151,59 @@ class TSMCodeGenerator implements TSMVisitor {
             this.output.push('(');
             this.output.push(interpolation.expression);
             this.output.push(')');
-        } else if (interpolation.isLogical) {
-            // Handle logical expressions like {{ cond && (...) }}
-            // Parse the expression to extract the condition and content
+        } else if (interpolation.nestedConditionalBlock) {
             const andPattern = /&&\s*\(/;
             const match = interpolation.expression.match(andPattern);
             if (match) {
                 const andIndex = match.index!;
                 const condition = interpolation.expression.substring(0, andIndex).trim();
-                const parenStart = andIndex + match[0].length - 1;
-                const parenEnd = this.findMatchingParen(interpolation.expression, parenStart);
 
-                if (parenEnd !== -1) {
-                    this.output.push('(');
-                    this.output.push(condition);
-                    this.output.push(' && ');
+                // Generate ternary that returns null when condition is false
+                // This prevents rendering empty lines for false conditionals
+                this.output.push('(');
+                this.output.push(condition);
+                this.output.push(' ? ');
+                const nestedGenerator = new TSMCodeGenerator({ ...this.context, isNested: true });
+                const nestedCode = nestedGenerator.generateExpression(interpolation.nestedConditionalBlock);
+                this.output.push(nestedCode);
+                this.output.push(' : null)');
+            }
+        } else if (interpolation.ternaryExpressions && interpolation.ternaryExpressions.length > 0) {
+            const ternary = interpolation.ternaryExpressions[0];
+            const questionIndex = interpolation.expression.indexOf('?');
+            const condition = interpolation.expression.substring(0, questionIndex).trim();
+            this.output.push(condition);
+            this.output.push(' ? ');
+            if (ternary.trueBlock) {
+                const nestedGenerator = new TSMCodeGenerator({ ...this.context, isNested: true });
+                const nestedCode = nestedGenerator.generateExpression(ternary.trueBlock);
+                this.output.push(nestedCode);
+            }
+            this.output.push(' : ');
+            if (ternary.falseBlock) {
+                const nestedGenerator = new TSMCodeGenerator({ ...this.context, isNested: true });
+                const nestedCode = nestedGenerator.generateExpression(ternary.falseBlock);
+                this.output.push(nestedCode);
+            }
+        } else if (interpolation.expression.includes('.map(')) {
+            const mapPattern = /(.+)\.map\s*\((.+)\s*=>\s*\(([\s\S]+)\)\)/s;
+            const match = interpolation.expression.match(mapPattern);
+            if (match) {
+                const array = match[1].trim();
+                const params = match[2].trim();
+                let blockContent = match[3];
 
-                    // PHASE 1 FIX: Use nested AST if available, otherwise fall back to content parsing
-                    if (interpolation.nestedConditionalBlock) {
-                        // Generate code from the nested AST (without return statement since this is within an expression)
-                        const nestedGenerator = new TSMCodeGenerator(this.context);
-                        const nestedCode = nestedGenerator.generateExpression(interpolation.nestedConditionalBlock);
-                        this.output.push(nestedCode);
-                    } else {
-                        // Fallback to the old method for backward compatibility
-                        const blockContent = interpolation.expression.substring(parenStart + 1, parenEnd).trim();
-                        if (false) {
-                            this.generateTSMBlockFromContent(blockContent);
-                        } else {
-                            this.output.push(blockContent);
-                        }
-                    }
+                // Strip common indentation from map block content
+                blockContent = this.stripBlockIndentation(blockContent);
 
-                    this.output.push(')');
-                } else {
-                    // Invalid syntax, treat as regular expression
-                    this.output.push(interpolation.expression);
-                }
+                const nestedGenerator = new TSMCodeGenerator({ ...this.context, isNested: true });
+                const nestedAst = parseContent(blockContent, this.parseContext!);
+                const nestedCode = nestedGenerator.generateExpression(nestedAst);
+
+                this.output.push(`${array}.map(${params} => ${nestedCode}).join('\\n')`);
             } else {
-                // No && pattern found, treat as regular expression
                 this.output.push(interpolation.expression);
             }
-        } else if (interpolation.expression.includes('?')) {
-            // Handle ternary expressions - check if they contain TSM blocks
-            this.generateTernaryExpression(interpolation);
         } else {
             // Regular interpolation
             const processedExpression = this.replacePlaceholders(interpolation.expression);
@@ -237,68 +239,6 @@ class TSMCodeGenerator implements TSMVisitor {
 
         this.output.push(')');
     }
-
-    /**
-     * Generate code for ternary expressions, handling TSM blocks within them
-     */
-    private generateTernaryExpression(interpolation: TSMInterpolation): void {
-        const expression = interpolation.expression;
-
-        // Parse the ternary expression to extract condition, true value, and false value
-        const questionIndex = expression.indexOf('?');
-        const colonIndex = expression.lastIndexOf(':');
-
-        if (questionIndex === -1 || colonIndex === -1 || colonIndex <= questionIndex) {
-            // Invalid ternary, treat as regular expression
-            this.output.push('(');
-            this.output.push(expression);
-            this.output.push(')');
-            return;
-        }
-
-        const condition = expression.substring(0, questionIndex).trim();
-        let trueValue = expression.substring(questionIndex + 1, colonIndex).trim();
-        let falseValue = expression.substring(colonIndex + 1).trim();
-
-        // Remove outer parentheses if present for cleaner parsing
-        if (trueValue.startsWith('(') && trueValue.endsWith(')')) {
-            trueValue = trueValue.slice(1, -1).trim();
-        }
-        if (falseValue.startsWith('(') && falseValue.endsWith(')')) {
-            falseValue = falseValue.slice(1, -1).trim();
-        }
-
-        // Check if either value is a TSM block
-        // For ternary expressions, if the value is within parentheses, it's likely TSM content
-        const isTrueTSMBlock = false;
-        const isFalseTSMBlock = false;
-
-        this.output.push('(');
-        this.output.push(condition);
-        this.output.push(' ? ');
-
-        if (isTrueTSMBlock) {
-            // Generate __tsm call for TSM block
-            this.generateTSMBlockFromContent(trueValue);
-        } else {
-            // Regular TypeScript expression
-            this.output.push(trueValue);
-        }
-
-        this.output.push(' : ');
-
-        if (isFalseTSMBlock) {
-            // Generate __tsm call for TSM block
-            this.generateTSMBlockFromContent(falseValue);
-        } else {
-            // Regular TypeScript expression
-            this.output.push(falseValue);
-        }
-
-        this.output.push(')');
-    }
-
-
 
     /**
      * Generate __tsm call from TSM block content
@@ -398,6 +338,49 @@ class TSMCodeGenerator implements TSMVisitor {
             .replace(/\n/g, '\\n')
             .replace(/\r/g, '\\r')
             .replace(/\t/g, '\\t');
+    }
+
+    /**
+     * Strip common leading indentation from a block of text while preserving empty lines
+     */
+    private stripBlockIndentation(content: string): string {
+        const lines = content.split('\n');
+
+        // Find minimum indentation (ignoring empty lines)
+        let minIndent = Infinity;
+        for (const line of lines) {
+            const trimmed = line.trimStart();
+            if (trimmed.length === 0) {
+                // Skip empty lines when calculating minimum indent
+                continue;
+            }
+            const indent = line.length - trimmed.length;
+            minIndent = Math.min(minIndent, indent);
+        }
+
+        // If all lines are empty, return as-is
+        if (minIndent === Infinity) {
+            return content;
+        }
+
+        // Strip the minimum indentation from all lines, preserving empty lines
+        const strippedLines = lines.map(line => {
+            if (line.trim().length === 0) {
+                // Preserve empty lines as empty strings
+                return '';
+            }
+            return line.slice(minIndent);
+        });
+
+        // Remove leading and trailing empty lines
+        while (strippedLines.length > 0 && strippedLines[0] === '') {
+            strippedLines.shift();
+        }
+        while (strippedLines.length > 0 && strippedLines[strippedLines.length - 1] === '') {
+            strippedLines.pop();
+        }
+
+        return strippedLines.join('\n');
     }
 }
 
