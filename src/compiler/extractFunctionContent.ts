@@ -34,6 +34,7 @@ export function extractFunctionContent(ast: ts.SourceFile, functionName: string)
 
     const tsmBlocks = findRootLevelTsmBlocks(functionNode);
     const returnStatements = tsmBlocks.map(block => {
+        // @ts-ignore
         const content = extractBlockContent(block, ast);
         return {
             condition: undefined, // Condition extraction is part of the old implementation and will be handled differently now.

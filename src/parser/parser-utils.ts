@@ -7,9 +7,6 @@ export { parseContent } from './pipeline';
 // String utilities
 export { findMatchingBrace, findMatchingParen, normalizeIndentation } from '../utils/string-helpers';
 
-// Interpolation parsing
-export { parseInterpolations } from './interpolations';
-
 // Conditional parsing
 export { parseConditionals, processConditionalBlocks } from './conditionals';
 

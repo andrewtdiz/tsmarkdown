@@ -146,6 +146,7 @@ class TSMCodeGenerator implements TSMVisitor {
         } else if (interpolation.isTSMContent) {
             // Handle TSM content in interpolations - convert to __tsm block
             this.generateTSMBlockFromContent(interpolation.expression);
+        // @ts-ignore
         } else if (interpolation.isConditional && interpolation.conditionalBlocks) {
             // Handle conditional expressions like {{ cond ? (...) : (...) }}
             this.output.push('(');

@@ -1,9 +1,6 @@
-import { findMatchingDoubleBrace, findMatchingBrace, findMatchingParen } from '../utils/string-helpers';
+import { findMatchingDoubleBrace, findMatchingParen } from '../utils/string-helpers';
 import type { ParseContext } from './types';
-import type { Chunk } from '../runtime/tsm-runtime';
-import type { TSMChunk, TSMComponent, TSMComponentAttribute, TSMAttributeValue, TSMInterpolation, TSMLine, TSMBlock } from './tsm-ast';
-import { protectCodeBlocks, restoreCodeBlocks } from './code-protection';
-import { normalizeIndentation, parseJSXProps, propsToObjectString } from '../utils/string-helpers';
+import type { TSMChunk, TSMComponent, TSMComponentAttribute, TSMInterpolation, TSMLine, TSMBlock } from './tsm-ast';
 import { parseContent } from './pipeline';
 
 // Helper function to create TSM AST nodes
