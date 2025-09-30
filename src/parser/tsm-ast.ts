@@ -6,20 +6,19 @@
  * parsed structure of TSM blocks within TypeScript functions.
  */
 
-// Base AST node interface
 export interface TSMNode {
     type: string;
     start?: number;
     end?: number;
 }
 
-// TSM Block - represents a complete TSM block: ( ... )
+// Represents a complete TSM block: ( ... )
 export interface TSMBlock extends TSMNode {
     type: 'TSMBlock';
     lines: TSMLine[];
 }
 
-// TSM Line - represents a single line within a TSM block
+// Represents a single line within a TSM block
 export interface TSMLine extends TSMNode {
     type: 'TSMLine';
     chunks: TSMChunk[];
@@ -54,10 +53,10 @@ export interface TSMInterpolation extends TSMNode {
 // Component - represents <@ComponentName .../> tags
 export interface TSMComponent extends TSMNode {
     type: 'TSMComponent';
-    name: string; // Component name without @ prefix
+    name: string;
     attributes: TSMComponentAttribute[];
     isSelfClosing: boolean;
-    children?: TSMBlock; // For future v2 support
+    children?: TSMBlock;
 }
 
 // Component attribute
@@ -72,7 +71,6 @@ export type TSMAttributeValue =
     | { type: 'string'; value: string }
     | { type: 'expression'; value: string };
 
-// Conditional block within interpolations
 export interface TSMConditionalBlock extends TSMNode {
     type: 'TSMConditionalBlock';
     condition: string;
@@ -120,7 +118,6 @@ export interface TSMParseResult {
     position?: number;
 }
 
-// AST visitor pattern support
 export interface TSMVisitor {
     visitBlock?(block: TSMBlock): void;
     visitLine?(line: TSMLine): void;
@@ -129,7 +126,6 @@ export interface TSMVisitor {
     visitComponent?(component: TSMComponent): void;
 }
 
-// AST transformer pattern support
 export interface TSMTransformer {
     transformBlock?(block: TSMBlock): TSMBlock;
     transformLine?(line: TSMLine): TSMLine;

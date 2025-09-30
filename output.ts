@@ -14,9 +14,10 @@ function List({ items }: { items: string[] }) {
 
 function Test() {
   const fruits = [ 'Apple', 'Banana', 'Cherry', 'Strawberry' ];
+  const vegetables = [ 'Carrot', 'Broccoli', 'Spinach', 'Tomato' ];
   const fruit = 'Apple';
   
-  return __tsm(["Here's a list of items:", "\n", fruits.length > 0 ? __tsm(["Test:", "\n", List({items: fruits})]) : __tsm(["No fruits"])])
+  return __tsm(["Here's a list of items:", "\n", "    ", fruits.length > 0 ? __tsm(["Test:", "\n", List({items: fruits}), "\n", List({items: vegetables})]) : __tsm(["No fruits"])])
 
 }
 

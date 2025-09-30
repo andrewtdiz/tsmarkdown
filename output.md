@@ -1,6 +1,10 @@
 Here's a list of items:
-Test:
+    Test:
 - Apple
 - Banana
 - Cherry
 - Strawberry
+- Carrot
+- Broccoli
+- Spinach
+- Tomato

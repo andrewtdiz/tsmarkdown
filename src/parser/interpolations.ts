@@ -1,4 +1,4 @@
-import { findMatchingDoubleBrace, findMatchingParen } from '../utils/string-helpers';
+import { findMatchingDoubleBrace, findMatchingParen, normalizeIndentation } from '../utils/string-helpers';
 import type { ParseContext } from './types';
 import type { TSMChunk, TSMComponent, TSMComponentAttribute, TSMInterpolation, TSMLine, TSMBlock } from './tsm-ast';
 import { parseContent } from './pipeline';
@@ -16,54 +16,36 @@ function createTSMTextChunk(content: string): TSMChunk {
  * This is used for ternary and conditional blocks to normalize their indentation
  */
 function stripBlockIndentation(content: string): string {
-    console.log('stripBlockIndentation:', JSON.stringify(content, null, 2));
-    const lines = content.split('\n');
+    const leadingMatch = content.match(/^(\s*\n+)/);
+    const trailingMatch = content.match(/(\n+\s*)$/);
 
-    // Find minimum indentation (ignoring empty lines)
-    let minIndent = Infinity;
-    for (const line of lines) {
-        const trimmed = line.trimStart();
-        if (trimmed.length === 0) {
-            // Skip empty lines when calculating minimum indent
-            continue;
-        }
-        const indent = line.length - trimmed.length;
-        minIndent = Math.min(minIndent, indent);
-    }
+    const leadingNewlines = leadingMatch ? (leadingMatch[1].match(/\n/g) || []).length : 0;
+    const trailingNewlines = trailingMatch ? (trailingMatch[1].match(/\n/g) || []).length : 0;
 
-    // If all lines are empty, return as-is
-    if (minIndent === Infinity) {
-        return content;
-    }
+    // Normalize indentation and trim, but preserve (n-1) newlines
+    const normalized = normalizeIndentation(content);
+    const trimmed = normalized.trim();
+    const leadingNewlineString = '\n'.repeat(Math.max(0, leadingNewlines - 1));
+    const trailingNewlineString = '\n'.repeat(Math.max(0, trailingNewlines - 1));
 
-    // Strip the minimum indentation from all lines, preserving empty lines
-    const strippedLines = lines.map(line => {
-        if (line.trim().length === 0) {
-            // Preserve empty lines as empty strings
-            return '';
-        }
-        return line.slice(minIndent);
-    });
-    console.log('strippedLines:', JSON.stringify(strippedLines, null, 2));
-    // Trim leading and trailing empty lines
-    while (strippedLines.length > 0 && strippedLines[0].trim() === '') {
-        strippedLines.shift();
-    }
-    while (strippedLines.length > 0 && strippedLines[strippedLines.length - 1].trim() === '') {
-        strippedLines.pop();
-    }
+    const result = leadingNewlineString + trimmed + trailingNewlineString;
 
-    return strippedLines.join('\n');
+    return result;
 }
 
 function parseComponent(content: string): { component: TSMComponent, newIndex: number } {
     const nameMatch = content.match(/<@(\w+)/);
     const componentName = nameMatch ? nameMatch[1] : '';
 
+    const closingIndex = content.indexOf('/>');
+    const newIndex = closingIndex !== -1 ? closingIndex + 2 : content.length;
+
+    const componentContent = content.substring(0, newIndex);
+
     const attributes: TSMComponentAttribute[] = [];
     const propsRegex = /([\w-]+)=("([^"]*)"|(\{[^}]*\}))/g;
     let match;
-    while ((match = propsRegex.exec(content)) !== null) {
+    while ((match = propsRegex.exec(componentContent)) !== null) {
         const name = match[1];
         const stringValue = match[3]; // String literal value (without quotes)
         const exprValue = match[4]; // Expression value (with braces)
@@ -83,9 +65,6 @@ function parseComponent(content: string): { component: TSMComponent, newIndex: n
         }
     }
 
-    const closingIndex = content.indexOf('/>');
-    const newIndex = closingIndex !== -1 ? closingIndex + 2 : content.length;
-
     const component: TSMComponent = {
         type: 'TSMComponent',
         name: componentName,
@@ -99,7 +78,6 @@ function parseComponent(content: string): { component: TSMComponent, newIndex: n
 export function parseInterpolationsToAST(content: string, context: ParseContext, isNested: boolean = false): TSMBlock {
     // Parse the entire content as a continuous string first,
     // finding interpolations and components that may span multiple lines
-    console.log('parseInterpolationsToAST:', JSON.stringify(content, null, 2));
     const chunks: TSMChunk[] = [];
     let currentIndex = 0;
 
@@ -224,8 +202,9 @@ export function parseInterpolationsToAST(content: string, context: ParseContext,
     let currentLine: TSMChunk[] = [];
 
     const pushLine = () => {
-        const isEmpty = currentLine.every(c => c.type === 'TSMTextChunk' && c.content.trim() === '');
-        tsmLines.push({ type: 'TSMLine', chunks: currentLine, isEmpty });
+        const isEmpty = currentLine.length === 0 || currentLine.every(c => c.type === 'TSMTextChunk' && c.content.trim() === '');
+        const isComment = currentLine.length > 0 && currentLine.every(c => c.type === 'TSMTextChunk' && c.content.trim().startsWith('//'));
+        tsmLines.push({ type: 'TSMLine', chunks: currentLine, isEmpty, isComment });
         currentLine = [];
     };
 

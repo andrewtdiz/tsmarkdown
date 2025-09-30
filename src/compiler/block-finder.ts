@@ -1,5 +1,6 @@
 import * as ts from 'typescript';
 import { TSMBlockMatch } from '../parser/types';
+import { normalizeIndentation } from '../utils/string-helpers';
 
 /**
  * Represents a nested TSM block found within an expression
@@ -26,7 +27,6 @@ export interface NestedTSMBlock {
  */
 export function findRootLevelTsmBlocks(node: ts.Node): Array<{ match: TSMBlockMatch, content: string }> {
     const blocks: Array<{ match: TSMBlockMatch, content: string }> = [];
-
 
     function visit(node: ts.Node) {
         if (ts.isReturnStatement(node)) {
@@ -62,30 +62,19 @@ export function findRootLevelTsmBlocks(node: ts.Node): Array<{ match: TSMBlockMa
                 const fullReturnStatement = returnText.substring(0, closeParenIndex + 1);
                 let content = returnText.substring(openParenIndex + 1, closeParenIndex);
 
-                const lines = content.split('\n');
-                let minIndent = Infinity;
+                const leadingMatch = content.match(/^(\s*\n+)/);
+                const trailingMatch = content.match(/(\n+\s*)$/);
 
-                for (const line of lines) {
-                    if (line.trim().length > 0) {
-                        const indent = line.match(/^(\s*)/)?.[1]?.length || 0;
-                        minIndent = Math.min(minIndent, indent);
-                    }
-                }
+                const leadingNewlines = leadingMatch ? (leadingMatch[1].match(/\n/g) || []).length : 0;
+                const trailingNewlines = trailingMatch ? (trailingMatch[1].match(/\n/g) || []).length : 0;
 
-                if (minIndent !== Infinity && minIndent > 0) {
-                    const deindentedLines = lines.map(line => line.startsWith(' '.repeat(minIndent)) ? line.slice(minIndent) : line);
-                    content = deindentedLines.join('\n');
-                }
+                // Normalize indentation and trim, but preserve (n-1) newlines
+                const normalized = normalizeIndentation(content);
+                const trimmed = normalized.trim();
+                const leadingNewlineString = '\n'.repeat(Math.max(0, leadingNewlines - 1));
+                const trailingNewlineString = '\n'.repeat(Math.max(0, trailingNewlines - 1));
 
-                // Trim leading and trailing empty lines (lines with only whitespace)
-                const trimmedLines = content.split('\n');
-                while (trimmedLines.length > 0 && trimmedLines[0].trim() === '') {
-                    trimmedLines.shift();
-                }
-                while (trimmedLines.length > 0 && trimmedLines[trimmedLines.length - 1].trim() === '') {
-                    trimmedLines.pop();
-                }
-                content = trimmedLines.join('\n');
+                content = leadingNewlineString + trimmed + trailingNewlineString;
 
                 const match: TSMBlockMatch = {
                     index: returnStart,

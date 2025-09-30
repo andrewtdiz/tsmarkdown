@@ -4,9 +4,7 @@ import { transpileSource } from "./src/compiler/core";
 const file = `
 function ListItem({ item, index }: { item: string, index: number }) {
   return (
-  
     - {{ item }}
-
   )
 }
 
@@ -21,13 +19,15 @@ function List({ items }: { items: string[] }) {
 
 function Test() {
   const fruits = [ 'Apple', 'Banana', 'Cherry', 'Strawberry' ];
+  const vegetables = [ 'Carrot', 'Broccoli', 'Spinach', 'Tomato' ];
   const fruit = 'Apple';
   
   return (
     Here's a list of items:
     {{ fruits.length > 0 ? (
       Test:
-      <@List items={fruits}/>
+      <@List items={fruits} />
+      <@List items={vegetables} />
     ) : (
       No fruits
     ) }}

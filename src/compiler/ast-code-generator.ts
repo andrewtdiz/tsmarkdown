@@ -9,7 +9,6 @@
 import { TSMBlock, TSMLine, TSMChunk, TSMTextChunk, TSMInterpolation, TSMComponent, TSMVisitor } from '../parser/tsm-ast';
 import { parseContent } from '../parser/pipeline';
 import type { ParseContext } from '../parser/types';
-import type { TSMInterpolation as TSMInterpolationType } from '../parser/tsm-ast';
 
 /**
  * Code generation context
@@ -54,7 +53,6 @@ class TSMCodeGenerator implements TSMVisitor {
     }
 
     visitBlock(block: TSMBlock): void {
-        // Generate __tsm([...]) call
         this.output.push('__tsm([');
 
         // Find the first and last non-empty lines to trim leading/trailing empty lines
@@ -77,9 +75,10 @@ class TSMCodeGenerator implements TSMVisitor {
             }
         }
 
-        // Process lines from first non-empty to last non-empty
         for (let i = 0; i < block.lines.length; i++) {
             const line = block.lines[i];
+
+            if (line.isComment) continue;
 
             // Add comma before each line (except the first)
             if (i > 0 && i < block.lines.length) {
