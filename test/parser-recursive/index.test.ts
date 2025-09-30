@@ -265,4 +265,51 @@ describe("Recursive TSM Parser", () => {
         expect(nestedBlock.lines[4].chunks).toHaveLength(0);
         expect(nestedBlock.lines[4].isEmpty).toBe(true);
     });
+
+    it("should handle deeply nested blocks", () => {
+        const content = `{{ condition && (
+  {{ condition && (
+    # Here's a component:
+    {{ condition && (
+      # Nested block
+      {{ condition && (
+        # Deeply nested block
+      )}}
+    )}}
+
+    ## Another line
+  )}}
+)}}`;
+        const context: ParseContext = { interpolations: [], conditionalBlocks: [], ternaryExpressions: [], jsxExpressions: [] };
+        const ast = parseContent(content, context);
+
+        // The entire content should be parsed as one line with one interpolation
+        expect(ast.lines).toHaveLength(1);
+        const interpolation = ast.lines[0].chunks[0] as TSMInterpolation;
+        expect(interpolation.type).toBe("TSMInterpolation");
+        expect(interpolation.nestedConditionalBlock).toBeDefined();
+
+        // First level nested block
+        const firstNestedBlock = interpolation.nestedConditionalBlock as TSMBlock;
+        expect(firstNestedBlock.lines).toHaveLength(1);
+        expect(firstNestedBlock.lines[0].chunks[0].type).toBe("TSMInterpolation");
+
+        // Second level nested block
+        const secondInterpolation = firstNestedBlock.lines[0].chunks[0] as TSMInterpolation;
+        const secondNestedBlock = secondInterpolation.nestedConditionalBlock as TSMBlock;
+        expect(secondNestedBlock.lines).toHaveLength(4); // "# Here's a component:", nested interpolation, empty line, "## Another line"
+
+        // Third level nested block (inside the nested interpolation)
+        const thirdInterpolation = secondNestedBlock.lines[1].chunks[0] as TSMInterpolation;
+        const thirdNestedBlock = thirdInterpolation.nestedConditionalBlock as TSMBlock;
+        expect(thirdNestedBlock.lines).toHaveLength(2); // "# Nested block" and the deeply nested interpolation
+
+        // Fourth level nested block (deeply nested)
+        const fourthInterpolation = thirdNestedBlock.lines[1].chunks[0] as TSMInterpolation;
+        const fourthNestedBlock = fourthInterpolation.nestedConditionalBlock as TSMBlock;
+        expect(fourthNestedBlock.lines).toHaveLength(1);
+        expect(fourthNestedBlock.lines[0].chunks[0].type).toBe("TSMTextChunk");
+        // @ts-ignore
+        expect(fourthNestedBlock.lines[0].chunks[0].content.trim()).toBe("# Deeply nested block");
+    });
 });

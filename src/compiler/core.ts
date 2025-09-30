@@ -121,7 +121,7 @@ export function transpileSource(source: string): TranspilationResult {
         }
 
         const hasImport = transpiledCode.includes('import { __tsm');
-        const imports = hasImport ? '' : `import { __tsm, __erasePrevLine } from 'typescriptmd';\n\n`;
+        const imports = hasImport ? '' : `import { __tsm } from 'typescriptmd';\n\n`;
 
         return {
             transpiledFile: imports + transpiledCode,

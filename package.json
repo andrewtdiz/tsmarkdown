@@ -1,6 +1,6 @@
 {
   "name": "typescriptmd",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "description": "A type-safe, component-based markdown engine for TypeScript",
   "main": "dist/src/index.js",
   "type": "module",
