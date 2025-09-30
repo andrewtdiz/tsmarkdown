@@ -1,6 +1,6 @@
 // Pipeline Core - orchestrates the parsing pipeline
 
-import { parseInterpolationsToAST, renderASTToChunks } from './interpolations';
+import { parseInterpolationsToAST } from './interpolations';
 import { protectCodeBlocks, restoreCodeBlocks } from './code-protection';
 import type { ParseContext } from './types';
 
@@ -9,11 +9,10 @@ export type { ParseContext } from './types';
 import { TSMBlock, TSMLine, TSMChunk } from "./tsm-ast";
 import { CodeProtection } from "./code-protection";
 
-export function parseContent(content: string, context: ParseContext): TSMBlock {
-    console.log("CONTENT:", content);
+export function parseContent(content: string, context: ParseContext, isNested: boolean = false): TSMBlock {
     const { protectedContent, codeBlocks } = protectCodeBlocks(content);
 
-    const ast = parseInterpolationsToAST(protectedContent, context);
+    const ast = parseInterpolationsToAST(protectedContent, context, isNested);
 
     if (codeBlocks.length > 0) {
         return restoreCodeBlocksInAST(ast, codeBlocks);

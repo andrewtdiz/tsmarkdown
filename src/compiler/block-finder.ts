@@ -50,9 +50,32 @@ export function findRootLevelTsmBlocks(node: ts.Node): Array<{ match: TSMBlockMa
 
                 const content = removeLeadingIndent.join('\n');
 
+                // Find the complete return statement by looking for the closing parenthesis
+                const sourceText = node.getSourceFile().text;
+                const returnText = sourceText.substring(returnStart);
+                const openParen = returnText.indexOf('(');
+                if (openParen === -1) return;
+
+                // Find matching closing parenthesis
+                let parenCount = 0;
+                let endPos = openParen;
+                for (let i = openParen; i < returnText.length; i++) {
+                    if (returnText[i] === '(') parenCount++;
+                    else if (returnText[i] === ')') {
+                        parenCount--;
+                        if (parenCount === 0) {
+                            endPos = i + 1;
+                            break;
+                        }
+                    }
+                }
+
+
+                const fullReturnStatement = returnText.substring(0, endPos);
+
                 const match: TSMBlockMatch = {
                     index: returnStart,
-                    [0]: content,
+                    [0]: fullReturnStatement,
                     [1]: content
                 };
 

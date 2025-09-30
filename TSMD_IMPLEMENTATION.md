@@ -117,7 +117,6 @@ Ident        := /[A-Za-z_][A-Za-z0-9_]*/
 Notes:
 
 * `Component` names prefixed by `@` are **TSM Components**; they compile to function calls.
-* `Xml` strings (e.g., `<content>`).
 * Single-line returns are the same grammar (Block with one Line).
 
 # 5) Semantics & Codegen

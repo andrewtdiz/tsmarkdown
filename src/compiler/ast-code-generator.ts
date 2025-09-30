@@ -183,7 +183,7 @@ class TSMCodeGenerator implements TSMVisitor {
                     } else {
                         // Fallback to the old method for backward compatibility
                         const blockContent = interpolation.expression.substring(parenStart + 1, parenEnd).trim();
-                        if (this.isTSMBlockPattern(blockContent) || this.isLikelyTSMContent(blockContent)) {
+                        if (false) {
                             this.generateTSMBlockFromContent(blockContent);
                         } else {
                             this.output.push(blockContent);
@@ -270,8 +270,8 @@ class TSMCodeGenerator implements TSMVisitor {
 
         // Check if either value is a TSM block
         // For ternary expressions, if the value is within parentheses, it's likely TSM content
-        const isTrueTSMBlock = this.isTSMBlockPattern(trueValue) || this.isLikelyTSMContent(trueValue);
-        const isFalseTSMBlock = this.isTSMBlockPattern(falseValue) || this.isLikelyTSMContent(falseValue);
+        const isTrueTSMBlock = false;
+        const isFalseTSMBlock = false;
 
         this.output.push('(');
         this.output.push(condition);
@@ -298,42 +298,7 @@ class TSMCodeGenerator implements TSMVisitor {
         this.output.push(')');
     }
 
-    /**
-     * Check if content matches TSM block pattern
-     */
-    private isTSMBlockPattern(content: string): boolean {
-        const trimmed = content.trim();
 
-        // Check for TSM syntax markers - content doesn't need to start with (
-        // since we're checking content that may have had outer parentheses removed
-        return trimmed.includes('#') ||
-            trimmed.includes('{{') ||
-            trimmed.includes('<@') ||
-            trimmed.includes('*') ||
-            trimmed.includes('-') ||
-            trimmed.includes('##') ||
-            trimmed.includes('###');
-    }
-
-    /**
-     * Check if content is likely TSM content (plain text that should be treated as TSM)
-     */
-    private isLikelyTSMContent(content: string): boolean {
-        const trimmed = content.trim();
-
-        // If it's plain text content (not a TypeScript expression), treat it as TSM content
-        // This handles cases like "This content should show." in ternary expressions
-        return trimmed.length > 0 &&
-            !trimmed.includes('(') &&
-            !trimmed.includes(')') &&
-            !trimmed.includes('{') &&
-            !trimmed.includes('}') &&
-            !trimmed.includes(';') &&
-            !trimmed.includes('=>') &&
-            !trimmed.includes('this.') && // Only exclude if it looks like object property access
-            !trimmed.includes('[') &&
-            !trimmed.includes(']');
-    }
 
     /**
      * Generate __tsm call from TSM block content

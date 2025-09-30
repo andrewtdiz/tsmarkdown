@@ -1,16 +1,22 @@
+function ListItem({ item, index }: { item: string, index: number }) {
+  return (
+    {{ index + 1 }}. {{ item }}
+  )
+}
+
 export function Test() {
   const fruits = ['Apple', 'Banana', 'Cherry'];
 
-  if (false) {
-    return fruits.map((item, index) => (
-      - {{ item }}
-    ));
+  if (fruits.length === 0) {
+    return (
+      No fruits currently
+    )
   }
     
   return (
     Here's a list of items:
     {{ fruits.map((fruit, i) => (
-      <@ListItem item={fruit} index={i} />
+      - {{ fruit }}
     ))}}
   )
 }

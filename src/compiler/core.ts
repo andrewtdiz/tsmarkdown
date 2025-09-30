@@ -112,8 +112,8 @@ export function transpileSource(source: string): TranspilationResult {
             const isWithinReturnStatement = isPositionWithinReturnStatement(sourceFile, match.index);
 
             let generatedCode = isWithinReturnStatement
-                ? generateExpressionFromAST(ast, context, parseContext)
-                : generateFromAST(ast, context, parseContext);
+                ? generateFromAST(ast, context, parseContext)
+                : generateExpressionFromAST(ast, context, parseContext);
 
             // Handle nested blocks if they exist
             if (nestedBlocks && nestedBlocks.length > 0) {

@@ -1,1411 +1,246 @@
-// Unified double-brace syntax dispatcher
-import { findMatchingDoubleBrace, findMatchingBrace } from '../utils/string-helpers';
+import { findMatchingDoubleBrace, findMatchingBrace, findMatchingParen } from '../utils/string-helpers';
 import type { ParseContext } from './types';
 import type { Chunk } from '../runtime/tsm-runtime';
-import type { TSMChunk, TSMComponent, TSMComponentAttribute, TSMAttributeValue } from './tsm-ast';
+import type { TSMChunk, TSMComponent, TSMComponentAttribute, TSMAttributeValue, TSMInterpolation, TSMLine } from './tsm-ast';
 import { protectCodeBlocks, restoreCodeBlocks } from './code-protection';
 import { normalizeIndentation, parseJSXProps, propsToObjectString } from '../utils/string-helpers';
 import { parseContent } from './pipeline';
 
-// Warning system for legacy single-brace usage
-const legacyWarnings = new Set<string>();
-
-function warnLegacySyntax(expression: string, line: number): void {
-    const warning = `Legacy single-brace syntax detected at line ${line}: {${expression}}. Please migrate to double-brace syntax: {{${expression}}}`;
-    if (!legacyWarnings.has(warning)) {
-        console.warn(`[TSmd] ${warning}`);
-        legacyWarnings.add(warning);
-    }
-}
-
-// Process legacy single-brace syntax with warnings
-function processLegacySingleBraces(content: string, context: ParseContext): string {
-    let processedContent = content;
-    let startIndex = 0;
-
-    while (startIndex < processedContent.length) {
-        // Find the next { pattern (not {{)
-        const openIndex = processedContent.indexOf('{', startIndex);
-        if (openIndex === -1) break;
-
-        // Skip if it's a double brace {{
-        if (processedContent[openIndex + 1] === '{') {
-            startIndex = openIndex + 2;
-            continue;
-        }
-
-        // Find the matching closing brace
-        const closeIndex = findMatchingBrace(processedContent, openIndex);
-        if (closeIndex === -1) {
-            startIndex = openIndex + 1;
-            continue;
-        }
-
-        // Extract the expression
-        const expression = processedContent.substring(openIndex + 1, closeIndex).trim();
-
-        if (expression) {
-            // Calculate approximate line number for warning
-            const lineNumber = processedContent.substring(0, openIndex).split('\n').length;
-            warnLegacySyntax(expression, lineNumber);
-
-            // Classify and process the legacy expression as if it were double-brace
-            const expressionType = classifyExpression(expression);
-            let placeholder: string;
-
-            switch (expressionType) {
-                case 'null':
-                    // Handle {{ null }} line-erase escape
-                    placeholder = `__NULL_${Date.now()}__`;
-                    break;
-                case 'conditional':
-                    placeholder = `__CONDITIONAL_${context.conditionalBlocks.length}__`;
-                    const andPattern = /&&\s*\(/;
-                    const match = expression.match(andPattern);
-                    if (match) {
-                        const andIndex = match.index!;
-                        const condition = expression.substring(0, andIndex).trim();
-                        const parenStart = andIndex + match[0].length - 1;
-                        const parenEnd = findMatchingParen(expression, parenStart);
-                        if (parenEnd !== -1) {
-                            const blockContent = expression.substring(parenStart + 1, parenEnd).trim();
-                            // Recursively process the block content to handle nested constructs
-                            const processedBlockContent = parseInterpolations(blockContent, context);
-                            context.conditionalBlocks.push({
-                                condition: condition,
-                                content: processedBlockContent,
-                            });
-                        }
-                    }
-                    break;
-
-                case 'ternary':
-                    placeholder = `__TERNARY_${context.ternaryExpressions.length}__`;
-                    const questionIndex = expression.indexOf('?');
-                    const colonIndex = expression.lastIndexOf(':');
-                    if (questionIndex !== -1 && colonIndex !== -1 && colonIndex > questionIndex) {
-                        const condition = expression.substring(0, questionIndex).trim();
-                        const trueValue = expression.substring(questionIndex + 1, colonIndex).trim();
-                        const falseValue = expression.substring(colonIndex + 1).trim();
-                        context.ternaryExpressions.push({
-                            condition: condition,
-                            trueValue: trueValue,
-                            falseValue: falseValue,
-                        });
-                    }
-                    break;
-
-                case 'jsx':
-                    placeholder = `__JSX_EXPRESSION_${context.jsxExpressions.length}__`;
-                    //@ts-ignore
-                    context.jsxExpressions.push({ placeholder, expression, name: '', props: [] });
-                    break;
-
-                case 'interpolation':
-                default:
-                    placeholder = `__INTERPOLATION_${context.interpolations.length}__`;
-                    context.interpolations.push({ placeholder, expression });
-                    break;
-            }
-
-            // Replace the entire { expression } with the placeholder
-            processedContent = processedContent.substring(0, openIndex) +
-                placeholder +
-                processedContent.substring(closeIndex + 1);
-
-            // Update startIndex to continue from the placeholder
-            startIndex = openIndex + placeholder.length;
-        } else {
-            startIndex = closeIndex + 1;
-        }
-    }
-
-    return processedContent;
-}
-
-// Helper function to detect if a ternary expression contains TSM blocks
-function isTSMBlockTernary(expression: string, questionIndex: number, colonIndex: number): boolean {
-    // Extract the true and false values
-    const trueValue = expression.substring(questionIndex + 1, colonIndex).trim();
-    const falseValue = expression.substring(colonIndex + 1).trim();
-
-    // Check if either value starts with ( and contains TSM syntax
-    const isTrueTSMBlock = isTSMBlockPattern(trueValue);
-    const isFalseTSMBlock = isTSMBlockPattern(falseValue);
-
-    return isTrueTSMBlock || isFalseTSMBlock;
-}
-
-// Helper function to detect if a conditional expression contains TSM blocks
-function isTSMBlockConditional(expression: string): boolean {
-    const andPattern = /&&\s*\(/;
-    const match = expression.match(andPattern);
-    if (!match) return false;
-
-    const andIndex = match.index!;
-    const parenStart = andIndex + match[0].length - 1;
-    const parenEnd = findMatchingParen(expression, parenStart);
-
-    if (parenEnd === -1) return false;
-
-    const blockContent = expression.substring(parenStart + 1, parenEnd).trim();
-
-    // If there's content within parentheses in a logical AND expression,
-    // it should be treated as TSM content regardless of syntax markers
-    return blockContent.length > 0;
-}
-
-// Helper function to detect TSM content patterns (for interpolations)
-function isTSMContentPattern(content: string): boolean {
-    // For now, disable TSM content detection in interpolations
-    // This approach is causing issues with mixed content
-    return false;
-}
-
-// Helper function to detect TSM block patterns
-function isTSMBlockPattern(content: string): boolean {
-    // A TSM block pattern is identified by:
-    // 1. Starting with (
-    // 2. Containing TSM syntax markers: #, {{, <@, *, -, etc.
-    // 3. Not being a simple string or expression
-
-    if (!content.startsWith('(')) return false;
-
-    return isTSMContentPattern(content);
-}
-
-// Classify expression type and route to appropriate handler
-function classifyExpression(expression: string): 'conditional' | 'ternary' | 'jsx' | 'null' | 'tsm' | 'interpolation' {
-    const trimmed = expression.trim();
-
-    // Check for null pattern: {{ null }}
-    if (trimmed === 'null') {
-        return 'null';
-    }
-
-    // Check for JSX pattern: contains < and > or JSX elements
-    if (trimmed.includes('<@') && trimmed.includes('>')) {
-        return 'jsx';
-    }
-
-    // Check for TSM content pattern: contains TSM syntax markers
-    if (isTSMContentPattern(trimmed)) {
-        return 'tsm';
-    }
-
-    // Check for ternary pattern: condition ? trueValue : falseValue
-    // Must have at least one ? and one : in the right order
-    if (trimmed.includes('?') && trimmed.includes(':')) {
-        const questionIndex = trimmed.indexOf('?');
-        const colonIndex = trimmed.lastIndexOf(':');
-        if (colonIndex > questionIndex) {
-            // Check if this is a TSM block ternary: condition ? (TSM content) : (TSM content)
-            if (isTSMBlockTernary(trimmed, questionIndex, colonIndex)) {
-                return 'ternary';
-            }
-        }
-    }
-
-    // Check for conditional pattern: condition && (content)
-    // Must have && followed by ( and the pattern should be at the start
-    if (trimmed.includes('&&') && trimmed.includes('(') && trimmed.includes(')')) {
-        const andPattern = /&&\s*\(/;
-        if (andPattern.test(trimmed)) {
-            // Check if this is a TSM block conditional: condition && (TSM content)
-            if (isTSMBlockConditional(trimmed)) {
-                return 'conditional';
-            }
-        }
-    }
-
-    return 'interpolation';
-}
-
-
-// Unified dispatcher for double-brace syntax with legacy support
-export function parseInterpolations(content: string, context: ParseContext): string {
-    let processedContent = content;
-    let startIndex = 0;
-
-    // First pass: process double-brace syntax {{...}}
-    while (startIndex < processedContent.length) {
-        // Find the next {{ pattern
-        const openIndex = processedContent.indexOf('{{', startIndex);
-        if (openIndex === -1) break;
-
-        // Find the matching }} using the helper function
-        const closeIndex = findMatchingDoubleBrace(processedContent, openIndex);
-        if (closeIndex === -1) {
-            // No matching }} found, skip this one
-            startIndex = openIndex + 2;
-            continue;
-        }
-
-        // Extract the expression (everything between {{ and }})
-        const expression = processedContent.substring(openIndex + 2, closeIndex).trim();
-
-        if (expression) {
-            // Classify the expression type
-            const expressionType = classifyExpression(expression);
-
-            let placeholder: string = '';
-
-            switch (expressionType) {
-                case 'null':
-                    // Handle {{ null }} line-erase escape
-                    placeholder = `__NULL_${Date.now()}__`;
-                    break;
-                case 'conditional':
-                    // Parse conditional logic
-                    const andPattern = /&&\s*\(/;
-                    const match = expression.match(andPattern);
-                    if (match) {
-                        const andIndex = match.index!;
-                        const condition = expression.substring(0, andIndex).trim();
-                        const parenStart = andIndex + match[0].length - 1;
-                        const parenEnd = findMatchingParen(expression, parenStart);
-                        if (parenEnd !== -1) {
-                            const blockContent = expression.substring(parenStart + 1, parenEnd).trim();
-
-                            // Store the current length to get the correct index for this conditional
-                            const currentIndex = context.conditionalBlocks.length;
-
-                            // Add the conditional block first (before processing nested content)
-                            context.conditionalBlocks.push({
-                                condition: condition,
-                                content: blockContent, // Don't process nested content yet
-                            });
-
-                            // Now process the nested content and update the content
-                            const processedBlockContent = parseInterpolations(blockContent, context);
-                            context.conditionalBlocks[currentIndex].content = processedBlockContent;
-
-                            placeholder = `__CONDITIONAL_${currentIndex}__`;
-                        } else {
-                            // Invalid conditional syntax, treat as regular interpolation
-                            placeholder = `__INTERPOLATION_${context.interpolations.length}__`;
-                            context.interpolations.push({ placeholder, expression });
-                        }
-                    } else {
-                        // Invalid conditional syntax, treat as regular interpolation
-                        placeholder = `__INTERPOLATION_${context.interpolations.length}__`;
-                        context.interpolations.push({ placeholder, expression });
-                    }
-                    break;
-
-                case 'ternary':
-                    placeholder = `__TERNARY_${context.ternaryExpressions.length}__`;
-                    // Parse ternary logic with proper nesting support
-                    const { condition, trueValue, falseValue } = parseNestedTernary(expression);
-                    if (condition && trueValue && falseValue) {
-                        // Process interpolations within the ternary values
-                        const processedTrueValue = parseInterpolations(trueValue, context);
-                        const processedFalseValue = parseInterpolations(falseValue, context);
-
-                        context.ternaryExpressions.push({
-                            condition: condition,
-                            trueValue: processedTrueValue,
-                            falseValue: processedFalseValue,
-                        });
-                    }
-                    break;
-
-                case 'jsx':
-                    placeholder = `__JSX_EXPRESSION_${context.jsxExpressions.length}__`;
-                    //@ts-ignore
-                    context.jsxExpressions.push({ placeholder, expression });
-                    break;
-
-                case 'interpolation':
-                default:
-                    // Check if this interpolation contains nested {{ }} expressions
-                    let processedExpression = expression;
-                    if (processedExpression.includes('{{') && processedExpression.includes('}}')) {
-                        // Recursively process nested interpolations
-                        processedExpression = processNestedInterpolations(processedExpression, context);
-                    }
-
-                    placeholder = `__INTERPOLATION_${context.interpolations.length}__`;
-                    context.interpolations.push({ placeholder, expression: processedExpression });
-                    break;
-            }
-
-            // Replace the entire {{ expression }} with the placeholder
-            processedContent = processedContent.substring(0, openIndex) +
-                placeholder +
-                processedContent.substring(closeIndex + 2);
-
-            // Update startIndex to continue from the placeholder
-            startIndex = openIndex + placeholder.length;
-        } else {
-            // Empty expression, skip
-            startIndex = closeIndex + 2;
-        }
-    }
-
-    // Second pass: process legacy single-brace syntax {...} with warnings
-    processedContent = processLegacySingleBraces(processedContent, context);
-
-    return processedContent;
-}
-
-// Helper function to process nested interpolations within expressions
-function processNestedInterpolations(expression: string, context: ParseContext): string {
-    let processedExpression = expression;
-    let startIndex = 0;
-
-    // Find and process all nested {{ }} expressions
-    while (startIndex < processedExpression.length) {
-        const openIndex = processedExpression.indexOf('{{', startIndex);
-        if (openIndex === -1) break;
-
-        const closeIndex = findMatchingDoubleBrace(processedExpression, openIndex);
-        if (closeIndex === -1) {
-            startIndex = openIndex + 2;
-            continue;
-        }
-
-        // Extract the nested expression
-        const nestedExpression = processedExpression.substring(openIndex + 2, closeIndex).trim();
-
-        if (nestedExpression) {
-            // Create a placeholder for the nested interpolation
-            const nestedPlaceholder = `__INTERPOLATION_${context.interpolations.length}__`;
-            context.interpolations.push({ placeholder: nestedPlaceholder, expression: nestedExpression });
-
-            // Replace the nested {{ }} with the placeholder
-            processedExpression = processedExpression.substring(0, openIndex) +
-                nestedPlaceholder +
-                processedExpression.substring(closeIndex + 2);
-
-            // Update startIndex to continue from the placeholder
-            startIndex = openIndex + nestedPlaceholder.length;
-        } else {
-            startIndex = closeIndex + 2;
-        }
-    }
-
-    return processedExpression;
-}
-
-// Helper function to find matching parenthesis (needed for conditional parsing)
-function findMatchingParen(content: string, startIndex: number): number {
-    let parenCount = 0;
-
-    for (let i = startIndex; i < content.length; i++) {
-        const char = content[i];
-
-        if (char === '(') {
-            parenCount++;
-        } else if (char === ')') {
-            parenCount--;
-            if (parenCount === 0) {
-                return i;
-            }
-        }
-    }
-
-    return -1; // No matching parenthesis found
-}
-
-// Helper function to clean parentheses and whitespace from ternary values
-function cleanParenthesesAndWhitespace(value: string): string {
-    // Remove leading and trailing whitespace
-    let cleaned = value.trim();
-
-    // If the value starts with ( and ends with ), and they match (not nested),
-    // remove the outer parentheses
-    if (cleaned.startsWith('(') && cleaned.endsWith(')')) {
-        // Check if the parentheses are properly matched at the top level
-        let parenCount = 0;
-        let hasUnmatchedParens = false;
-
-        for (let i = 0; i < cleaned.length; i++) {
-            const char = cleaned[i];
-            if (char === '(') {
-                parenCount++;
-            } else if (char === ')') {
-                parenCount--;
-                // If we hit 0 before the end, there are nested parentheses
-                if (parenCount === 0 && i < cleaned.length - 1) {
-                    hasUnmatchedParens = true;
-                    break;
-                }
-            }
-        }
-
-        // Only remove outer parentheses if they're properly matched
-        if (!hasUnmatchedParens && parenCount === 0) {
-            cleaned = cleaned.slice(1, -1).trim();
-        }
-    }
-
-    return cleaned;
-}
-
-// Helper function to parse nested ternary expressions
-function parseNestedTernary(expression: string): { condition: string; trueValue: string; falseValue: string } {
-
-    // For complex expressions with function calls, arrow functions, etc.,
-    // we still need to parse them as ternary expressions if they contain nested interpolations
-    // The key is to handle the ternary structure even if the values contain complex expressions
-    const hasComplexExpressions = expression.includes('=>') || expression.includes('.map(') || expression.includes('.filter(');
-    const hasNestedInterpolations = expression.includes('{{') && expression.includes('}}');
-
-    // If it has complex expressions but no nested interpolations, treat as regular interpolation
-    if (hasComplexExpressions && !hasNestedInterpolations) {
-        return { condition: '', trueValue: '', falseValue: '' };
-    }
-
-    let parenCount = 0;
-    let questionIndex = -1;
-    let colonIndex = -1;
-
-    // Find the outermost ? operator
-    for (let i = 0; i < expression.length; i++) {
-        const char = expression[i];
-        if (char === '(') parenCount++;
-        else if (char === ')') parenCount--;
-        else if (char === '?' && parenCount === 0) {
-            questionIndex = i;
-            break;
-        }
-    }
-
-    if (questionIndex === -1) {
-        return { condition: '', trueValue: '', falseValue: '' };
-    }
-
-    // Find the matching : operator for this ?
-    for (let i = questionIndex + 1; i < expression.length; i++) {
-        const char = expression[i];
-        if (char === '(') parenCount++;
-        else if (char === ')') parenCount--;
-        else if (char === ':' && parenCount === 0) {
-            colonIndex = i;
-            break;
-        }
-    }
-
-    if (colonIndex === -1) {
-        return { condition: '', trueValue: '', falseValue: '' };
-    }
-
-    const condition = expression.substring(0, questionIndex).trim();
-    let trueValue = expression.substring(questionIndex + 1, colonIndex).trim();
-    let falseValue = expression.substring(colonIndex + 1).trim();
-
-    // Clean up parentheses and whitespace from trueValue and falseValue
-    trueValue = cleanParenthesesAndWhitespace(trueValue);
-    falseValue = cleanParenthesesAndWhitespace(falseValue);
-
-    return { condition, trueValue, falseValue };
-}
-
-
-// TSM AST parser that builds AST nodes instead of chunks
-import type { TSMBlock, TSMLine, TSMTextChunk, TSMInterpolation } from './tsm-ast';
-
 // Helper function to create TSM AST nodes
-function createTSMTextChunk(content: string): TSMTextChunk {
+function createTSMTextChunk(content: string): TSMChunk {
     return {
         type: 'TSMTextChunk',
         content
     };
 }
 
-function createTSMInterpolation(expression: string, isLogical?: boolean, isConditional?: boolean): TSMInterpolation {
-    return {
-        type: 'TSMInterpolation',
-        expression,
-        isLogical,
-        isConditional
+function parseComponent(content: string): { component: TSMComponent, newIndex: number } {
+    const nameMatch = content.match(/<@(\w+)/);
+    const componentName = nameMatch ? nameMatch[1] : '';
+
+    const attributes: TSMComponentAttribute[] = [];
+    const propsRegex = /([\w-]+)=("([^"]*)"|(\{[^}]*\}))/g;
+    let match;
+    while ((match = propsRegex.exec(content)) !== null) {
+        const name = match[1];
+        const stringValue = match[3]; // String literal value (without quotes)
+        const exprValue = match[4]; // Expression value (with braces)
+
+        if (exprValue) {
+            attributes.push({
+                type: 'TSMComponentAttribute',
+                name,
+                value: { type: 'expression', value: exprValue.slice(1, -1) }
+            });
+        } else {
+            attributes.push({
+                type: 'TSMComponentAttribute',
+                name,
+                value: { type: 'string', value: stringValue }
+            });
+        }
+    }
+
+    const closingIndex = content.indexOf('/>');
+    const newIndex = closingIndex !== -1 ? closingIndex + 2 : content.length;
+
+    const component: TSMComponent = {
+        type: 'TSMComponent',
+        name: componentName,
+        attributes: attributes,
+        isSelfClosing: true,
     };
+
+    return { component, newIndex };
 }
 
-// TSM AST parser that builds AST nodes instead of chunks
-export function parseInterpolationsToAST(content: string, context: ParseContext): TSMBlock {
-
-    // First, split content into lines
-    const lines = content.split('\n');
-    const tsmLines: TSMLine[] = [];
-
-    // Process the entire content at once, not line by line
+export function parseInterpolationsToAST(content: string, context: ParseContext, isNested: boolean = false): TSMBlock {
+    // Parse the entire content as a continuous string first,
+    // finding interpolations and components that may span multiple lines
     const chunks: TSMChunk[] = [];
-    let startIndex = 0;
+    let currentIndex = 0;
 
-    // First pass: process double-brace syntax {{...}}
-    while (startIndex < content.length) {
-        // Find the next {{ pattern
-        const openIndex = content.indexOf('{{', startIndex);
-        if (openIndex === -1) {
-            // No more {{, process remaining text for JSX elements before adding as text chunk
-            if (startIndex < content.length) {
-                const remainingText = content.substring(startIndex);
-                const processedText = processJSXElementsInText(remainingText, context);
-                chunks.push(createTSMTextChunk(processedText));
+    while (currentIndex < content.length) {
+        // Find next component or interpolation
+        const componentIndex = content.indexOf('<@', currentIndex);
+        const interpolationIndex = content.indexOf('{{', currentIndex);
+
+        // Determine which comes first (or if either exists)
+        let nextSpecialIndex = -1;
+        let isComponent = false;
+
+        if (componentIndex !== -1 && interpolationIndex !== -1) {
+            // Both exist, pick the closer one
+            if (componentIndex < interpolationIndex) {
+                nextSpecialIndex = componentIndex;
+                isComponent = true;
+            } else {
+                nextSpecialIndex = interpolationIndex;
+                isComponent = false;
+            }
+        } else if (componentIndex !== -1) {
+            nextSpecialIndex = componentIndex;
+            isComponent = true;
+        } else if (interpolationIndex !== -1) {
+            nextSpecialIndex = interpolationIndex;
+            isComponent = false;
+        }
+
+        // If neither component nor interpolation found, add remaining text
+        if (nextSpecialIndex === -1) {
+            if (currentIndex < content.length) {
+                chunks.push(createTSMTextChunk(content.substring(currentIndex)));
             }
             break;
         }
 
-        // Add text before {{ as text chunk, but process JSX elements first
-        if (openIndex > startIndex) {
-            const textSegment = content.substring(startIndex, openIndex);
-            const processedText = processJSXElementsInText(textSegment, context);
-            chunks.push(createTSMTextChunk(processedText));
+        // Add text before the component/interpolation
+        if (nextSpecialIndex > currentIndex) {
+            chunks.push(createTSMTextChunk(content.substring(currentIndex, nextSpecialIndex)));
         }
 
-        // Find the matching }} using the helper function
-        const closeIndex = findMatchingDoubleBrace(content, openIndex);
-        if (closeIndex === -1) {
-            // No matching }} found, add {{ and continue
-            chunks.push(createTSMTextChunk('{{'));
-            startIndex = openIndex + 2;
+        // Handle component
+        if (isComponent) {
+            const { component, newIndex } = parseComponent(content.substring(nextSpecialIndex));
+            chunks.push(component);
+            currentIndex = nextSpecialIndex + newIndex;
             continue;
         }
 
-        // Extract the expression (everything between {{ and }})
-        const expression = content.substring(openIndex + 2, closeIndex).trim();
-
-        if (expression) {
-            // Classify the expression type
-            const expressionType = classifyExpression(expression);
-
-            switch (expressionType) {
-                case 'null':
-                    // Handle {{ null }} line-erase escape
-                    chunks.push({
-                        type: 'TSMInterpolation',
-                        expression: 'null',
-                        isNull: true
-                    });
-                    break;
-                case 'conditional':
-                    // Parse conditional logic
-                    const andPattern = /&&\s*\(/;
-                    const match = expression.match(andPattern);
-                    if (match) {
-                        const andIndex = match.index!;
-                        const condition = expression.substring(0, andIndex).trim();
-                        const parenStart = andIndex + match[0].length - 1;
-                        const parenEnd = findMatchingParen(expression, parenStart);
-                        if (parenEnd !== -1) {
-                            const blockContent = expression.substring(parenStart + 1, parenEnd).trim();
-
-                            // PHASE 1 FIX: Recursively parse the nested content into AST
-                            const { protectedContent, codeBlocks } = protectCodeBlocks(blockContent);
-                            const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
-                            const nestedAST = parseContent(normalizedMarkdown, context);
-
-                            // Store the conditional block with the parsed AST
-                            const currentIndex = context.conditionalBlocks.length;
-                            context.conditionalBlocks.push({
-                                condition: condition,
-                                content: nestedAST, // Store AST instead of processed chunks
-                            });
-
-                            // Add the conditional expression as TSMInterpolation with nested AST
-                            chunks.push({
-                                type: 'TSMInterpolation',
-                                expression: expression,
-                                isConditional: false,
-                                isLogical: true,
-                                nestedConditionalBlock: nestedAST, // Store the nested AST directly
-                            });
-                        } else {
-                            // Invalid conditional syntax, treat as regular interpolation
-                            chunks.push(createTSMInterpolation(expression, false, false));
-                        }
-                    } else {
-                        // Invalid conditional syntax, treat as regular interpolation
-                        chunks.push(createTSMInterpolation(expression, false, false));
-                    }
-                    break;
-
-                case 'ternary':
-                    // Parse ternary logic with proper nesting support
-                    const { condition, trueValue, falseValue } = parseNestedTernary(expression);
-                    if (condition && trueValue && falseValue) {
-                        // Check if this is a TSM block ternary
-                        const isTrueTSMBlock = isTSMBlockPattern(trueValue);
-                        const isFalseTSMBlock = isTSMBlockPattern(falseValue);
-
-                        if (isTrueTSMBlock || isFalseTSMBlock) {
-                            // Process TSM blocks through the parsing pipeline
-                            const processTSMBlock = (value: string): Chunk[] => {
-                                if (value.trim()) {
-                                    // Remove outer parentheses if present
-                                    let blockContent = value.trim();
-                                    if (blockContent.startsWith('(') && blockContent.endsWith(')')) {
-                                        blockContent = blockContent.slice(1, -1).trim();
-                                    }
-
-                                    const { protectedContent, codeBlocks } = protectCodeBlocks(blockContent);
-                                    const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
-                                    const ast = parseContent(normalizedMarkdown, context);
-                                    const chunks = renderASTToChunks(ast, context);
-                                    return restoreCodeBlocks(chunks, codeBlocks);
-                                }
-                                return [];
-                            };
-
-                            const processedTrueValue = isTrueTSMBlock ? processTSMBlock(trueValue) : [trueValue];
-                            const processedFalseValue = isFalseTSMBlock ? processTSMBlock(falseValue) : [falseValue];
-
-                            context.ternaryExpressions.push({
-                                condition: condition,
-                                trueValue: processedTrueValue,
-                                falseValue: processedFalseValue,
-                            });
-
-                            // Add the ternary expression as TSMInterpolation
-                            chunks.push(createTSMInterpolation(expression, false, true));
-                        } else {
-                            // Regular ternary with TypeScript expressions
-                            const processedTrueValue = parseInterpolations(trueValue, context);
-                            const processedFalseValue = parseInterpolations(falseValue, context);
-
-                            context.ternaryExpressions.push({
-                                condition: condition,
-                                trueValue: [processedTrueValue],
-                                falseValue: [processedFalseValue],
-                            });
-
-                            // Add the ternary expression as TSMInterpolation
-                            chunks.push(createTSMInterpolation(expression, false, true));
-                        }
-                    } else {
-                        console.log('DEBUG: Invalid ternary syntax, treating as regular interpolation');
-                        // Invalid ternary syntax, treat as regular interpolation
-                        chunks.push(createTSMInterpolation(expression, false, false));
-                    }
-                    break;
-
-                case 'jsx':
-                    // Handle JSX expressions
-                    // Parse JSX expressions within the expression
-                    const jsxRegex = /<@(\w+)([^/>]*)\/>/g;
-                    let jsxMatch;
-                    let jsxProcessedExpression = expression;
-
-                    while ((jsxMatch = jsxRegex.exec(expression)) !== null) {
-                        const fullMatch = jsxMatch[0];
-                        const componentName = jsxMatch[1];
-                        const props = jsxMatch[2] || '';
-
-                        // Create a unique placeholder for this JSX expression
-                        const jsxPlaceholder = `__JSX_EXPRESSION_${context.jsxExpressions.length}__`;
-                        //@ts-ignore
-                        context.jsxExpressions.push({
-                            placeholder: jsxPlaceholder,
-                            expression: fullMatch
-                        });
-
-                        // Replace the JSX in the expression with the placeholder
-                        jsxProcessedExpression = jsxProcessedExpression.replace(fullMatch, jsxPlaceholder);
-                    }
-
-                    // Check if the processed expression contains ternary syntax
-                    if (jsxProcessedExpression.includes('?') && jsxProcessedExpression.includes(':')) {
-                        // Parse ternary logic
-                        const { condition, trueValue, falseValue } = parseNestedTernary(jsxProcessedExpression);
-                        if (condition && trueValue && falseValue) {
-                            // Process the ternary
-                            const processValue = (value: string): any => {
-                                if (value.trim()) {
-                                    const { protectedContent, codeBlocks } = protectCodeBlocks(value);
-                                    const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
-                                    const ast = parseContent(normalizedMarkdown, context);
-                                    const chunks = renderASTToChunks(ast, context);
-                                    return restoreCodeBlocks(chunks, codeBlocks);
-                                }
-                                return [];
-                            };
-
-                            const processedTrueValue = processValue(trueValue);
-                            const processedFalseValue = processValue(falseValue);
-
-                            context.ternaryExpressions.push({
-                                condition: condition,
-                                trueValue: processedTrueValue,
-                                falseValue: processedFalseValue,
-                            });
-
-                            // Add the ternary expression as TSMInterpolation
-                            chunks.push(createTSMInterpolation(jsxProcessedExpression, false, true));
-                        } else {
-                            // Use the processed expression for the interpolation
-                            chunks.push(createTSMInterpolation(jsxProcessedExpression, false, false));
-                        }
-                    } else {
-                        // Use the processed expression for the interpolation
-                        chunks.push(createTSMInterpolation(jsxProcessedExpression, false, false));
-                    }
-                    break;
-
-                case 'tsm':
-                    // Handle TSM content in interpolations - convert to __tsm block
-                    // For TSM content in interpolations, we need to create a special interpolation
-                    // that will be converted to a __tsm call during code generation
-                    chunks.push({
-                        type: 'TSMInterpolation',
-                        expression: expression,
-                        isTSMContent: true
-                    });
-                    break;
-
-                case 'interpolation':
-                default:
-                    // Check if this interpolation contains JSX
-                    let processedExpression = expression;
-                    if (processedExpression.includes('<@') && processedExpression.includes('/>')) {
-                        // Parse JSX expressions within the interpolation
-                        const jsxRegex = /<@(\w+)([^/>]*)\/>/g;
-                        let jsxMatch;
-
-                        while ((jsxMatch = jsxRegex.exec(processedExpression)) !== null) {
-                            const fullMatch = jsxMatch[0];
-                            const componentName = jsxMatch[1];
-                            const props = jsxMatch[2] || '';
-
-                            // Create a unique placeholder for this JSX expression
-                            const jsxPlaceholder = `__JSX_EXPRESSION_${context.jsxExpressions.length}__`;
-                            //@ts-ignore
-                            context.jsxExpressions.push({
-                                placeholder: jsxPlaceholder,
-                                expression: fullMatch
-                            });
-
-                            // Replace the JSX in the expression with the placeholder
-                            processedExpression = processedExpression.replace(fullMatch, jsxPlaceholder);
-                        }
-                    }
-
-                    // Check if this interpolation contains nested {{ }} expressions
-                    if (processedExpression.includes('{{') && processedExpression.includes('}}')) {
-                        // Recursively process nested interpolations
-                        processedExpression = processNestedInterpolations(processedExpression, context);
-                    }
-
-                    // Regular interpolation - add to context and create chunk
-                    const placeholder = `__INTERPOLATION_${context.interpolations.length}__`;
-                    context.interpolations.push({ placeholder, expression: processedExpression });
-                    chunks.push(createTSMInterpolation(processedExpression, false, false));
-                    break;
-            }
-
-            // Update startIndex to continue after the }}
-            startIndex = closeIndex + 2;
-        } else {
-            // Empty expression, add {{}} as text
-            chunks.push(createTSMTextChunk('{{}}'));
-            startIndex = closeIndex + 2;
+        // Handle interpolation
+        const closeIndex = findMatchingDoubleBrace(content, nextSpecialIndex);
+        if (closeIndex === -1) {
+            // No matching close, treat as literal text
+            chunks.push(createTSMTextChunk('{{'));
+            currentIndex = nextSpecialIndex + 2;
+            continue;
         }
+
+        // Parse the interpolation
+        const expression = content.substring(nextSpecialIndex + 2, closeIndex);
+        const interpolation: TSMInterpolation = {
+            type: 'TSMInterpolation',
+            expression: expression,
+            ternaryExpressions: [],
+        };
+
+        // Check for conditional (logical &&) with nested block
+        const conditionalMatch = expression.match(/&&\s*\(/);
+        if (conditionalMatch && conditionalMatch.index !== undefined) {
+            const parenStart = conditionalMatch.index + conditionalMatch[0].length - 1;
+            const parenEnd = findMatchingParen(expression, parenStart);
+            if (parenEnd !== -1) {
+                const blockContent = expression.substring(parenStart + 1, parenEnd);
+                interpolation.isLogical = true;
+                interpolation.nestedConditionalBlock = parseContent(blockContent, context, true);
+            }
+        }
+
+        // Check for ternary with nested blocks
+        const ternaryMatch = expression.match(/\?\s*\(/);
+        if (ternaryMatch && ternaryMatch.index !== undefined) {
+            const conditionEnd = ternaryMatch.index;
+            const trueBlockStart = conditionEnd + ternaryMatch[0].length;
+            const trueBlockEnd = findMatchingParen(expression, trueBlockStart - 1);
+
+            if (trueBlockEnd !== -1) {
+                const colonIndex = expression.indexOf(':', trueBlockEnd);
+                if (colonIndex !== -1) {
+                    const falseBlockStart = expression.indexOf('(', colonIndex) + 1;
+                    const falseBlockEnd = findMatchingParen(expression, falseBlockStart - 1);
+
+                    if (falseBlockEnd !== -1) {
+                        const trueBlockContent = expression.substring(trueBlockStart, trueBlockEnd);
+                        const falseBlockContent = expression.substring(falseBlockStart, falseBlockEnd);
+
+                        interpolation.isConditional = true;
+                        interpolation.ternaryExpressions!.push({
+                            trueBlock: parseContent(trueBlockContent, context, true),
+                            falseBlock: parseContent(falseBlockContent, context, true),
+                        });
+                    }
+                }
+            }
+        }
+
+        chunks.push(interpolation);
+        currentIndex = closeIndex + 2;
     }
 
-    // Create TSM lines from chunks, splitting on newlines
-    let currentLineChunks: TSMChunk[] = [];
+    // Now organize chunks into lines
+    // Split text chunks by newlines, but keep interpolations and components intact
+    const tsmLines: TSMLine[] = [];
+    let currentLine: TSMChunk[] = [];
 
     for (const chunk of chunks) {
-        if (chunk.type === 'TSMTextChunk' && chunk.content.includes('\n')) {
-            // Split text chunk on newlines
-            const parts = chunk.content.split('\n');
-            for (let i = 0; i < parts.length; i++) {
-                if (parts[i]) {
-                    currentLineChunks.push(createTSMTextChunk(parts[i]));
-                } else {
-                    // Create empty text chunk to preserve empty lines
-                    currentLineChunks.push(createTSMTextChunk(''));
+        if (chunk.type === 'TSMTextChunk') {
+            // Split text chunks by newlines
+            const lines = chunk.content.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                const lineText = lines[i];
+                // Only add non-whitespace text chunks, or whitespace if there's already content on the line
+                if (lineText.length > 0 && (lineText.trim().length > 0 || currentLine.length > 0)) {
+                    currentLine.push(createTSMTextChunk(lineText));
                 }
-                if (i < parts.length - 1) {
-                    // End current line and start new one
+                // Add line break (except for the last segment)
+                if (i < lines.length - 1) {
+                    // Always add the line, even if empty (to preserve empty lines)
+                    const isEmpty = currentLine.length === 0 ||
+                        (currentLine.length === 1 &&
+                            currentLine[0].type === 'TSMTextChunk' &&
+                            currentLine[0].content.trim() === '');
                     tsmLines.push({
                         type: 'TSMLine',
-                        chunks: currentLineChunks
+                        chunks: currentLine,
+                        isEmpty: isEmpty
                     });
-                    currentLineChunks = [];
+                    currentLine = [];
                 }
             }
         } else {
-            currentLineChunks.push(chunk);
+            // Interpolations and components go on the current line
+            currentLine.push(chunk);
         }
     }
 
-    // Add final line if it has content
-    if (currentLineChunks.length > 0) {
+    // Add the last line if it has content or if we need to preserve it
+    if (currentLine.length > 0) {
+        const isEmpty = currentLine.length === 1 &&
+            currentLine[0].type === 'TSMTextChunk' &&
+            currentLine[0].content.trim() === '';
         tsmLines.push({
             type: 'TSMLine',
-            chunks: currentLineChunks
+            chunks: currentLine,
+            isEmpty: isEmpty
         });
     }
 
-    return {
-        type: 'TSMBlock',
-        lines: tsmLines
-    };
-}
-
-// TSM AST renderer that converts AST nodes to chunks
-export function renderASTToChunks(ast: TSMBlock, context: ParseContext): Chunk[] {
-    const chunks: Chunk[] = [];
-
-    for (const line of ast.lines) {
-        for (const chunk of line.chunks) {
-            if (chunk.type === 'TSMTextChunk') {
-                // Process JSX elements in text chunks
-                const processedContent = processJSXElementsInText(chunk.content, context);
-                chunks.push(processedContent);
-            } else if (chunk.type === 'TSMInterpolation') {
-                const interpolation = chunk as TSMInterpolation;
-
-                // Handle different types of interpolations
-                if (interpolation.isLogical) {
-                    // Handle conditional expressions like {{ cond && (content) }}
-                    // Extract condition by finding the && pattern and getting text before it
-                    const andMatch = interpolation.expression.match(/(.+?)\s*&&\s*\(/);
-                    const conditionalIndex = andMatch ? context.conditionalBlocks.findIndex(cb => cb.condition === andMatch[1].trim()) : -1;
-                    if (conditionalIndex !== -1) {
-                        const conditional = context.conditionalBlocks[conditionalIndex];
-                        // Convert chunks to TSM runtime calls
-                        const processChunks = (chunks: any[], isNested: boolean = false): any => {
-                            // Ensure chunks is always treated as an array
-                            if (!Array.isArray(chunks)) {
-                                chunks = [chunks];
-                            }
-
-                            if (chunks.length === 0) return isNested ? [] : '__tsm([])';
-                            if (chunks.length === 1) {
-                                const chunk = chunks[0];
-                                if (typeof chunk === 'string') {
-                                    // Single string - return simple string or chunk depending on context
-                                    return isNested ? chunk : `"${chunk}"`;
-                                }
-                                if (Array.isArray(chunk)) {
-                                    // Check if this is a runtime interpolation array [ "variable.name" ]
-                                    if (chunk.length === 1 && typeof chunk[0] === 'string') {
-                                        // This is a runtime interpolation
-                                        // In nested context (like conditional content), treat as variable reference
-                                        // In non-nested context, execute as expression
-                                        return isNested ? chunk[0] : chunk.join('');
-                                    }
-                                    // Otherwise, recursively process nested chunks
-                                    return processChunks(chunk, true);
-                                }
-                                return isNested ? chunk : String(chunk);
-                            }
-
-                            // Check if this is nested content (mixed strings and arrays)
-                            const hasMixedContent = chunks.some(chunk =>
-                                Array.isArray(chunk) && chunk.length > 1
-                            ) || (chunks.some(chunk => typeof chunk === 'string') &&
-                                chunks.some(chunk => Array.isArray(chunk)));
-
-                            if (isNested || hasMixedContent) {
-                                // Return chunks directly for nested content
-                                return chunks;
-                            }
-
-                            // Multiple chunks - collect them for __tsm call
-                            const tsmChunks: string[] = [];
-                            for (const chunk of chunks) {
-                                if (typeof chunk === 'string') {
-                                    tsmChunks.push(`"${chunk}"`);
-                                } else if (Array.isArray(chunk)) {
-                                    // Check if this is a ternary condition array [ "condition", " ? ", ... ]
-                                    if (chunk.length >= 3 && chunk[1] === ' ? ') {
-                                        // This is a ternary expression, preserve the condition as a variable reference
-                                        tsmChunks.push(chunk[0]); // The condition
-                                        // Add the rest of the ternary as-is
-                                        for (let i = 1; i < chunk.length; i++) {
-                                            tsmChunks.push(chunk[i]);
-                                        }
-                                    } else if (chunk.length === 1 && typeof chunk[0] === 'string') {
-                                        // This is a runtime interpolation - always treat as variable reference
-                                        tsmChunks.push(chunk[0]);
-                                    } else {
-                                        // Otherwise, recursively process nested chunks
-                                        tsmChunks.push(processChunks(chunk, true));
-                                    }
-                                } else {
-                                    tsmChunks.push(String(chunk));
-                                }
-                            }
-
-                            return `__tsm([${tsmChunks.join(', ')}])`;
-                        };
-
-                        // Process conditional content - always process through TSM runtime
-                        let content: any = conditional.content;
-
-                        if (Array.isArray(content)) {
-                            // For arrays, process through chunks to ensure TSM rendering
-                            // Always process through TSM runtime for any array content
-                            if (content.length === 1 && typeof content[0] === 'string') {
-                                // Check if this is a JSX placeholder
-                                const jsxMatch = content[0].match(/^__JSX_EXPRESSION_(\d+)__$/);
-                                if (jsxMatch) {
-                                    const jsxIndex = parseInt(jsxMatch[1]);
-                                    const jsxExpr = context.jsxExpressions[jsxIndex];
-                                    if (jsxExpr && jsxExpr.expression) {
-                                        // Parse the JSX expression to get component name and props
-                                        const parsedJSX = parseJSXExpressionToTSMComponent(jsxExpr.expression);
-                                        if (parsedJSX) {
-                                            // Replace with actual JSX component call
-                                            content = `${parsedJSX.name}(${propsToObjectString(parsedJSX.attributes)})`;
-                                        } else {
-                                            // Fallback to placeholder if JSX parsing fails
-                                            content = `__tsm(["${content[0]}"])`;
-                                        }
-                                    } else {
-                                        // Fallback to placeholder if JSX expression not found
-                                        content = `__tsm(["${content[0]}"])`;
-                                    }
-                                } else {
-                                    content = `__tsm(["${content[0]}"])`;
-                                }
-                            } else {
-                                // For mixed content or multiple elements, manually construct TSM call
-                                const tsmArgs: string[] = [];
-                                for (const chunk of content) {
-                                    if (typeof chunk === 'string') {
-                                        // Check if this is a JSX placeholder
-                                        const jsxMatch = chunk.match(/^__JSX_EXPRESSION_(\d+)__$/);
-                                        if (jsxMatch) {
-                                            const jsxIndex = parseInt(jsxMatch[1]);
-                                            const jsxExpr = context.jsxExpressions[jsxIndex];
-                                            if (jsxExpr) {
-                                                // Replace with actual JSX component call
-                                                tsmArgs.push(`${jsxExpr.name}(${propsToObjectString(jsxExpr.props)})`);
-                                            } else {
-                                                // Fallback to placeholder if JSX expression not found
-                                                tsmArgs.push(`"${chunk}"`);
-                                            }
-                                        } else {
-                                            tsmArgs.push(`"${chunk}"`);
-                                        }
-                                    } else if (Array.isArray(chunk)) {
-                                        if (chunk.length === 1 && typeof chunk[0] === 'string') {
-                                            // This is a runtime interpolation - treat as variable reference
-                                            tsmArgs.push(chunk[0]);
-                                        } else {
-                                            // Otherwise, recursively process
-                                            const nestedResult = processChunks(chunk, true);
-                                            tsmArgs.push(nestedResult);
-                                        }
-                                    } else {
-                                        tsmArgs.push(String(chunk));
-                                    }
-                                }
-                                content = `__tsm([${tsmArgs.join(', ')}])`;
-                            }
-                        }
-
-                        chunks.push([conditional.condition, ' && ', content] as Chunk);
-                    }
-                } else if (interpolation.isConditional) {
-                    // Handle ternary expressions like {{ cond ? true : false }}
-                    // Parse the ternary expression directly instead of matching to stored expressions
-                    const { condition, trueValue, falseValue } = parseNestedTernary(interpolation.expression);
-                    if (condition && trueValue && falseValue) {
-                        // Process the true and false values through the parsing pipeline
-                        const processValue = (value: string): any => {
-                            if (value.trim()) {
-                                const { protectedContent, codeBlocks } = protectCodeBlocks(value);
-                                const normalizedMarkdown = normalizeIndentation(protectedContent).trim();
-                                const ast = parseContent(normalizedMarkdown, context);
-                                const chunks = renderASTToChunks(ast, context);
-                                const restoredChunks = restoreCodeBlocks(chunks, codeBlocks);
-
-                                // If we have chunks, check if they represent a conditional expression
-                                if (Array.isArray(restoredChunks) && restoredChunks.length > 0) {
-                                    if (restoredChunks.length === 1) {
-                                        const chunk = restoredChunks[0];
-                                        if (typeof chunk === 'string') {
-                                            // Check if this is a conditional expression pattern
-                                            if (chunk.includes('&&') && chunk.includes('(') && chunk.includes(')')) {
-                                                // This is a conditional - return as-is to be processed later
-                                                return chunk;
-                                            }
-                                            return `"${chunk}"`;
-                                        }
-                                        if (Array.isArray(chunk)) {
-                                            // Recursively process nested chunks
-                                            const processChunks = (chunks: any[], isNested: boolean = false): any => {
-                                                // Ensure chunks is always treated as an array
-                                                if (!Array.isArray(chunks)) {
-                                                    chunks = [chunks];
-                                                }
-
-                                                if (chunks.length === 0) return isNested ? [] : '__tsm([])';
-                                                if (chunks.length === 1) {
-                                                    const chunk = chunks[0];
-                                                    if (typeof chunk === 'string') {
-                                                        return isNested ? chunk : `"${chunk}"`;
-                                                    }
-                                                    if (Array.isArray(chunk)) {
-                                                        // Recursively process nested chunks
-                                                        return processChunks(chunk, true);
-                                                    }
-                                                    return isNested ? chunk : String(chunk);
-                                                }
-
-                                                // Check if this is nested content (mixed strings and arrays)
-                                                const hasMixedContent = chunks.some(chunk =>
-                                                    Array.isArray(chunk) && chunk.length > 1
-                                                ) || (chunks.some(chunk => typeof chunk === 'string') &&
-                                                    chunks.some(chunk => Array.isArray(chunk)));
-
-                                                if (isNested || hasMixedContent) {
-                                                    // Return chunks directly for nested content
-                                                    return chunks;
-                                                }
-
-                                                // Multiple chunks - collect them for __tsm call
-                                                const tsmChunks: string[] = [];
-                                                for (const chunk of chunks) {
-                                                    if (typeof chunk === 'string') {
-                                                        tsmChunks.push(`"${chunk}"`);
-                                                    } else if (Array.isArray(chunk)) {
-                                                        // Recursively process nested chunks
-                                                        tsmChunks.push(processChunks(chunk, true));
-                                                    } else {
-                                                        tsmChunks.push(String(chunk));
-                                                    }
-                                                }
-
-                                                return `__tsm([${tsmChunks.join(', ')}])`;
-                                            };
-                                            return processChunks(chunk);
-                                        }
-                                        return String(chunk);
-                                    }
-
-                                    // Multiple chunks - collect them for __tsm call
-                                    const processChunks = (chunks: any[], isNested: boolean = false): any => {
-                                        // Ensure chunks is always treated as an array
-                                        if (!Array.isArray(chunks)) {
-                                            chunks = [chunks];
-                                        }
-
-                                        if (chunks.length === 0) return isNested ? [] : '__tsm([])';
-                                        if (chunks.length === 1) {
-                                            const chunk = chunks[0];
-                                            if (typeof chunk === 'string') {
-                                                return isNested ? chunk : `"${chunk}"`;
-                                            }
-                                            if (Array.isArray(chunk)) {
-                                                // Check if this is a runtime interpolation array [ "variable.name" ]
-                                                if (chunk.length === 1 && typeof chunk[0] === 'string') {
-                                                    // This is a runtime interpolation
-                                                    // In nested context (like conditional content), treat as variable reference
-                                                    // In non-nested context, execute as expression
-                                                    return isNested ? chunk[0] : chunk.join('');
-                                                }
-                                                // Otherwise, recursively process nested chunks
-                                                return processChunks(chunk, true);
-                                            }
-                                            return isNested ? chunk : String(chunk);
-                                        }
-
-                                        // Check if this is nested content (mixed strings and arrays)
-                                        const hasMixedContent = chunks.some(chunk =>
-                                            Array.isArray(chunk) && chunk.length > 1
-                                        ) || (chunks.some(chunk => typeof chunk === 'string') &&
-                                            chunks.some(chunk => Array.isArray(chunk)));
-
-                                        if (isNested || hasMixedContent) {
-                                            // Return chunks directly for nested content
-                                            return chunks;
-                                        }
-
-                                        // Multiple chunks - collect them for __tsm call
-                                        const tsmChunks: string[] = [];
-                                        for (const chunk of chunks) {
-                                            if (typeof chunk === 'string') {
-                                                tsmChunks.push(`"${chunk}"`);
-                                            } else if (Array.isArray(chunk)) {
-                                                // Check if this is a runtime interpolation array [ "variable.name" ]
-                                                if (chunk.length === 1 && typeof chunk[0] === 'string') {
-                                                    // This is a runtime interpolation
-                                                    // In nested context (like conditional content), treat as variable reference
-                                                    // In non-nested context, execute as expression
-                                                    if (isNested) {
-                                                        tsmChunks.push(chunk[0]);
-                                                    } else {
-                                                        tsmChunks.push(chunk.join(''));
-                                                    }
-                                                } else {
-                                                    // Otherwise, recursively process nested chunks
-                                                    tsmChunks.push(processChunks(chunk, true));
-                                                }
-                                            } else {
-                                                tsmChunks.push(String(chunk));
-                                            }
-                                        }
-
-                                        return `__tsm([${tsmChunks.join(', ')}])`;
-                                    };
-
-                                    // For mixed content in ternary values, manually construct TSM call
-                                    if (restoredChunks.length === 1 && typeof restoredChunks[0] === 'string') {
-                                        return `"${restoredChunks[0]}"`;
-                                    } else {
-                                        const tsmArgs: string[] = [];
-                                        for (const chunk of restoredChunks) {
-                                            if (typeof chunk === 'string') {
-                                                // Check if this is a JSX placeholder
-                                                const jsxMatch = chunk.match(/^__JSX_EXPRESSION_(\d+)__$/);
-                                                if (jsxMatch) {
-                                                    const jsxIndex = parseInt(jsxMatch[1]);
-                                                    const jsxExpr = context.jsxExpressions[jsxIndex];
-                                                    if (jsxExpr && jsxExpr.expression) {
-                                                        // Parse the JSX expression to get component name and props
-                                                        const parsedJSX = parseJSXExpressionToTSMComponent(jsxExpr.expression);
-                                                        if (parsedJSX) {
-                                                            // Replace with actual JSX component call
-                                                            tsmArgs.push(`${parsedJSX.name}(${propsToObjectString(parsedJSX.attributes)})`);
-                                                        } else {
-                                                            // Fallback to placeholder if JSX parsing fails
-                                                            tsmArgs.push(`"${chunk}"`);
-                                                        }
-                                                    } else {
-                                                        // Fallback to placeholder if JSX expression not found
-                                                        tsmArgs.push(`"${chunk}"`);
-                                                    }
-                                                } else {
-                                                    tsmArgs.push(`"${chunk}"`);
-                                                }
-                                            } else if (Array.isArray(chunk)) {
-                                                if (chunk.length === 1 && typeof chunk[0] === 'string') {
-                                                    // This is a runtime interpolation - treat as variable reference
-                                                    tsmArgs.push(chunk[0]);
-                                                } else {
-                                                    // Otherwise, recursively process
-                                                    const nestedResult = processChunks(chunk, true);
-                                                    tsmArgs.push(nestedResult);
-                                                }
-                                            } else {
-                                                tsmArgs.push(String(chunk));
-                                            }
-                                        }
-                                        return `__tsm([${tsmArgs.join(', ')}])`;
-                                    }
-                                }
-                                return `"${value}"`;
-                            }
-                            return '""';
-                        };
-
-                        const trueVal = processValue(trueValue);
-                        const falseVal = processValue(falseValue);
-
-                        // Check if the values contain complex expressions that need to be wrapped in __tsm
-                        const wrapInTsm = (val: any): any => {
-                            if (typeof val === 'string') {
-                                // If it's a string containing interpolation placeholders or complex expressions,
-                                // it needs to be processed and wrapped in __tsm
-                                if (val.includes('__INTERPOLATION_') || val.includes('.map(') || val.includes('=>')) {
-                                    // Process interpolation placeholders first
-                                    let processedVal = val;
-                                    if (val.includes('__INTERPOLATION_')) {
-                                        context.interpolations.forEach(({ placeholder, expression }) => {
-                                            processedVal = processedVal.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), `\${${expression}}`);
-                                        });
-                                    }
-                                    // Remove any surrounding quotes if they exist
-                                    if (processedVal.startsWith('"') && processedVal.endsWith('"')) {
-                                        processedVal = processedVal.slice(1, -1);
-                                    }
-
-                                    // Check if this is a map function that should return a template literal
-                                    if (processedVal.includes('.map(') && processedVal.includes('=>')) {
-                                        // This is a map function, return it as a template literal that will be executed
-                                        return `\`${processedVal}\``;
-                                    } else {
-                                        // For other complex expressions, return as-is
-                                        return processedVal;
-                                    }
-                                }
-                                return val;
-                            } else if (Array.isArray(val)) {
-                                // If it's an array of chunks, process it through the chunksToTemplateLiteral logic
-                                return processChunksForTsm(val);
-                            }
-                            return val;
-                        };
-
-                        const processChunksForTsm = (chunks: any[]): string => {
-                            const tsmChunks: string[] = [];
-                            for (const chunk of chunks) {
-                                if (typeof chunk === 'string') {
-                                    // Check if this is a JSX placeholder
-                                    const jsxMatch = chunk.match(/^__JSX_EXPRESSION_(\d+)__$/);
-                                    if (jsxMatch) {
-                                        const jsxIndex = parseInt(jsxMatch[1]);
-                                        const jsxExpr = context.jsxExpressions[jsxIndex];
-                                        if (jsxExpr && jsxExpr.expression) {
-                                            // Parse the JSX expression to get component name and props
-                                            const parsedJSX = parseJSXExpressionToTSMComponent(jsxExpr.expression);
-                                            if (parsedJSX) {
-                                                // Replace with actual JSX component call
-                                                tsmChunks.push(`${parsedJSX.name}(${propsToObjectString(parsedJSX.attributes)})`);
-                                            } else {
-                                                // Fallback to placeholder if JSX parsing fails
-                                                tsmChunks.push(`"${chunk}"`);
-                                            }
-                                        } else {
-                                            // Fallback to placeholder if JSX expression not found
-                                            tsmChunks.push(`"${chunk}"`);
-                                        }
-                                    } else if (chunk.includes('__INTERPOLATION_')) {
-                                        // This contains interpolation placeholders, process them
-                                        let processedChunk = chunk;
-                                        context.interpolations.forEach(({ placeholder, expression }) => {
-                                            processedChunk = processedChunk.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), `\${${expression}}`);
-                                        });
-                                        tsmChunks.push(`\`${processedChunk}\``);
-                                    } else {
-                                        tsmChunks.push(`"${chunk}"`);
-                                    }
-                                } else if (Array.isArray(chunk)) {
-                                    if (chunk.length === 1 && typeof chunk[0] === 'string') {
-                                        // This is a runtime interpolation - treat as variable reference
-                                        tsmChunks.push(chunk[0]);
-                                    } else {
-                                        // Otherwise, recursively process
-                                        tsmChunks.push(processChunksForTsm(chunk));
-                                    }
-                                } else {
-                                    tsmChunks.push(String(chunk));
-                                }
-                            }
-                            return `__tsm([${tsmChunks.join(', ')}])`;
-                        };
-
-                        const wrappedTrueVal = wrapInTsm(trueVal);
-                        const wrappedFalseVal = wrapInTsm(falseVal);
-
-                        // The condition should be preserved as a runtime variable reference
-                        chunks.push([condition.trim(), ' ? ', wrappedTrueVal, ' : ', wrappedFalseVal] as Chunk);
-                    } else {
-                        // Fallback to treating as regular interpolation if parsing fails
-                        chunks.push([interpolation.expression] as Chunk);
-                    }
-                } else {
-                    // Regular interpolation - check if it's a variable reference that can be resolved
-                    let expression = interpolation.expression.trim();
-
-                    // Check if the expression contains JSX placeholders
-                    const jsxRegex = /__JSX_EXPRESSION_(\d+)__/g;
-                    let jsxMatch;
-                    let hasJsx = false;
-
-                    while ((jsxMatch = jsxRegex.exec(expression)) !== null) {
-                        hasJsx = true;
-                        const jsxIndex = parseInt(jsxMatch[1]);
-                        const jsxExpr = context.jsxExpressions[jsxIndex];
-                        if (jsxExpr && jsxExpr.expression) {
-                            // Parse the JSX expression to get component name and props
-                            const parsedJSX = parseJSXExpressionToTSMComponent(jsxExpr.expression);
-                            if (parsedJSX) {
-                                // Replace the placeholder with the actual JSX component call
-                                expression = expression.replace(jsxMatch[0], `${parsedJSX.name}(${propsToObjectString(parsedJSX.attributes)})`);
-                            }
-                        }
-                    }
-
-                    // Check if this is a simple variable reference (no dots, no function calls, etc.)
-                    if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(expression) && context.variableValues?.has(expression)) {
-                        // This is a variable reference that can be resolved
-                        const resolvedValue = context.variableValues.get(expression);
-                        chunks.push(resolvedValue);
-                    } else {
-                        // Regular interpolation that can't be resolved
-                        chunks.push([expression] as Chunk);
-                    }
-                }
-            } else if (chunk.type === 'TSMComponent') {
-                // Handle components
-                chunks.push([chunk.name] as Chunk);
-            }
-        }
-
-        // Add newline between lines (but not after the last line)
-        if (line !== ast.lines[ast.lines.length - 1]) {
-            chunks.push('\n');
-        }
+    // If no lines were created, create an empty line
+    if (tsmLines.length === 0) {
+        tsmLines.push({ type: 'TSMLine', chunks: [], isEmpty: true });
     }
 
-    return chunks;
-}
+    // Trim leading and trailing empty lines, but keep empty lines in the middle
+    let startIndex = 0;
+    let endIndex = tsmLines.length - 1;
 
-// Helper function to process JSX elements in text chunks
-function processJSXElementsInText(content: string, context: ParseContext): string {
-    // Find JSX elements like <@Component prop={value} />
-    const jsxElementRegex = /<@(\w+)([^/>]*)\/>/g;
-
-    let processedContent = content;
-
-    let match;
-    while ((match = jsxElementRegex.exec(content)) !== null) {
-        const fullMatch = match[0];
-        const componentName = match[1];
-        const props = match[2] || '';
-
-        // Create a JSX expression placeholder
-        const placeholder = `__JSX_EXPRESSION_${context.jsxExpressions.length}__`;
-        const fullJsxElement = fullMatch; // Keep the full JSX element for later processing
-
-        // Add to JSX expressions array
-        //@ts-ignore
-        context.jsxExpressions.push({ placeholder, expression: fullJsxElement });
-
-        // Replace the JSX element with the placeholder
-        processedContent = processedContent.replace(fullMatch, placeholder);
+    // Find first non-empty line
+    while (startIndex < tsmLines.length && tsmLines[startIndex].isEmpty) {
+        startIndex++;
     }
 
-    return processedContent;
-}
-
-/**
- * Parses a JSX expression like <@Dashboard title="My Title" showHeader={true} /> into a TSMComponent
- */
-export function parseJSXExpressionToTSMComponent(jsxExpression: string): TSMComponent | null {
-    // Match JSX element pattern: <@ComponentName props... />
-    const jsxElementRegex = /<@(\w+)([^/>]*)\/>/;
-    const match = jsxExpression.match(jsxElementRegex);
-
-    if (!match) {
-        return null;
+    // Find last non-empty line
+    while (endIndex >= 0 && tsmLines[endIndex].isEmpty) {
+        endIndex--;
     }
 
-    const componentName = match[1];
-    const propsString = match[2] || '';
+    // If all lines are empty, return a single empty line
+    if (startIndex > endIndex) {
+        return { type: 'TSMBlock', lines: [{ type: 'TSMLine', chunks: [], isEmpty: true }] };
+    }
 
-    // Parse props using the existing parseJSXProps function
-    const parsedProps = parseJSXProps(propsString);
+    // Return the trimmed slice (inclusive of endIndex)
+    const trimmedLines = tsmLines.slice(startIndex, endIndex + 1);
 
-    // Convert parsed props to TSMComponentAttribute objects
-    const attributes: TSMComponentAttribute[] = parsedProps.map(prop => ({
-        type: 'TSMComponentAttribute',
-        name: prop.name,
-        value: prop.isExpression
-            ? { type: 'expression', value: prop.value }
-            : { type: 'string', value: prop.value }
-    }));
-
-    return {
-        type: 'TSMComponent',
-        name: componentName,
-        attributes,
-        isSelfClosing: true
-    };
-}
-
-// Legacy chunk-based parser (keeping for backward compatibility)
-export function parseInterpolationsToChunks(content: string, context: ParseContext): Chunk[] {
-    const ast = parseInterpolationsToAST(content, context);
-
-    // Convert AST to chunks
-    return renderASTToChunks(ast, context);
+    return { type: 'TSMBlock', lines: trimmedLines };
 }
