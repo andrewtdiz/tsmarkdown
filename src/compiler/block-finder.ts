@@ -76,7 +76,17 @@ export function findRootLevelTsmBlocks(node: ts.Node): Array<{ match: TSMBlockMa
                     const deindentedLines = lines.map(line => line.startsWith(' '.repeat(minIndent)) ? line.slice(minIndent) : line);
                     content = deindentedLines.join('\n');
                 }
-                
+
+                // Trim leading and trailing empty lines (lines with only whitespace)
+                const trimmedLines = content.split('\n');
+                while (trimmedLines.length > 0 && trimmedLines[0].trim() === '') {
+                    trimmedLines.shift();
+                }
+                while (trimmedLines.length > 0 && trimmedLines[trimmedLines.length - 1].trim() === '') {
+                    trimmedLines.pop();
+                }
+                content = trimmedLines.join('\n');
+
                 const match: TSMBlockMatch = {
                     index: returnStart,
                     [0]: fullReturnStatement,

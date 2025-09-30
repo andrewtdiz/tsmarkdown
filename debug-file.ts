@@ -4,7 +4,9 @@ import { transpileSource } from "./src/compiler/core";
 const file = `
 function ListItem({ item, index }: { item: string, index: number }) {
   return (
+  
     - {{ item }}
+
   )
 }
 
@@ -12,6 +14,7 @@ function List({ items }: { items: string[] }) {
   return (
     {{ items.map((item, index) => (
       <@ListItem item={item} index={index} />
+
     ))}}
   )
 }

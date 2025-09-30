@@ -16,6 +16,7 @@ function createTSMTextChunk(content: string): TSMChunk {
  * This is used for ternary and conditional blocks to normalize their indentation
  */
 function stripBlockIndentation(content: string): string {
+    console.log('stripBlockIndentation:', JSON.stringify(content, null, 2));
     const lines = content.split('\n');
 
     // Find minimum indentation (ignoring empty lines)
@@ -43,6 +44,14 @@ function stripBlockIndentation(content: string): string {
         }
         return line.slice(minIndent);
     });
+    console.log('strippedLines:', JSON.stringify(strippedLines, null, 2));
+    // Trim leading and trailing empty lines
+    while (strippedLines.length > 0 && strippedLines[0].trim() === '') {
+        strippedLines.shift();
+    }
+    while (strippedLines.length > 0 && strippedLines[strippedLines.length - 1].trim() === '') {
+        strippedLines.pop();
+    }
 
     return strippedLines.join('\n');
 }
@@ -90,6 +99,7 @@ function parseComponent(content: string): { component: TSMComponent, newIndex: n
 export function parseInterpolationsToAST(content: string, context: ParseContext, isNested: boolean = false): TSMBlock {
     // Parse the entire content as a continuous string first,
     // finding interpolations and components that may span multiple lines
+    console.log('parseInterpolationsToAST:', JSON.stringify(content, null, 2));
     const chunks: TSMChunk[] = [];
     let currentIndex = 0;
 

@@ -146,7 +146,7 @@ class TSMCodeGenerator implements TSMVisitor {
         } else if (interpolation.isTSMContent) {
             // Handle TSM content in interpolations - convert to __tsm block
             this.generateTSMBlockFromContent(interpolation.expression);
-        // @ts-ignore
+            // @ts-ignore
         } else if (interpolation.isConditional && interpolation.conditionalBlocks) {
             // Handle conditional expressions like {{ cond ? (...) : (...) }}
             this.output.push('(');
@@ -201,7 +201,8 @@ class TSMCodeGenerator implements TSMVisitor {
                 const nestedAst = parseContent(blockContent, this.parseContext!);
                 const nestedCode = nestedGenerator.generateExpression(nestedAst);
 
-                this.output.push(`${array}.map(${params} => ${nestedCode}).join('')`);
+                // Join with newlines to separate each mapped item
+                this.output.push(`${array}.map(${params} => ${nestedCode}).join('\\n')`);
             } else {
                 this.output.push(interpolation.expression);
             }

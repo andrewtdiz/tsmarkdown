@@ -48,12 +48,9 @@ export function transpileSource(source: string): TranspilationResult {
             };
             const ast = parseContent(content, context);
 
-            let processedNestedBlocks: NestedTSMBlock[] | undefined;
-
             return {
                 ast,
                 context,
-                nestedBlocks: processedNestedBlocks
             };
         });
 
@@ -61,7 +58,7 @@ export function transpileSource(source: string): TranspilationResult {
 
         for (let i = tsmBlocks.length - 1; i >= 0; i--) {
             const { match } = tsmBlocks[i];
-            const { ast, context: parseContext, nestedBlocks } = parsedBlocks[i];
+            const { ast, context: parseContext } = parsedBlocks[i];
             const context = {
                 indentLevel: 0,
                 isAsync: false,
