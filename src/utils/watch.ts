@@ -58,7 +58,7 @@ export async function watch(watchOptions?: WatchOptions) {
 
       writeFileSync(
         outputFileName,
-        `import { __tsm } from "typescriptmd";\n\n${fullFileResult.transpiledFile}`
+        fullFileResult.transpiledFile
       );
     } catch (error) {
       console.error(`❌ Error transpiling ${fileName}:`, error);
