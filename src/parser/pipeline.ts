@@ -1,7 +1,7 @@
 // Pipeline Core - orchestrates the parsing pipeline
 
 import { parseInterpolationsToAST } from './interpolations';
-import { protectCodeBlocks, restoreCodeBlocks } from './code-protection';
+import { protectCodeBlocks } from './code-protection';
 import type { ParseContext } from './types';
 
 export type { ParseContext } from './types';

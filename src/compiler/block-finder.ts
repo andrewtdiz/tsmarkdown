@@ -29,7 +29,7 @@ export function findRootLevelTsmBlocks(node: ts.Node): Array<{ match: TSMBlockMa
     const blocks: Array<{ match: TSMBlockMatch, content: string }> = [];
 
     function visit(node: ts.Node) {
-        if (ts.isReturnStatement(node)) {
+        if (ts.isReturnStatement(node) && node.getFullText().includes('(\n')) {
             const returnStart = node.getStart();
 
             const textBeforeReturn = node.getSourceFile().text.substring(0, returnStart);

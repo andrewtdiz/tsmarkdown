@@ -12,7 +12,6 @@ import {
     __tsm,
     __tsmJoin,
     __erasePrevLine,
-    __normalizeWhitespace,
     __ERASE_PREV_LINE,
     type Chunk
 } from "../../src/runtime/tsm-runtime";
@@ -100,13 +99,6 @@ describe('Phase 1: TSM Runtime Module', () => {
         const expectedBuffer = ["Line 1\n", "Line 2\n", "Line 3"];
         __erasePrevLine(testBuffer);
         expect(testBuffer).toEqual(expectedBuffer);
-    });
-
-    it('should normalize whitespace with __normalizeWhitespace', () => {
-        const testWhitespace = "  \t  Line with spaces\n\n\nMultiple newlines\n  Trailing spaces   \t\n";
-        const expected = "      Line with spaces\n\nMultiple newlines\n  Trailing spaces\n";
-        const result = __normalizeWhitespace(testWhitespace);
-        expect(result).toBe(expected);
     });
 
     it('should handle complex scenarios with all features', () => {

@@ -11,6 +11,9 @@
 
 // Sentinel value for line erasure functionality
 export const __ERASE_PREV_LINE = Symbol('__ERASE_PREV_LINE');
+export const __SYSTEM__ = "__TSM_SYSTEM__";
+export const __USER__ = "__TSM_USER__";
+export const __ASSISTANT__ = "__TSM_ASSISTANT__";
 
 // Core chunk type that can be processed by the TSM runtime
 export type Chunk = string | number | null | undefined | false | Iterable<Chunk> | typeof __ERASE_PREV_LINE | '\n';
@@ -25,14 +28,23 @@ export function __tsm(chunks: Array<Chunk>): string {
     const buffer: string[] = [];
     const flattenedChunks = __tsmJoin(chunks);
 
+    let prevIsErase = false;
+
     for (const chunk of flattenedChunks) {
         if (chunk === __ERASE_PREV_LINE || chunk === null) {
             // Both __ERASE_PREV_LINE and null should erase the previous line
             __erasePrevLine(buffer);
+            prevIsErase = true;
+            continue;
         } else if (chunk === undefined || chunk === false) {
             // undefined and false don't emit text or whitespace
+            prevIsErase = true;
             continue;
         } else if (chunk === '\n') {
+            if (prevIsErase) {
+                prevIsErase = false;
+                continue;
+            }
             // Handle newline chunks by adding actual newline
             buffer.push('\n');
         } else if (typeof chunk === 'string') {
@@ -109,24 +121,28 @@ export function __tsm(chunks: Array<Chunk>): string {
  */
 export function __tsmJoin(parts: Array<Chunk>): Array<Chunk> {
     const result: Array<Chunk> = [];
+    let prevIsErase = false;
 
     for (const part of parts) {
         if (part === null) {
             // null should erase the previous line
             result.push(__ERASE_PREV_LINE);
+            prevIsErase = true;
         } else if (part === undefined || part === false) {
             // undefined and false don't emit text or whitespace
+            prevIsErase = true;
             continue;
         } else if (part === '\n') {
             // Handle newline chunks
+            if (prevIsErase) {
+                prevIsErase = false;
+                continue;
+            }
             result.push(part);
         } else if (typeof part === 'string') {
-            // Split strings on newlines and create separate chunks
             const stringParts = part.split('\n');
             for (let i = 0; i < stringParts.length; i++) {
-                // Always push the string part, even if it's empty (to preserve empty lines)
                 result.push(stringParts[i]);
-                // Add newline chunk after each part except the last one
                 if (i < stringParts.length - 1) {
                     result.push('\n');
                 }
@@ -159,72 +175,47 @@ export function __tsmJoin(parts: Array<Chunk>): Array<Chunk> {
 export function __erasePrevLine(buf: string[]): void {
     if (buf.length === 0) return;
 
-    // Find the last newline in the buffer
-    let lastNewlineIndex = -1;
-    let lastNewlineBufferIndex = -1;
-
-    // Search backwards through the buffer to find the last newline
-    for (let i = buf.length - 1; i >= 0; i--) {
-        const item = buf[i];
-        if (typeof item === 'string') {
-            const newlineIndex = item.lastIndexOf('\n');
-            if (newlineIndex !== -1) {
-                lastNewlineIndex = newlineIndex;
-                lastNewlineBufferIndex = i;
-                break;
-            }
-        }
-    }
-
-    if (lastNewlineBufferIndex !== -1) {
-        const item = buf[lastNewlineBufferIndex];
-        if (typeof item === 'string') {
-            // Remove everything after the last newline in that item
-            buf[lastNewlineBufferIndex] = item.substring(0, lastNewlineIndex);
-            // Remove all items that come after (not just empty strings)
-            buf.splice(lastNewlineBufferIndex + 1);
-            // If the item with the newline is now empty, remove it too
-            if (buf[lastNewlineBufferIndex] === '') {
-                buf.pop();
-            }
-        }
-    } else {
-        // If no newline found, remove the last item
+    const lastItem = buf[buf.length - 1];
+    if (lastItem === '\n') {
         buf.pop();
     }
 }
 
-/**
- * Normalize whitespace in a string, handling newlines and indentation
- * 
- * @param str String to normalize
- * @returns Normalized string
- */
-export function __normalizeWhitespace(str: string): string {
-    // Handle multiple consecutive newlines
-    let normalized = str.replace(/\n{3,}/g, '\n\n');
+type ChatMessage = {
+    type: "input_text";
+    text: string;
+    role: "system" | "user" | "assistant";
+};
 
-    // Handle trailing whitespace on lines
-    normalized = normalized.replace(/[ \t]+$/gm, '');
+export function parseLLMCall(out: string): ChatMessage[] {
+    const messages: ChatMessage[] = [];
 
-    // Handle leading whitespace normalization
-    normalized = normalized.replace(/^[ \t]+/gm, (match) => {
-        // Convert tabs to spaces for consistent indentation
-        return match.replace(/\t/g, '  ');
-    });
+    const delimiterRegex = /__TSM_(SYSTEM|USER|ASSISTANT)__/g;
 
-    return normalized;
-}
+    const matches = Array.from(out.matchAll(delimiterRegex));
 
-/**
- * Process a single chunk with whitespace normalization
- * 
- * @param chunk Chunk to process
- * @returns Processed chunk
- */
-export function __processChunk(chunk: Chunk): Chunk {
-    if (typeof chunk === 'string') {
-        return __normalizeWhitespace(chunk);
+    if (matches.length === 0) {
+        return messages;
     }
-    return chunk;
+
+    for (let i = 0; i < matches.length; i++) {
+        const match = matches[i];
+        const role = match[1].toLowerCase() as "system" | "user" | "assistant";
+        const startIdx = match.index! + match[0].length;
+        const endIdx = i < matches.length - 1 ? matches[i + 1].index! : out.length;
+
+        const text = out
+            .slice(startIdx, endIdx)
+            .trim();
+
+        if (text.length > 0) {
+            messages.push({
+                type: "input_text",
+                text,
+                role,
+            });
+        }
+    }
+
+    return messages;
 }

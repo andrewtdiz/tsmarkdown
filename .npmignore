@@ -1,7 +1,7 @@
 # Source files
 src/
 test/
-test-compilation.ts
+debug/
 
 # Build artifacts
 *.tsbuildinfo

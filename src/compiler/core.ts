@@ -2,7 +2,7 @@ import * as ts from 'typescript';
 import { findRootLevelTsmBlocks, NestedTSMBlock } from './block-finder';
 import { parseContent } from '../parser/pipeline';
 import { generateFromAST, generateExpressionFromAST } from './ast-code-generator';
-import { isPositionWithinReturnStatement } from './ast/return-detection';
+import { isPositionWithinReturnStatement } from './return-detection';
 import type { ParseContext, TSMBlockMatch } from '../parser/types';
 
 export interface TranspilationResult {

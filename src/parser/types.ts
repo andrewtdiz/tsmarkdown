@@ -1,5 +1,4 @@
 // Shared types for the parser modules
-import type { Chunk } from '../runtime/tsm-runtime';
 import { TSMComponentAttribute } from './tsm-ast';
 
 export interface ParseContext {
