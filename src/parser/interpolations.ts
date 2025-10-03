@@ -1,7 +1,7 @@
-import { findMatchingDoubleBrace, findMatchingParen, normalizeIndentation } from '../utils/string-helpers';
-import type { ParseContext } from './types';
-import type { TSMChunk, TSMComponent, TSMComponentAttribute, TSMInterpolation, TSMLine, TSMBlock } from './tsm-ast';
-import { parseContent } from './pipeline';
+import { findMatchingDoubleBrace, findMatchingParen, normalizeIndentation } from '../utils/string-helpers.js';
+import type { ParseContext } from './types.js';
+import type { TSMChunk, TSMComponent, TSMComponentAttribute, TSMInterpolation, TSMLine, TSMBlock } from './tsm-ast.js';
+import { parseContent } from './pipeline.js';
 
 // Helper function to create TSM AST nodes
 function createTSMTextChunk(content: string): TSMChunk {

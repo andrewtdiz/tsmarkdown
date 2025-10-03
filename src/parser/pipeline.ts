@@ -1,13 +1,13 @@
 // Pipeline Core - orchestrates the parsing pipeline
 
-import { parseInterpolationsToAST } from './interpolations';
-import { protectCodeBlocks } from './code-protection';
+import { parseInterpolationsToAST } from './interpolations.js';
+import { protectCodeBlocks } from './code-protection.js';
 import type { ParseContext } from './types';
 
 export type { ParseContext } from './types';
 
-import { TSMBlock, TSMLine, TSMChunk } from "./tsm-ast";
-import { CodeProtection } from "./code-protection";
+import { TSMBlock, TSMLine, TSMChunk } from "./tsm-ast.js";
+import { CodeProtection } from "./code-protection.js";
 
 export function parseContent(content: string, context: ParseContext, isNested: boolean = false): TSMBlock {
     const { protectedContent, codeBlocks } = protectCodeBlocks(content);

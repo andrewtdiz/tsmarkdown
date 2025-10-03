@@ -1,6 +1,6 @@
 import * as ts from 'typescript';
 import { TSMBlockMatch } from '../parser/types';
-import { normalizeIndentation } from '../utils/string-helpers';
+import { normalizeIndentation } from '../utils/string-helpers.js';
 
 /**
  * Represents a nested TSM block found within an expression

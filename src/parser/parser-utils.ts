@@ -1,8 +1,8 @@
 // Re-exports from modular parser architecture
 
-export type { ParseContext } from './types';
-export { parseContent } from './pipeline';
+export type { ParseContext } from './types.js';
+export { parseContent } from './pipeline.js';
 
-export { findMatchingBrace, findMatchingParen, normalizeIndentation } from '../utils/string-helpers';
+export { findMatchingBrace, findMatchingParen, normalizeIndentation } from '../utils/string-helpers.js';
 
 

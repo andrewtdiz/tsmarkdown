@@ -1,9 +1,9 @@
 import * as ts from 'typescript';
-import { findRootLevelTsmBlocks, NestedTSMBlock } from './block-finder';
-import { parseContent } from '../parser/pipeline';
-import { generateFromAST, generateExpressionFromAST } from './ast-code-generator';
-import { isPositionWithinReturnStatement } from './return-detection';
-import type { ParseContext, TSMBlockMatch } from '../parser/types';
+import { findRootLevelTsmBlocks } from './block-finder.js';
+import { parseContent } from '../parser/pipeline.js';
+import { generateFromAST, generateExpressionFromAST } from './ast-code-generator.js';
+import { isPositionWithinReturnStatement } from './return-detection.js';
+import type { ParseContext } from '../parser/types.js';
 
 export interface TranspilationResult {
     transpiledFile: string;

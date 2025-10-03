@@ -1,4 +1,4 @@
-import { __tsm } from "../runtime/tsm-runtime"
+import { __tsm } from "../runtime/tsm-runtime.js"
 
 function User() {
     return __tsm(["__TSM_USER__"])
