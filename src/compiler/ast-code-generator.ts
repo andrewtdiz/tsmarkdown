@@ -7,7 +7,7 @@
  */
 
 import { TSMBlock, TSMLine, TSMChunk, TSMTextChunk, TSMInterpolation, TSMComponent, TSMVisitor } from '../parser/tsm-ast';
-import { parseContent } from '../parser/pipeline';
+import { parseContent } from '../parser/pipeline.js';
 import type { ParseContext } from '../parser/types';
 
 /**
