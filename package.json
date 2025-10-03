@@ -1,6 +1,6 @@
 {
   "name": "typescriptmd",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "A type-safe, component-based markdown engine for TypeScript",
   "main": "dist/src/index.js",
   "type": "module",
@@ -81,10 +81,12 @@
   },
   "devDependencies": {
     "@types/bun": "^1.2.22",
-    "@types/node": "^20.0.0",
+    "@types/node": "^24.6.2",
     "typescript": "^5.9.2"
   },
-  "dependencies": {},
+  "dependencies": {
+    "commander": "^14.0.1"
+  },
   "peerDependencies": {
     "typescript": ">=5.0.0"
   },

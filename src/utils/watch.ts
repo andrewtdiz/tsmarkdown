@@ -19,18 +19,18 @@ type WatchOptions = {
   outputDirectory?: string;
 };
 
-const DEFAULT_OUTPUT_DIR = "__tsmdgenerated";
+const DEFAULT_OUTPUT_DIR = "tsmd-out";
 
 /**
  * Watches .tsmd files and auto-transpiles them to TypeScript
  *
  * @param watchOptions - Watch configuration
- * @param watchOptions.directory - Directory to watch (defaults to "/tsmd")
+ * @param watchOptions.directory - Directory to watch (defaults to "tsmd")
  * @returns File system watcher
  *
  * @example
  * ```typescript
- * const watcher = await watch({ directory: "/tsmd" });
+ * const watcher = await watch({ directory: "tsmd" });
  * watcher.close();
  * ```
  */
@@ -39,8 +39,8 @@ export async function watch(watchOptions?: WatchOptions) {
   const outputDir = watchOptions?.outputDirectory || DEFAULT_OUTPUT_DIR;
 
   const cwd = process.cwd();
-  const listenDir = directory || `/tsmd`;
-  const dir = `${cwd}${listenDir}`;
+  const listenDir = directory || `tsmd`;
+  const dir = `${cwd}/${listenDir}`;
 
   async function processTsmdFile(fileName: string) {
     const inputFileName = `${dir}/${fileName}`;
@@ -87,7 +87,7 @@ export async function watch(watchOptions?: WatchOptions) {
     }
     const inputFileName = `${dir}/${fullFileName}`;
     const fileTitle = fullFileName.split(".")[0];
-    const outputFileName = `${dir}/_generated/${fileTitle}.ts`;
+    const outputFileName = `${dir}/${outputDir}/${fileTitle}.ts`;
     try {
       const file = readFileSync(inputFileName, "utf8");
     } catch (error) {
