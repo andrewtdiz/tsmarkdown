@@ -7,7 +7,7 @@ import {
   mkdirSync,
   existsSync,
 } from "fs";
-import { transpileSource } from "../compiler/core";
+import { transpileSource } from "../compiler/core.js";
 
 /**
  * Options for the file watcher
@@ -15,7 +15,11 @@ import { transpileSource } from "../compiler/core";
 type WatchOptions = {
   /** Directory to watch (relative to cwd) */
   directory?: string;
+  /** Output directory for generated files */
+  outputDirectory?: string;
 };
+
+const DEFAULT_OUTPUT_DIR = "__tsmdgenerated";
 
 /**
  * Watches .tsmd files and auto-transpiles them to TypeScript
@@ -32,6 +36,7 @@ type WatchOptions = {
  */
 export async function watch(watchOptions?: WatchOptions) {
   const directory = watchOptions?.directory;
+  const outputDir = watchOptions?.outputDirectory || DEFAULT_OUTPUT_DIR;
 
   const cwd = process.cwd();
   const listenDir = directory || `/tsmd`;
@@ -40,20 +45,19 @@ export async function watch(watchOptions?: WatchOptions) {
   async function processTsmdFile(fileName: string) {
     const inputFileName = `${dir}/${fileName}`;
     const fileTitle = fileName.split(".")[0];
-    const outputFileName = `${dir}/_generated/${fileTitle}.ts`;
+    const outputFileName = `${cwd}/${outputDir}/${fileTitle}.ts`;
 
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true });
     }
 
-    const generatedDir = `${dir}/_generated`;
+    const generatedDir = `${cwd}/${outputDir}`;
     if (!existsSync(generatedDir)) {
       mkdirSync(generatedDir, { recursive: true });
     }
 
     try {
       const file = readFileSync(inputFileName, "utf8");
-      // TODO: Fix this when the new compiler is ready
       const fullFileResult = transpileSource(file);
 
       writeFileSync(

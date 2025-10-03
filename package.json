@@ -1,6 +1,6 @@
 {
   "name": "typescriptmd",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "A type-safe, component-based markdown engine for TypeScript",
   "main": "dist/src/index.js",
   "type": "module",
@@ -27,8 +27,7 @@
     "publish": "npm publish --access public",
     "lint": "bun tsc --noEmit",
     "version": "bun run build && git add -A dist",
-    "postversion": "git push && git push --tags",
-    "typescriptmd": "bun run bin/typescriptmd.ts"
+    "postversion": "git push && git push --tags"
   },
   "keywords": [
     "tsmd",
