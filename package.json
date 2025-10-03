@@ -1,6 +1,6 @@
 {
   "name": "typescriptmd",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "A type-safe, component-based markdown engine for TypeScript",
   "main": "dist/src/index.js",
   "type": "module",
@@ -11,7 +11,7 @@
     }
   },
   "bin": {
-    "typescriptmd": "./dist/bin/typescriptmd.js"
+    "tsmd": "./dist/bin/tsmd.js"
   },
   "files": [
     "dist/**/*",
