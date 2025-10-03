@@ -9,6 +9,7 @@ program
     .description("A type-safe, component-based markdown engine for TypeScript")
     .option("-t, --target <directory>", "Target directory to watch for .tsmd files (relative to pwd)", "tsmd")
     .option("-o, --out <directory>", "Output directory for generated .ts files (relative to pwd)", "tsmd-out")
+    .option("-1, --once", "Process .tsmd files once and exit (don't watch for changes)")
     .parse(process.argv);
 
 const options = program.opts();
@@ -18,5 +19,6 @@ const outDir = options.out || "tsmd-out";
 
 await watch({
     directory: targetDir,
-    outputDirectory: outDir
+    outputDirectory: outDir,
+    once: options.once || false
 });

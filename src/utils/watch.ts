@@ -17,6 +17,8 @@ type WatchOptions = {
   directory?: string;
   /** Output directory for generated files */
   outputDirectory?: string;
+  /** If true, only process the files once and then exit */
+  once?: boolean;
 };
 
 const DEFAULT_OUTPUT_DIR = "tsmd-out";
@@ -26,12 +28,18 @@ const DEFAULT_OUTPUT_DIR = "tsmd-out";
  *
  * @param watchOptions - Watch configuration
  * @param watchOptions.directory - Directory to watch (defaults to "tsmd")
- * @returns File system watcher
+ * @param watchOptions.once - If true, processes files once and exits (no watcher returned)
+ * @returns File system watcher (or void if once mode)
  *
  * @example
  * ```typescript
  * const watcher = await watch({ directory: "tsmd" });
  * watcher.close();
+ * ```
+ *
+ * @example
+ * ```typescript
+ * await watch({ directory: "tsmd", once: true });
  * ```
  */
 export async function watch(watchOptions?: WatchOptions) {
@@ -69,12 +77,26 @@ export async function watch(watchOptions?: WatchOptions) {
     }
   }
 
+  if (!existsSync(dir)) {
+    if (watchOptions?.once) {
+      console.log(`Directory ${listenDir} does not exist, nothing to process.`);
+      return;
+    }
+    mkdirSync(dir, { recursive: true });
+  }
+
   const files = await readdir(dir);
   for (const file of files) {
     if (!file.endsWith(".tsmd")) {
       continue;
     }
     await processTsmdFile(file);
+  }
+
+  // If once mode, exit after processing all files
+  if (watchOptions?.once) {
+    console.log(`Processed all .tsmd files in ${listenDir}, exiting...`);
+    return;
   }
 
   const watcher = fsWatch(dir, async (event, fullFileName) => {
@@ -87,7 +109,7 @@ export async function watch(watchOptions?: WatchOptions) {
     }
     const inputFileName = `${dir}/${fullFileName}`;
     const fileTitle = fullFileName.split(".")[0];
-    const outputFileName = `${dir}/${outputDir}/${fileTitle}.ts`;
+    const outputFileName = `${cwd}/${outputDir}/${fileTitle}.ts`;
     try {
       const file = readFileSync(inputFileName, "utf8");
     } catch (error) {
@@ -98,7 +120,7 @@ export async function watch(watchOptions?: WatchOptions) {
           unlinkSync(outputFileName);
           console.log(`Removed ${outputFileName}`);
         }
-      } catch (error) {}
+      } catch (error) { }
       return;
     }
     await processTsmdFile(fullFileName);
