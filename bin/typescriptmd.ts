@@ -11,4 +11,3 @@ if (directory) {
 } else {
     await watch();
 }
-
